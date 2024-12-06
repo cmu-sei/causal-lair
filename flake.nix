@@ -184,18 +184,20 @@
           executable = true;
         };
 
+        workspace = builtins.path {
+          name = "workspace";
+          path = ./.;
+        };
       in
       {
         packages.default = pkgs.dockerTools.buildImage {
           name = "polar-dev";
           tag = "latest";
           copyToRoot = [
-            myEnv baseInfo fishConfig codeSettings license createUserScript fishPluginsFile
-            # This copies the entire local directory (including scripts/, AIRTool_v2.2.qmd, etc.) to /app
-            { source = ./.; target = "/workspace"; }
+            myEnv baseInfo fishConfig codeSettings license createUserScript fishPluginsFile workspace
           ];
           config = {
-            WorkingDir = "/workspace";
+            WorkingDir = "workspace";
             Env = [
               # Certificates and environment setup
               "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
