@@ -1,5 +1,5 @@
 {
-  description = "creates a dev container for polar";
+  description = "creates a dev container for polar, with R setup per the dev shell example";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils"; # Utility functions for Nix flakes
@@ -62,14 +62,14 @@
           vscode = pkgs.code-server;
           vscodeExtensions = [
             extensions.open-vsx-release.rust-lang.rust-analyzer
-            extensions.vscode-marketplace.vadimcn.vscode-lldb # does not work yet - known bug
+            extensions.vscode-marketplace.vadimcn.vscode-lldb
             extensions.vscode-marketplace.fill-labs.dependi
             extensions.vscode-marketplace.tamasfe.even-better-toml
             extensions.vscode-marketplace.jnoortheen.nix-ide
             extensions.vscode-marketplace.jinxdash.prettier-rust
             extensions.vscode-marketplace.dustypomerleau.rust-syntax
             extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-            extensions.vscode-marketplace.hbenl.vscode-test-explorer # dependency for rust test adapter
+            extensions.vscode-marketplace.hbenl.vscode-test-explorer
             extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
             extensions.vscode-marketplace.vscodevim.vim
             extensions.vscode-marketplace.redhat.vscode-yaml
@@ -189,7 +189,11 @@
         packages.default = pkgs.dockerTools.buildImage {
           name = "polar-dev";
           tag = "latest";
-          copyToRoot = [ myEnv baseInfo fishConfig codeSettings license createUserScript fishPluginsFile ];
+          copyToRoot = [
+            myEnv baseInfo fishConfig codeSettings license createUserScript fishPluginsFile
+            # This copies the entire local directory (including scripts/, AIRTool_v2.2.qmd, etc.) to /app
+            { source = ./.; target = "/workspace"; }
+          ];
           config = {
             WorkingDir = "/workspace";
             Env = [
@@ -216,6 +220,8 @@
             ];
             Volumes = { };
             Cmd = [ "/bin/fish" ]; # Default command
+            ExposedPorts = ["4173"];
+            # Cmd = [ "sh" "/app/scripts/run_quarto.sh" ];
           };
           extraCommands = ''
             # Link the env binary (needed for the check requirements script)
@@ -229,14 +235,12 @@
             # Create /tmp dir
             mkdir -p tmp
 
-            # If you need to install R dependencies from a script, uncomment:
-            Rscript /workspace/scripts/install_dependencies.R
-
-            # If you need Tetrad, uncomment and adjust the URL:
             mkdir -p /workspace/inst
-            curl -fsSLO "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar" \
-            -o /workspace/inst/tetrad-gui-7.6.5-launch.jar
+            cd /workspace/inst
+            curl -fsSLO "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar"
+            cd /
 
+            ${pkgs.R}/bin/Rscript /workspace/scripts/install_dependencies.R
           '';
         };
       }
