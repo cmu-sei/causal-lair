@@ -143,12 +143,82 @@
             # -- R and R packages (from your dev shell example) --
             R
             rPackages.lintr
+            rPackages.assertthat
+            rPackages.caret
+            rPackages.delayed
+            rPackages.devtools
+            rPackages.DiagrammeR
+            rPackages.dplyr
+            rPackages.ggplot2
+            rPackages.gifski
+            rPackages.hash
+            rPackages.here
+            rPackages.igraph
+            rPackages.knitr
+            rPackages.magick
+            rPackages.origami
+            rPackages.readr
+            rPackages.rJava
+            rPackages.rmarkdown
+            rPackages.rsconnect
+            rPackages.sets
+            rPackages.shiny
+            rPackages.shinyWidgets
+            rPackages.tidyr
+            rPackages.AIPW
+            rPackages.e1071
+            rPackages.earth
+            rPackages.nnet
+            rPackages.randomForest
+            rPackages.ranger
+            rPackages.xgboost
           ];
           pathsToLink = [
             "/bin"
             "/lib"
             "/inc"
             "/etc/ssl/certs"
+          ];
+        };
+
+        sl3 = pkgs.rPackages.buildRPackage {
+          name = "sl3";
+          src = pkgs.fetchFromGitHub{
+            owner = "tlverse";
+            repo = "sl3";
+            rev = "0m1cg7icdza230l2jlpkwf9s8b4pwbyn0xj5vrk6yq6lfq8dgvpr";
+            sha256 = "12mhmmibizbxgmsns80c8h97rr7rclv9hz98zpgsl26hw3s4l0vm";
+          };
+          propagatedBuildInputs = with pkgs.rPackages; [
+            assertthat
+            caret
+            delayed
+            devtools
+            DiagrammeR
+            dplyr
+            ggplot2
+            gifski
+            hash
+            here
+            igraph
+            knitr
+            magick
+            origami
+            readr
+            rJava
+            rmarkdown
+            rsconnect
+            sets
+            shiny
+            shinyWidgets
+            tidyr
+            AIPW
+            e1071
+            earth
+            nnet
+            randomForest
+            ranger
+            xgboost
           ];
         };
 
@@ -184,17 +254,42 @@
           executable = true;
         };
 
-        workspace = builtins.path {
-          name = "workspace";
-          path = ./.;
-        };
+        # Predicate for filterSource if you still need it
+        predicate = path: type:
+        type != "directory" || (baseNameOf path != ".git");
+
+        localPath = toString ./.; # Convert flake path to a string path
+        filteredSrc = builtins.filterSource predicate localPath;
+
+        # Now we create a derivation that:
+        # 1. Copies filteredSrc into $out (our "workspace")
+        # 2. Downloads the Tetrad JAR into $out/inst
+        # 3. Runs the R dependency script from within $out
+        myWorkspace = pkgs.runCommand "workspace" {
+          buildInputs = [
+            pkgs.R
+          ];
+        } ''
+            mkdir $out
+            cp -r ${filteredSrc}/* $out/
+            cd $out
+            #${pkgs.R}/bin/Rscript $out/scripts/install_dependencies.R
+          '';
       in
       {
         packages.default = pkgs.dockerTools.buildImage {
           name = "polar-dev";
           tag = "latest";
           copyToRoot = [
-            myEnv baseInfo fishConfig codeSettings license createUserScript fishPluginsFile workspace
+            myEnv
+            baseInfo
+            fishConfig
+            codeSettings
+            license
+            createUserScript
+            fishPluginsFile
+            myWorkspace
+            sl3
           ];
           config = {
             WorkingDir = "workspace";
@@ -237,12 +332,12 @@
             # Create /tmp dir
             mkdir -p tmp
 
-            mkdir -p /workspace/inst
-            cd /workspace/inst
-            curl -fsSLO "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar"
-            cd /
+            #mkdir -p /workspace/inst
+            #cd /workspace/inst
+            #curl -fsSLO "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar"
+            #cd /
 
-            ${pkgs.R}/bin/Rscript /workspace/scripts/install_dependencies.R
+            #${pkgs.R}/bin/Rscript /workspace/scripts/install_dependencies.R
           '';
         };
       }
