@@ -1,31 +1,60 @@
 {
-  description = "creates a dev container for polar, with R setup per the dev shell example";
+  description = "creates a dev container for AIR, with R and other tools";
 
   inputs = {
     flake-utils.url = "github:numtide/flake-utils"; # Utility functions for Nix flakes
+
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"; # Main Nix package repository
-    rust-overlay.url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
-    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
-    rust-overlay.inputs.flake-utils.follows = "flake-utils";
-    myNeovimOverlay.url = "github:daveman1010221/nix-neovim";
-    myNeovimOverlay.inputs.nixpkgs.follows = "nixpkgs";
-    myNeovimOverlay.inputs.flake-utils.follows = "flake-utils";
-    nix-vscode-extensions.url = "github:nix-community/nix-vscode-extensions";
-    nix-vscode-extensions.inputs.nixpkgs.follows = "nixpkgs";
-    nix-vscode-extensions.inputs.flake-utils.follows = "flake-utils";
-    staticanalysis.url = "github:rmdettmar/polar-static-analysis";
-    staticanalysis.inputs.nixpkgs.follows = "nixpkgs";
-    staticanalysis.inputs.flake-utils.follows = "flake-utils";
+
+    # Rust packages source
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
+
+    # Neovim with customizations
+    myNeovimOverlay = {
+      url = "github:daveman1010221/nix-neovim";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
+
+    # VSCode Extensions
+    nix-vscode-extensions = {
+      url = "github:nix-community/nix-vscode-extensions";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
+
+    # Rust static analysis tools and scripts
+    staticanalysis = {
+      url = "github:rmdettmar/polar-static-analysis";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
-  outputs = { self, flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [ rust-overlay.overlays.default myNeovimOverlay.overlays.default ];
+          overlays = [
+            rust-overlay.overlays.default
+            myNeovimOverlay.overlays.default
+          ];
         };
-        # This is needed since VSCode Devcontainers need the following files in order to function.
+
+        # We create an account for the container user. These are necessary user files.
         baseInfo = with pkgs; [
           # Set up shadow file with user information
           (writeTextDir "etc/shadow" ''
@@ -77,148 +106,266 @@
           ];
         };
 
+        sl3 = pkgs.rPackages.buildRPackage {
+          name = "sl3";
+          src = pkgs.fetchFromGitHub{
+            owner = "tlverse";
+            repo = "sl3";
+            rev = "0e8f2365bcbe54010b8120c04a7a2dcfc8119227"; # <-- 'devel' branch
+            sha256 = "0m1cg7icdza230l2jlpkwf9s8b4pwbyn0xj5vrk6yq6lfq8dgvpr";
+          };
+          propagatedBuildInputs = with pkgs.rPackages; [
+            Rdpack
+            data_table
+            assertthat
+            origami
+            R6
+            uuid
+            BBmisc
+            delayed
+            ggplot2
+            digest
+            dplyr
+            caret
+            ROCR
+          ];
+        };
+
+        rWithPkgs = pkgs.rWrapper.override {
+          packages = [
+            pkgs.rPackages.udunits2      # libudunits2-dev
+            pkgs.rPackages.AIPW
+            pkgs.rPackages.devtools
+            pkgs.rPackages.DiagrammeR
+            pkgs.rPackages.e1071
+            pkgs.rPackages.earth
+            pkgs.rPackages.gifski
+            pkgs.rPackages.hash
+            pkgs.rPackages.here
+            pkgs.rPackages.igraph
+            pkgs.rPackages.knitr
+            pkgs.rPackages.lintr
+            pkgs.rPackages.magick
+            pkgs.rPackages.nnet
+            pkgs.rPackages.randomForest
+            pkgs.rPackages.ranger
+            pkgs.rPackages.Rdpack
+            pkgs.rPackages.readr
+            pkgs.rPackages.rJava
+            pkgs.rPackages.rmarkdown
+            pkgs.rPackages.rsconnect
+            pkgs.rPackages.sets
+            pkgs.rPackages.shiny
+            pkgs.rPackages.shinyWidgets
+            pkgs.rPackages.tidyr
+            pkgs.rPackages.xgboost
+            pkgs.rPackages.quarto
+
+            # These are SL3's dependencies
+            pkgs.rPackages.BBmisc
+            pkgs.rPackages.caret
+            pkgs.rPackages.dplyr
+            pkgs.rPackages.R6
+            pkgs.rPackages.ROCR
+
+            # These are TMLE3's dependencies
+            pkgs.rPackages.foreach
+            pkgs.rPackages.magrittr
+            pkgs.rPackages.mvtnorm
+            pkgs.rPackages.R6
+
+            # These are HAL9001's dependencies
+            pkgs.rPackages.Rcpp
+            pkgs.rPackages.Matrix
+            pkgs.rPackages.glmnet
+            pkgs.rPackages.RcppEigen
+
+            # These are common to TMLE3 and HAL9001
+            pkgs.rPackages.stringr
+
+            # These are common to SL3 and HAL9001
+            pkgs.rPackages.origami
+
+            # These are common to SL3, TMLE3, and HAL9001
+            pkgs.rPackages.assertthat
+            pkgs.rPackages.data_table
+            pkgs.rPackages.delayed
+            pkgs.rPackages.digest
+            pkgs.rPackages.ggplot2
+            pkgs.rPackages.uuid
+
+            (pkgs.rPackages.buildRPackage {
+              name = "tmle3";
+              src = pkgs.fetchFromGitHub{
+                owner = "tlverse";
+                repo = "tmle3";
+                rev = "ed72f8a20e64c914ab25ffe015d865f7a9963d27"; # <-- 'devel' branch
+                sha256 = "159vhzpcw1rldicql8w4ykmc87y0rj970cnn8apcyk9cwd08bk1r";
+              };
+              propagatedBuildInputs = [
+                sl3
+                pkgs.rPackages.delayed
+                pkgs.rPackages.data_table
+                pkgs.rPackages.assertthat
+                pkgs.rPackages.R6
+                pkgs.rPackages.uuid
+                pkgs.rPackages.ggplot2
+                pkgs.rPackages.foreach
+                pkgs.rPackages.mvtnorm
+                pkgs.rPackages.magrittr
+                pkgs.rPackages.stringr
+                pkgs.rPackages.digest
+              ];
+            })
+
+            (pkgs.rPackages.buildRPackage {
+              name = "hal9001";
+              src = pkgs.fetchFromGitHub{
+                owner = "tlverse";
+                repo = "hal9001";
+                rev = "00fe70f32bcf32e006ad415fe5b1bd8947be8b6f"; # <-- 'devel' branch
+                sha256 = "18wa8zk88fx1w5y814wby4an6jq1bj8ffkqnqsc9ykk37fagnnyw";
+              };
+              propagatedBuildInputs = [
+                pkgs.rPackages.Rcpp
+                pkgs.rPackages.Matrix
+                pkgs.rPackages.assertthat
+                pkgs.rPackages.origami
+                pkgs.rPackages.glmnet
+                pkgs.rPackages.data_table
+                pkgs.rPackages.stringr
+                pkgs.rPackages.RcppEigen
+              ];
+            })
+          ];
+        };
+
         myEnv = pkgs.buildEnv {
           name = "my-env";
           paths = with pkgs; [
+
+            gfortran
+            gnupg
+            ffmpeg                  # libavfilter-dev
+            curlFull                # libcurl4-openssl-dev
+            fontconfig              # libfontconfig1-dev
+            freetype                # libfreetype6-dev
+            fribidi                 # libfribidi-dev
+            giflib                  # libgif-dev
+            libgit2                 # libgit2-dev
+            harfbuzz                # libharfbuzz-dev
+            libjpeg                 # libjpeg-dev
+            #lapack                  # liblapack-dev    <- seems to be provided by openblas
+            imagemagick_light       # libmagick++-dev
+            libmysqlclient          # libmariadb-dev
+                                    # libmariadb-dev-compat
+            openblas                # libopenblas-dev
+            libpng                  # libpng-dev
+            poppler                 # libpoppler-cpp-dev
+            librsvg                 # librsvg2-dev
+            libsodium               # libsodium-dev
+            openssl                 # libssl-dev
+            libtiff                 # libtiff5-dev
+            libwebp                 # libwebp-dev
+            libxml2                 # libxml2-dev
+
+            lsb-release
+            iproute2
+            pkg-config
+            quarto
+
+            # software-properties-common <- apt-specific, has no corollary in nix?
+
+            wget
+            zlib                    # zlib1g-dev
+
+            jdk17
+            pandoc
+            libtirpc
+
+
             # -- Basic Required Files --
-            bash # Basic bash
-            uutils-coreutils-noprefix # Essential utilities
-            gnutar
-            gzip
+            bash # Basic bash. For real, this is the worst bash experience you'll ever have.
+
+            # Some of these are essential packages, but most of these are here
+            # to make a developer's life better. Remove them if you don't like
+            # cool stuff.
+            cacert
+            cmake
+            eza
+            fd
+            figlet
+            findutils
+            fzf
+            gawk
+            (lib.meta.hiPrio gcc)
+            getent
+            git
+            glibc
+            glibcLocalesUtf8
             gnugrep
+            gnumake
             gnused
+            gnutar
+            grc
+            gzip
+            jq
+            libclang
+            lolcat
+            lsof
+            ncurses
+            nix
+            openssl
+            openssl.dev
+            pkg-config
             pkgs.stdenv.cc.cc.lib
+            ps
+            ripgrep
+            strace
+            tree
+            tree-sitter
+            uutils-coreutils-noprefix # Essential utilities
+            which
+
+            # We make the default terminal-based editor in the dev container
+            # Neovim. If you want something sad like nano, you can remove all
+            # vim references.
+            nvim-pkg
+
+            # Fish shell. Remove these and the overlay if you want a sad shell
+            # experience.
             fish
             fishPlugins.bass
             fishPlugins.bobthefish
             fishPlugins.foreign-env
             fishPlugins.grc
-            figlet
-            lolcat
-            cacert
-            openssl
-            openssl.dev
+
+            # If for some reason you don't want VS Code Server, remove this and
+            # its overlay.
             code-extended
+
+            # -- Rust Toolchain --
             rust-analyzer
-
-            which
-            nvim-pkg
-            curl
-            lsof
-            strace
-            ripgrep
-            tree
-            tree-sitter
-            nix
-            git
-            fzf
-            fd
-            eza
-            findutils
-            gnugrep
-            getent
-            gawk
-            jq
-            ps
-            ncurses
-
-            # -- Compilers, Etc. --
-            gcc
-            grc
-            cmake
-            gnumake
-            libclang
-            glibc
-
-            # -- Rust toolchain --
             (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
               extensions = [ "rust-src" ];
-              targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
-            }))
-            pkg-config
 
-            # -- Static Analysis Tools --
+              # I think the default architecture for rust is whatever
+              # architecture you happen to be working on. If we need to support
+              # other architectures, this is where you do it.
+              # targets = [ "wasm32-unknown-unknown" ];
+            }))
+
+            # -- Rust Static Analysis Tools --
             staticanalysis.packages.${system}.default
 
-            # -- R and R packages (from your dev shell example) --
-            R
-            rPackages.lintr
-            rPackages.assertthat
-            rPackages.caret
-            rPackages.delayed
-            rPackages.devtools
-            rPackages.DiagrammeR
-            rPackages.dplyr
-            rPackages.ggplot2
-            rPackages.gifski
-            rPackages.hash
-            rPackages.here
-            rPackages.igraph
-            rPackages.knitr
-            rPackages.magick
-            rPackages.origami
-            rPackages.readr
-            rPackages.rJava
-            rPackages.rmarkdown
-            rPackages.rsconnect
-            rPackages.sets
-            rPackages.shiny
-            rPackages.shinyWidgets
-            rPackages.tidyr
-            rPackages.AIPW
-            rPackages.e1071
-            rPackages.earth
-            rPackages.nnet
-            rPackages.randomForest
-            rPackages.ranger
-            rPackages.xgboost
+            sl3
+            rWithPkgs
           ];
           pathsToLink = [
             "/bin"
             "/lib"
             "/inc"
             "/etc/ssl/certs"
-          ];
-        };
-
-        sl3 = pkgs.rPackages.buildRPackage {
-          name = "sl3";
-          src = pkgs.fetchFromGitHub{
-            owner = "tlverse";
-            repo = "sl3";
-            rev = "0m1cg7icdza230l2jlpkwf9s8b4pwbyn0xj5vrk6yq6lfq8dgvpr";
-            sha256 = "12mhmmibizbxgmsns80c8h97rr7rclv9hz98zpgsl26hw3s4l0vm";
-          };
-          propagatedBuildInputs = with pkgs.rPackages; [
-            assertthat
-            caret
-            delayed
-            devtools
-            DiagrammeR
-            dplyr
-            ggplot2
-            gifski
-            hash
-            here
-            igraph
-            knitr
-            magick
-            origami
-            readr
-            rJava
-            rmarkdown
-            rsconnect
-            sets
-            shiny
-            shinyWidgets
-            tidyr
-            AIPW
-            e1071
-            earth
-            nnet
-            randomForest
-            ranger
-            xgboost
           ];
         };
 
@@ -254,31 +401,10 @@
           executable = true;
         };
 
-        # Predicate for filterSource if you still need it
-        predicate = path: type:
-        type != "directory" || (baseNameOf path != ".git");
-
-        localPath = toString ./.; # Convert flake path to a string path
-        filteredSrc = builtins.filterSource predicate localPath;
-
-        # Now we create a derivation that:
-        # 1. Copies filteredSrc into $out (our "workspace")
-        # 2. Downloads the Tetrad JAR into $out/inst
-        # 3. Runs the R dependency script from within $out
-        myWorkspace = pkgs.runCommand "workspace" {
-          buildInputs = [
-            pkgs.R
-          ];
-        } ''
-            mkdir $out
-            cp -r ${filteredSrc}/* $out/
-            cd $out
-            #${pkgs.R}/bin/Rscript $out/scripts/install_dependencies.R
-          '';
       in
       {
         packages.default = pkgs.dockerTools.buildImage {
-          name = "polar-dev";
+          name = "airtool-dev";
           tag = "latest";
           copyToRoot = [
             myEnv
@@ -288,8 +414,6 @@
             license
             createUserScript
             fishPluginsFile
-            myWorkspace
-            sl3
           ];
           config = {
             WorkingDir = "workspace";
@@ -297,18 +421,25 @@
               # Certificates and environment setup
               "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
               "SSL_CERT_DIR=/etc/ssl/certs"
+
+              "LANG=en_US.UTF-8"
+              "TZ=UTC"
+
               "CARGO_HTTP_CAINFO=/etc/ssl/certs/ca-bundle.crt"
               "CC=gcc"
               "CXX=g++"
               "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
               "PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig"
-              "PATH=/bin:/usr/bin:${myEnv}/bin:/root/.cargo/bin"
               "USER=root"
               "COREUTILS=${pkgs.uutils-coreutils-noprefix}"
               "CMAKE=/bin/cmake"
               "CMAKE_MAKE_PROGRAM=/bin/make"
               "LIBCLANG_PATH=${pkgs.libclang.lib}/lib/"
               "SHELL=/bin/fish"
+              "JAVA_HOME=${pkgs.jdk17}"
+              "PATH=${myEnv}/bin:/bin:/usr/bin:/root/.cargo/bin:$JAVA_HOME/bin"
+              "QUARTO_R=${rWithPkgs}/bin/R"
+              "LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
 
               # Fish plugins environment variables
               "FISH_GRC=${pkgs.fishPlugins.grc}"
@@ -317,7 +448,9 @@
             ];
             Volumes = { };
             Cmd = [ "/bin/fish" ]; # Default command
-            ExposedPorts = ["4173"];
+            ExposedPorts = {
+                "4173/tcp" = {};
+            };
             # Cmd = [ "sh" "/app/scripts/run_quarto.sh" ];
           };
           extraCommands = ''
@@ -331,13 +464,6 @@
 
             # Create /tmp dir
             mkdir -p tmp
-
-            #mkdir -p /workspace/inst
-            #cd /workspace/inst
-            #curl -fsSLO "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar"
-            #cd /
-
-            #${pkgs.R}/bin/Rscript /workspace/scripts/install_dependencies.R
           '';
         };
       }
