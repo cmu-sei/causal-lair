@@ -438,7 +438,7 @@
               "SHELL=/bin/fish"
               "JAVA_HOME=${pkgs.jdk17}"
               "PATH=${myEnv}/bin:/bin:/usr/bin:/root/.cargo/bin:$JAVA_HOME/bin"
-              "QUARTO_R=${rWithPkgs}/bin/R"
+              "QUARTO_R=${rWithPkgs}/bin"
               "LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
 
               # Fish plugins environment variables
