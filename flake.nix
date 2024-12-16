@@ -6,6 +6,8 @@
 
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable"; # Main Nix package repository
 
+    tetrad.url = "github:daveman1010221/tetrad";
+
     # Rust packages source
     rust-overlay = {
       url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
@@ -43,7 +45,7 @@
     };
   };
 
-  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, tetrad, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -279,7 +281,8 @@
             wget
             zlib                    # zlib1g-dev
 
-            jdk17
+            jdk23
+            maven
             pandoc
             libtirpc
 
@@ -360,6 +363,7 @@
 
             sl3
             rWithPkgs
+            tetrad.packages.x86_64-linux.default
           ];
           pathsToLink = [
             "/bin"
@@ -416,7 +420,7 @@
             fishPluginsFile
           ];
           config = {
-            WorkingDir = "workspace";
+            WorkingDir = "/workspace";
             Env = [
               # Certificates and environment setup
               "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
@@ -436,7 +440,7 @@
               "CMAKE_MAKE_PROGRAM=/bin/make"
               "LIBCLANG_PATH=${pkgs.libclang.lib}/lib/"
               "SHELL=/bin/fish"
-              "JAVA_HOME=${pkgs.jdk17}"
+              "JAVA_HOME=${pkgs.jdk23}"
               "PATH=${myEnv}/bin:/bin:/usr/bin:/root/.cargo/bin:$JAVA_HOME/bin"
               "QUARTO_R=${rWithPkgs}/bin"
               "LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
@@ -445,6 +449,9 @@
               "FISH_GRC=${pkgs.fishPlugins.grc}"
               "FISH_BASS=${pkgs.fishPlugins.bass}"
               "BOB_THE_FISH=${pkgs.fishPlugins.bobthefish}"
+              "_JAVA_OPTIONS='-Dawt.useSystemAAFontSettings=lcd -Dswing.defaultlaf=com.sun.java.swing.plaf.gtk.GTKLookAndFeel'"
+              "DISPLAY=:1"
+              "TETRAD_PATH=${tetrad.packages.x86_64-linux.default}/share/java/tetrad-gui-7.6.7-SNAPSHOT-launch.jar"
             ];
             Volumes = { };
             Cmd = [ "/bin/fish" ]; # Default command
@@ -464,6 +471,8 @@
 
             # Create /tmp dir
             mkdir -p tmp
+
+            ln -s ${myEnv}/bin/javadoc usr/bin/javadoc
           '';
         };
       }

@@ -288,6 +288,21 @@
         "type": "github"
       }
     },
+    "nixpkgs_3": {
+      "locked": {
+        "lastModified": 1734235588,
+        "narHash": "sha256-3znQ2ryrPyGBjCHHRXueMLF801hl4sbUQ6SfZWq30Bw=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "13c0d4c59e67b9d47d455b02f94fe558aa957533",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "flake-utils": "flake-utils",
@@ -295,7 +310,8 @@
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpkgs": "nixpkgs_2",
         "rust-overlay": "rust-overlay",
-        "staticanalysis": "staticanalysis"
+        "staticanalysis": "staticanalysis",
+        "tetrad": "tetrad"
       }
     },
     "rust-overlay": {
@@ -380,6 +396,24 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "tetrad": {
+      "inputs": {
+        "nixpkgs": "nixpkgs_3"
+      },
+      "locked": {
+        "lastModified": 1734238631,
+        "narHash": "sha256-ipBHHMVtQa2zbTQ69nauotaS9Zcuod/v7Nz9qmh2bKw=",
+        "owner": "daveman1010221",
+        "repo": "tetrad",
+        "rev": "267d52319290f67ee008e48ccc7cbf46989c032a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "daveman1010221",
+        "repo": "tetrad",
         "type": "github"
       }
     }

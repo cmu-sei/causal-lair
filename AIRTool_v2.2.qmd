@@ -53,6 +53,9 @@ AIRHome <- here()
 setwd(AIRHome)
 set.seed(123)
 
+# Nick, I significantly reduced the complexity of tetrad_utils. Most of what it
+# was doing is no longer needed.
+
 source("scripts/tetrad_utils.R")
 source("scripts/TetradSearch.R")
 source("scripts/AIR_functions.R")
