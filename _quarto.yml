@@ -1,0 +1,3 @@
+execute:
+  type: r
+  engine: /nix/store/bfwlxjbs2ablij7830ryjyvv7h8mp9bc-R-4.4.1-wrapper/bin/R
