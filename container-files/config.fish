@@ -96,10 +96,10 @@ function fish_greeting --description="Displays the Fish logo and some other init
     set_color $fish_color_autosuggestion
     set_color normal
     echo 'The license for this container can be found in /root/license.txt' | lolcat --force | cat
-    lol_fig "Welcome to the Polar Shell."
+    lol_fig "Welcome to the AIR Shell."
     
     # Array of funny phrases
-    set phrases "Brace yourself for a flurry of brilliant code!" "Our code is cooler than an ice cube in Antarctica!" "Get ready to chill and code!" "Let's make some code that's ice-olated in perfection!" "There are no polar bears, only coding bears!" "Next stop: Bug-free code!" "Where the only thing frozen is the bugs!" "It's time to break the ice and dive into development!" "Where every line of code is as cool as the Arctic!" "Let's code like penguins on ice!" "Navigating the icy waters of code with ease!" "Our coding skills are as sharp as an icicle!" "Chill vibes, hot code!" "Frosty fingers, fiery code!" "Coding in a winter wonderland!" "Sliding into smooth code like a penguin!" "Our code is a polar express to success!" "Ice-cold focus, blazing fast code!" "From the tundra to triumph with our code!" "Arctic-level precision in every line!" "Coding through the polar vortex of bugs!" "Snow problem we can't solve with code!" "Where coding brilliance is as vast as the polar ice cap!" "Cool minds, warm hearts, perfect code!"
+    set phrases "Coding with AIR: It’s a breeze!" "Let’s give your ideas some lift!" "Where bugs get blown away in a gust of genius!" "Catch your second wind of inspiration!" "Time to take off into coding greatness!" "We keep your code light as AIR!" "AIR: Where bugs don’t stand a draft!" "Blow the cobwebs off your old code!" "Let your code soar to new heights!" "Why walk when you can fly through development?" "Take a deep breath and exhale excellence!" "We make coding look plane and simple!" "No hot AIR, just cool code!" "Put your bugs on standby—this is a no-fly zone!" "AIR: Propelling your projects forward!" "Don’t just code, hover above the competition!" "Our code? It’s on cloud nine!" "When the winds of bugs blow, we stay grounded!" "Ready to take off into bug-free skies?" "AIR: Because your code deserves a tailwind!" "No updrafts, only upgrades!" "Make your code so good it takes your breath away!" "AIR: Where every bug goes down the vent!" "AIR: The gust of genius your code needs!" "With AIR, your code is never up in the air!"
 
     # Select a random funny phrase
     set random_index (random 1 (count $phrases))

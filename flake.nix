@@ -429,6 +429,12 @@
           executable = true;
         };
 
+        # Materialize the flake directory
+        workspacePath = pkgs.runCommand "materialized-flake" {} ''
+          mkdir -p $out/workspace
+          cp -r ${./.}/* $out/workspace
+        '';
+
       in
       {
         packages.default = pkgs.dockerTools.buildImage {
@@ -442,6 +448,7 @@
             license
             createUserScript
             fishPluginsFile
+            workspacePath
           ];
           config = {
             WorkingDir = "/workspace";

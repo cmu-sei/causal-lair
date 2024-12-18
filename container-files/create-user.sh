@@ -73,6 +73,12 @@ create_user_in_container() {
     # Set permissions for the /tmp directory
     chmod -R 777 /tmp
 
+    # Set permissions for the home directory
+    chmod -R 755 /workspace
+
+    # Change ownership of the home directory to the new user
+    chown -R $username:$username /workspace
+
     HOME=/home/$username
 
     # set env vars
@@ -83,9 +89,12 @@ create_user_in_container() {
     echo 'set -x XDG_CONFIG_HOME $HOME/.config' >> $HOME/.config/fish/config.fish
     echo 'set -x XDG_CACHE_HOME $HOME/.local/share' >> $HOME/.config/fish/config.fish
 
+    # Start the web server as root in the background
+    /workspace/scripts/run_quarto.sh &
 
     # Set HOME environment variable and execute chroot and switch to the new user
     HOME=/home/$username FISH_CONFIG_DIR=$HOME/.config/fish/ XDG_DATA_HOME=$HOME/.local/share XDG_CONFIG_HOME=$HOME/.config XDG_CACHE_HOME=$HOME/.local/share exec chroot --userspec=$uid:$gid / /bin/fish -c "cd /workspace; exec fish"
+
 }
 
 # Check if script is being run with superuser privileges
@@ -99,6 +108,7 @@ if [ "$#" -ne 3 ]; then
     echo "Usage: $0 username uid gid"
     exit 1
 fi
+
 
 # Call the function with the provided arguments
 create_user_in_container $1 $2 $3
