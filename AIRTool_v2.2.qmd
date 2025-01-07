@@ -810,7 +810,7 @@ output$ui_interpretation = renderUI({
   interpretation <- "What we can learn from these results"
   dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
   dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
-
+  
   if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
       (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
     interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
@@ -822,12 +822,11 @@ output$ui_interpretation = renderUI({
     interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
   }
   
-  flag <- dfr$flag
-
-  if (flag >= dfr$z1_ATE_LCI & flag <= dfr$z1_ATE_UCI) {
+  
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
     inZ1 <- TRUE
   } else { inZ1 <- FALSE }
-  if (flag >= dfr$z2_ATE_LCI & flag <= dfr$z2_ATE_UCI) {
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
     inZ2 <- TRUE
   } else { inZ2 <- FALSE }
   
@@ -836,11 +835,11 @@ output$ui_interpretation = renderUI({
   flagdir <- case_when(maxflag < 0 ~ "a negative",
                        minflag > 0 ~ "a positive",
                        TRUE ~ "no")
-  effect_estimation <- case_when(abs(flag) < min(abs(maxflag), abs(minflag)) ~ "underestimating",
-                                 abs(flag) > max(abs(maxflag), abs(minflag)) ~ "overestimating",
+  effect_estimation <- case_when(any(abs(flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
                                  TRUE ~ "correctly estimating")
-  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(flag), 2)*100, "-",round(abs(minflag) - abs(flag), 2)*100, "%"),
-                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(flag) - abs(minflag), 2)*100, "-",round(abs(flag) - abs(maxflag), 2)*100, "%"),
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(flag)), 2)*100, "-",round(abs(minflag) - abs(mean(flag)), 2)*100, "%"),
+                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(flag)) - abs(minflag), 2)*100, "-",round(abs(mean(flag)) - abs(maxflag), 2)*100, "%"),
                           TRUE ~ "")
   effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
                               TRUE ~ "Unfortunately")
