@@ -27,7 +27,7 @@
 # Define required CRAN packages
 cran_packages <- c(
     "assertthat", "caret", "delayed", "devtools", "DiagrammeR", "dplyr", "ggplot2", "gifski", "hash",
-    "here", "igraph", "knitr", "magick", "origami", "readr", "rJava", "rmarkdown",
+    "here", "igraph", "jsonlite", "knitr", "magick", "origami", "readr", "rJava", "rmarkdown",
     "rsconnect", "sets", "shiny", "shinyWidgets", "tidyr"
 )
 

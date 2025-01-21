@@ -48,6 +48,7 @@ suppressMessages(library(sl3))
 suppressMessages(library(tidyr))
 suppressMessages(library(tmle3))
 suppressMessages(library(xgboost))
+suppressMessages(library(jsonlite))
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -506,9 +507,27 @@ observeEvent(input$updateButton, {
                     "val" = c(input$xvar, input$yvar)),
          envir = .GlobalEnv)
   # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
-  
   # source_python(paste0(AIRHome, "/scripts/identify.py"))
-  source("scripts/identify.R")
+  
+  param1 = df_vars$val[1]
+  param2 = df_vars$val[2]
+  
+  rust_bin = paste0(AIRHome, "/scripts/identify")
+  # system2() returns the output as a character vector (one element per line).
+  json_output <- system2(rust_bin,
+                         args = c(paste0("--param1=", param1),
+                                  paste0("--param2=", param2)),
+                         stdout = TRUE)
+  
+  # json_output is a character vector. If the Rust program only prints a single line
+  # of JSON, json_output[1] will hold the entire JSON string.
+  parsed <- fromJSON(json_output[1])
+  
+  # Now `parsed` should be a list with two elements: $vector1 and $vector2
+  Z1 <- parsed$vector1
+  Z2 <- parsed$vector2
+  
+  # source("scripts/identify.R")
   Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
   Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
   # Z1 = "region_sensitivity"
