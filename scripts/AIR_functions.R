@@ -244,7 +244,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   write_csv(df_out, paste0(AIRHome, "/data/", settings$doc_title,"-data.csv"))
 }
 
-processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold){
+processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in){
   # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
   treatment <- settings$varName
   outcome <- df_vars[df_vars$var == "OV",]$val
@@ -437,8 +437,8 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
     
     if (model_yn == "Yes") {
       # model_in <- read_rds("input/model.rda")
-      pred_m0 = predict(model_in(), xtest_0)
-      pred_m1 = predict(model_in(), xtest_1)
+      pred_m0 = predict(model_in, xtest_0)
+      pred_m1 = predict(model_in, xtest_1)
       # pred_m0 = predict(model_in, xtest_0)
       # pred_m1 = predict(model_in, xtest_1)
       

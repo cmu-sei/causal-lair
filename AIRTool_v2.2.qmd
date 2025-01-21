@@ -644,7 +644,7 @@ observeEvent(input$goButton, {
     }
     
     incProgress(0.2, message = "Processing Results")
-    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold)
+    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
 
     calc_complete(TRUE)
   })
