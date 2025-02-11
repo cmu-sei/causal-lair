@@ -1,0 +1,22 @@
+[package]
+name = "boss_scoring"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# For matrix operations, we can use 'ndarray' or something similar:
+ndarray = "0.16"
+# For log, exp, etc. we can just use Rust std or 'num-traits'
+num-traits = "0.2"
+
+lapack = { version = "0.19" }
+lapack-sys = { version = "0.14" }
+ndarray-linalg = { version = "0.17", features = ["openblas"] }
+
+[lib]
+name = "boss_scoring"
+path = "src/lib.rs"
+
+[[bin]]
+name = "score_driver"
+path = "src/main.rs"
