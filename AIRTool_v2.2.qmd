@@ -1,27 +1,3 @@
-# AIR Tool
-#
-# Copyright 2024 Carnegie Mellon University.
-#
-# NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE ENGINEERING INSTITUTE
-# MATERIAL IS FURNISHED ON AN "AS-IS" BASIS. CARNEGIE MELLON UNIVERSITY MAKES NO
-# WARRANTIES OF ANY KIND, EITHER EXPRESSED OR IMPLIED, AS TO ANY MATTER
-# INCLUDING, BUT NOT LIMITED TO, WARRANTY OF FITNESS FOR PURPOSE OR
-# MERCHANTABILITY, EXCLUSIVITY, OR RESULTS OBTAINED FROM USE OF THE MATERIAL.
-# CARNEGIE MELLON UNIVERSITY DOES NOT MAKE ANY WARRANTY OF ANY KIND WITH RESPECT
-# TO FREEDOM FROM PATENT, TRADEMARK, OR COPYRIGHT INFRINGEMENT.
-#
-# Licensed under a MIT (SEI)-style license, please see license.txt or contact
-# permission_at_sei.cmu.edu for full terms.
-#
-# [DISTRIBUTION STATEMENT A] This material has been approved for public release
-# and unlimited distribution.  Please see Copyright notice for non-US Government
-# use and distribution.
-#
-# This Software includes and/or makes use of Third-Party Software each subject to
-# its own license.
-#
-# DM24-1686
-
 ---
 title: "AIRTOOL PROTOTYPE--not intended for public consumption"
 format: 
@@ -32,6 +8,7 @@ format:
 server: shiny
 ---
 
+```{=html}
 <style>
   .plot-container, .shiny-text-output, .panel, .card {
     border: none;
@@ -43,8 +20,15 @@ server: shiny
     font-weight: bold;
   }
 </style>
+```
+
+```{=html}
 <style> .main-container { max-width: unset; } </style>
+```
+
+```{=html}
 <style> .main-container { max-height: unset; } </style>
+```
 
 ```{r}
 #| context: setup
@@ -72,6 +56,7 @@ suppressMessages(library(sl3))
 suppressMessages(library(tidyr))
 suppressMessages(library(tmle3))
 suppressMessages(library(xgboost))
+suppressMessages(library(jsonlite))
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -80,10 +65,7 @@ set.seed(123)
 # Nick, I significantly reduced the complexity of tetrad_utils. Most of what it
 # was doing is no longer needed.
 
-source("scripts/tetrad_utils.R")
-source("scripts/TetradSearch.R")
 source("scripts/AIR_functions.R")
-
 if (!dir.exists(paste0(AIRHome, "/data/"))) {
   dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
 }
@@ -95,16 +77,34 @@ if (!dir.exists(paste0(AIRHome, "/input/"))) {
 if (!dir.exists(paste0(AIRHome, "/plots/"))) {
   dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
 }
-# Setup Java and Tetrad
-## if running on local machine, uncomment out the next line
-# setup_tetrad_environment()
 
-.jinit()
-# .jinit(parameters = "-verbose:class")
-.jaddClassPath(TETRAD_PATH)
+if (Sys.info()["sysname"] == "Linux") {
+  source("scripts/tetrad_utils.R")
+  source("scripts/TetradSearch.R")
+  
+  if (!dir.exists(paste0(AIRHome, "/data/"))) {
+    dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
+  }
+  
+  if (!dir.exists(paste0(AIRHome, "/input/"))) {
+    dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
+  }
+  
+  if (!dir.exists(paste0(AIRHome, "/plots/"))) {
+    dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
+  }
+  # Setup Java and Tetrad
+  ## if running on local machine, uncomment out the next line
+  # setup_tetrad_environment()
+  
+  .jinit()
+  # .jinit(parameters = "-verbose:class")
+  .jaddClassPath(TETRAD_PATH)
+  
+  java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
+  # print(paste("Java version:", java_version))
 
-java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
-# print(paste("Java version:", java_version))
+  } 
 ```
 
 # Setup
@@ -137,16 +137,19 @@ uiOutput('ui_goButton')
 ```
 
 ## Column {width = "40%"}
+
 ```{r}
 grVizOutput('blankGraph')
 ```
 
-
 ## Column {width = "60%"}
+
 ```{r}
 plotOutput('histogram_x', height = "50%")
 ```
+
 #### Row
+
 ```{r}
 plotOutput('histogram_y', height = "50%")
 ```
@@ -154,6 +157,7 @@ plotOutput('histogram_y', height = "50%")
 # Results
 
 ## Column {width="60%"}
+
 ```{r}
 #| padding: 0px
 ##| title: "Causal Discovery"
@@ -161,6 +165,7 @@ uiOutput('ui_graphViz')
 ```
 
 ## Column {width="40%"}
+
 ```{r}
 #| padding: 0px
 # UI Output for ribbon plot
@@ -177,7 +182,14 @@ graph_update <- reactiveVal(FALSE)
 model_in <- reactive({
   req(input$model_in)
   #loading the model
-  model_in = read_rds(input$model_in$datapath)
+  # model_in = read_rds(input$model_in$datapath)
+  ext <- tools::file_ext(input$modelFile$datapath)
+    
+    switch(ext,
+           "rds" = read_rds(input$modelFile$datapath),  # R models
+           "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
+           stop("Unsupported file type")
+    )
   
   return(model_in)
 })
@@ -313,9 +325,9 @@ output$histogram_x <- renderPlot({
     data <- df()[[input$xvar]]
     
     # Ensure the selected variable is numeric
-    #validate(
-    #  need(is.numeric(data), "Selected variable must be numeric.")
-    #)
+    # validate(
+    #   need(is.numeric(data), "Selected variable must be numeric.")
+    # )
     
     # Define treatment condition based on operator and threshold
     if (input$tv_dir == ">") {
@@ -371,9 +383,9 @@ output$histogram_y <- renderPlot({
     data <- df()[[input$yvar]]
     
     # Ensure the selected variable is numeric
-    #validate(
-    #  need(is.numeric(data), "Selected variable must be numeric.")
-    #)
+    # validate(
+    #   need(is.numeric(data), "Selected variable must be numeric.")
+    # )
     
     # Define treatment condition based on operator and threshold
     if (input$ov_dir == ">") {
@@ -457,7 +469,8 @@ output$ui_ate_upload = renderUI({
 output$ui_model_upload = renderUI({
   req(input$model_exist)
   if (input$model_exist == "Yes") {
-    fileInput("model_in", "", accept = ".rda")
+    fileInput("model_in", "", 
+              accept = c(".rds", ".rda", ".model"))
   } else (return(NULL))
 })
 
@@ -530,9 +543,28 @@ observeEvent(input$updateButton, {
                     "val" = c(input$xvar, input$yvar)),
          envir = .GlobalEnv)
   # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
-  
   # source_python(paste0(AIRHome, "/scripts/identify.py"))
-  source("scripts/identify.R")
+  if (Sys.info()["sysname"] == "Linux") {
+    param1 = df_vars$val[1]
+    param2 = df_vars$val[2]
+    
+    rust_bin = paste0(AIRHome, "/scripts/identify")
+    # system2() returns the output as a character vector (one element per line).
+    json_output <- system2(rust_bin,
+                           args = c(paste0("--param1=", param1),
+                                    paste0("--param2=", param2)),
+                           stdout = TRUE)
+    
+    # json_output is a character vector. If the Rust program only prints a single line
+    # of JSON, json_output[1] will hold the entire JSON string.
+    parsed <- fromJSON(json_output[1])
+    
+    # Now `parsed` should be a list with two elements: $vector1 and $vector2
+    Z1 <- parsed$vector1
+    Z2 <- parsed$vector2
+  } else {
+    source("scripts/identify.R")
+  }
   Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
   Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
   # Z1 = "region_sensitivity"
@@ -649,7 +681,7 @@ observeEvent(input$goButton, {
     }
     
     incProgress(0.2, message = "Processing Results")
-    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold)
+    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
 
     calc_complete(TRUE)
   })
@@ -834,7 +866,7 @@ output$ui_interpretation = renderUI({
   interpretation <- "What we can learn from these results"
   dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
   dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
-
+  
   if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
       (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
     interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
@@ -846,12 +878,11 @@ output$ui_interpretation = renderUI({
     interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
   }
   
-  flag <- dfr$flag
-
-  if (flag >= dfr$z1_ATE_LCI & flag <= dfr$z1_ATE_UCI) {
+  
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
     inZ1 <- TRUE
   } else { inZ1 <- FALSE }
-  if (flag >= dfr$z2_ATE_LCI & flag <= dfr$z2_ATE_UCI) {
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
     inZ2 <- TRUE
   } else { inZ2 <- FALSE }
   
@@ -860,11 +891,11 @@ output$ui_interpretation = renderUI({
   flagdir <- case_when(maxflag < 0 ~ "a negative",
                        minflag > 0 ~ "a positive",
                        TRUE ~ "no")
-  effect_estimation <- case_when(abs(flag) < min(abs(maxflag), abs(minflag)) ~ "underestimating",
-                                 abs(flag) > max(abs(maxflag), abs(minflag)) ~ "overestimating",
+  effect_estimation <- case_when(any(abs(flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
                                  TRUE ~ "correctly estimating")
-  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(flag), 2)*100, "-",round(abs(minflag) - abs(flag), 2)*100, "%"),
-                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(flag) - abs(minflag), 2)*100, "-",round(abs(flag) - abs(maxflag), 2)*100, "%"),
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(flag)), 2)*100, "-",round(abs(minflag) - abs(mean(flag)), 2)*100, "%"),
+                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(flag)) - abs(minflag), 2)*100, "-",round(abs(mean(flag)) - abs(maxflag), 2)*100, "%"),
                           TRUE ~ "")
   effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
                               TRUE ~ "Unfortunately")
