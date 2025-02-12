@@ -1,0 +1,2 @@
+z1_Row,z1_ATE,z1_ATE_LCI,z1_ATE_UCI,z2_Row,z2_ATE,z2_ATE_LCI,z2_ATE_UCI,algorithm,flag,Treatment,z1_sig,z2_sig,significance,avg.cond.ef,Lower.avg.cond.ef,Upper.avg.cond.ef
+0,-0.591267364434334,-0.668104316016821,-0.514430412851848,0,-0.680419294002233,-0.728512039694255,-0.632326548310211,Existing Model,0,images_acquired,1,1,1,-0.6358433292182835,-0.728512039694255,-0.514430412851848

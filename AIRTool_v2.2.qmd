@@ -304,8 +304,8 @@ output$ui_threshold_y = renderUI({
                      width = "80px")
         )
     )
-    # tv_dir = "<="
-    # tv_threshold = 0
+    # ov_dir = "<="
+    # ov_threshold = 0
 })
 
 output$blankGraph <- renderGrViz({
@@ -462,7 +462,7 @@ output$ui_ate_upload = renderUI({
   if (input$model_exist == "ATE") {
     numericInput("ate_in", label = "ATE: ", value = 0, min = -1, max = 1, step = 0.1)
     # model_exist <- "ATE"
-    # ate_in <- -0.4
+    # ate_in <- 0
   } else (return(NULL))
 })
 
@@ -676,13 +676,15 @@ observeEvent(input$goButton, {
             NULL
             })
         runSuperLearner(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold)
-        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold)
+        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
       }
     }
     
     incProgress(0.2, message = "Processing Results")
     processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
-
+    # processResults(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in)
+    
+    
     calc_complete(TRUE)
   })
 })
@@ -891,11 +893,11 @@ output$ui_interpretation = renderUI({
   flagdir <- case_when(maxflag < 0 ~ "a negative",
                        minflag > 0 ~ "a positive",
                        TRUE ~ "no")
-  effect_estimation <- case_when(any(abs(flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
-                                 any(abs(flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+  effect_estimation <- case_when(any(abs(min(dfr$flag)) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(max(dfr$flag)) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
                                  TRUE ~ "correctly estimating")
-  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(flag)), 2)*100, "-",round(abs(minflag) - abs(mean(flag)), 2)*100, "%"),
-                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(flag)) - abs(minflag), 2)*100, "-",round(abs(mean(flag)) - abs(maxflag), 2)*100, "%"),
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
+                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
                           TRUE ~ "")
   effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
                               TRUE ~ "Unfortunately")
