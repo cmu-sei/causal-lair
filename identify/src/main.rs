@@ -7,7 +7,7 @@ use petgraph::visit::{Dfs, Walker};
 use std::collections::HashMap;
 use std::fs;
 use std::str::Lines;
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 use clap::Parser;
 
 #[macro_use]
@@ -76,7 +76,7 @@ fn main() {
     // let ancestors = get_ancestors(&graph, b);
     //let ancestors = get_ancestors_by_name(&graph, index);
     //println!("Ancestors of b: {:?}", ancestors);
-    let mut visited = HashSet::new();
+    let mut visited = BTreeSet::new();
     let ancestors = find_ancestors(&graph, index, &mut visited);
 
     // Convert NodeIndex to node names and print ancestors
@@ -84,13 +84,13 @@ fn main() {
     //println!("Ancestors of {tv}: {:?}", ancestor_names);
 
     // let's pull it all together and get an intersection
-    let mut ov_visited = HashSet::new();
+    let mut ov_visited = BTreeSet::new();
     let ov_ancestors = find_ancestors(&graph, ov_index, &mut ov_visited);
-    let ov_ancestor_names: HashSet<String> = ov_ancestors.iter().map(|&idx| &graph[idx]).cloned().collect();
+    let ov_ancestor_names: BTreeSet<String> = ov_ancestors.iter().map(|&idx| &graph[idx]).cloned().collect();
     let nodes_on_dir_path: Vec<_> = ov_ancestor_names.intersection(&descendants).collect();
     //println!("Z1: {:?}", parents);
     //println!("M: {:?}", nodes_on_dir_path);
-    let mut confounder: HashSet<String> = HashSet::new();
+    let mut confounder: BTreeSet<String> = BTreeSet::new();
     for node in nodes_on_dir_path {
         let idx = get_node_index_by_name(&graph, node.clone());
         match idx {
@@ -279,27 +279,27 @@ fn create_digraph (graph_input:(Vec<String>,Vec<(String, String)>)) -> Graph<Str
 }
 
 // Function to get children of a node
-fn _get_children(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<NodeIndex> {
+fn _get_children(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<NodeIndex> {
     graph
         .neighbors_directed(node, Direction::Outgoing)
         .collect()
 }
 
-fn get_parents_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<String> {
+fn get_parents_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<String> {
     graph
         .neighbors_directed(node, petgraph::Direction::Incoming)
         .map(|node| graph[node].clone()) // Convert NodeIndex to names
         .collect()
 }
 
-fn get_children_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<String> {
+fn get_children_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<String> {
     graph
         .neighbors_directed(node, petgraph::Direction::Outgoing)
         .map(|child| graph[child].clone()) // Convert NodeIndex to names
         .collect()
 }
 
-fn _get_ancestors_by_name_old(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<String> {
+fn _get_ancestors_by_name_old(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<String> {
     // Use an incoming direction to find ancestors
     Dfs::new(graph, node)
         .iter(graph)
@@ -308,11 +308,11 @@ fn _get_ancestors_by_name_old(graph: &DiGraph<String, ()>, node: NodeIndex) -> H
         .collect()
 }
 
-fn _get_ancestors_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<String> {
+fn _get_ancestors_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<String> {
     // base case is parent has no parent. this is oldest possible anctor. 
     //     when you reach this, add parent to set of all_parents
     // until you hit base case, it's going to be get_parents(node).
-    let mut visited = HashSet::new();
+    let mut visited = BTreeSet::new();
     let ancestors = find_ancestors(&graph, node, &mut visited);
 
     // Convert NodeIndex to node names and print ancestors
@@ -325,21 +325,21 @@ fn _get_ancestors_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashS
 fn find_ancestors(
     graph: &DiGraph<String, ()>,
     node: NodeIndex,
-    visited: &mut HashSet<NodeIndex>,
-) -> HashSet<NodeIndex> {
+    visited: &mut BTreeSet<NodeIndex>,
+) -> BTreeSet<NodeIndex> {
     // If the node has already been visited, return an empty set
     if visited.contains(&node) {
-        return HashSet::new();
+        return BTreeSet::new();
     }
 
     // Mark this node as visited
     visited.insert(node);
 
     // Initialize an empty set to store ancestors
-    let mut ancestors = HashSet::new();
+    let mut ancestors = BTreeSet::new();
 
     // Get immediate parents of the current node
-    let parents: HashSet<NodeIndex> = graph
+    let parents: BTreeSet<NodeIndex> = graph
         .neighbors_directed(node, Direction::Incoming)
         .collect();
 
@@ -353,7 +353,7 @@ fn find_ancestors(
 } 
 
 
-fn get_descendants_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<String> {
+fn get_descendants_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<String> {
     Dfs::new(graph, node)
         .iter(graph)
         .filter(|&n| n != node) // Exclude the starting node itself
@@ -362,14 +362,14 @@ fn get_descendants_by_name(graph: &DiGraph<String, ()>, node: NodeIndex) -> Hash
 }
 
 // function to get parents of a node
-fn _get_parents(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<NodeIndex> {
+fn _get_parents(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<NodeIndex> {
     graph
         .neighbors_directed(node, Direction::Incoming)
         .collect()
 }
 
 // function to get descendants of a node
-fn _get_descendants(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<NodeIndex> {
+fn _get_descendants(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<NodeIndex> {
     Dfs::new(graph, node)
         .iter(graph)
         .filter(|&n| n != node) // Exclude the starting node itself
@@ -377,7 +377,7 @@ fn _get_descendants(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<Nod
 }
 
 // function to get ancestors of a node
-fn _get_ancestors(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<NodeIndex> {
+fn _get_ancestors(graph: &DiGraph<String, ()>, node: NodeIndex) -> BTreeSet<NodeIndex> {
     Dfs::new(graph, node)
         .iter(graph)
         .filter(|&n| n != node) // Exclude the starting node itself
@@ -385,8 +385,8 @@ fn _get_ancestors(graph: &DiGraph<String, ()>, node: NodeIndex) -> HashSet<NodeI
 }
 
 fn _intersection(
-    set1: &HashSet<NodeIndex>,
-    set2: &HashSet<NodeIndex>,
-) -> HashSet<NodeIndex> {
+    set1: &BTreeSet<NodeIndex>,
+    set2: &BTreeSet<NodeIndex>,
+) -> BTreeSet<NodeIndex> {
     set1.intersection(set2).cloned().collect()
 }
