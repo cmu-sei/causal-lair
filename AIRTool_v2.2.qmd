@@ -938,9 +938,9 @@ output$ui_interpretation = renderUI({
          df_vars[1,][[2]],
          " changes. ",
          case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
-                   inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z2, collapse = ", "), " (see graph)."),
-                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z1, collapse = ", "), " (see graph)."),
-                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z1, collapse = ", "), " and/or ", paste0(Z2, collapse = ", ")," (see graph)."))
+                   inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
+                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
+                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
          )
 
   tagList(
