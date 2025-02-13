@@ -182,14 +182,15 @@ graph_update <- reactiveVal(FALSE)
 model_in <- reactive({
   req(input$model_in)
   #loading the model
-  # model_in = read_rds(input$model_in$datapath)
-  ext <- tools::file_ext(input$modelFile$datapath)
+  model_in = read_rds(input$model_in$datapath)
+  # model_in = read_rds("input/model.rda")
+  # ext <- tools::file_ext(input$modelFile$datapath)
     
-    switch(ext,
-           "rds" = read_rds(input$modelFile$datapath),  # R models
-           "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
-           stop("Unsupported file type")
-    )
+  #model_in <- switch(ext,
+  #         "rds" = read_rds(input$modelFile$datapath),  # R models
+  #         "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
+  #         stop("Unsupported file type")
+  #  )
   
   return(model_in)
 })
@@ -637,6 +638,7 @@ observeEvent(input$goButton, {
     ### AIR Step 3 ----------------
     
     write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
 
     incProgress(0.1, message = "Estimating Causal Effects")
     assign("model_yn",
@@ -647,8 +649,7 @@ observeEvent(input$goButton, {
            input$ate_in,
            envir = .GlobalEnv)
 
-    # assign("model_yn", model_exist, envir = .GlobalEnv)
-    # assign("model_ate", ate_in, envir = .GlobalEnv)
+    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
 
     write.csv(file = "Results.csv",
               x = data.frame("Row" = vector(),
