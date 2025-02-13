@@ -99,9 +99,13 @@ fn main() {
                 let tmp_confounder = parents_of_m.difference(&descendants);
                 let mut new_items: Vec<String> = Vec::new();
                 for item in tmp_confounder{
-                    new_items.push(item.clone());
+                    let single_item: BTreeSet<String> = [item.to_string()].into_iter().collect();
+                    if ov_ancestor_names.intersection(&single_item).filter(|x| *x != &tv).count() > 0 {
+                        let new_guy: BTreeSet<String> = ov_ancestor_names.intersection(&single_item).filter(|x| *x != &tv).cloned().collect();
+                        new_items.extend(new_guy.clone());
+                    }
                 }
-                confounder = new_items.into_iter().collect();
+                confounder.extend(new_items); // = new_items.into_iter().collect();
             }, 
             None => {
                 //println!("Null case in index.");
