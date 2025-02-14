@@ -548,12 +548,14 @@ observeEvent(input$updateButton, {
   if (Sys.info()["sysname"] == "Linux") {
     param1 = df_vars$val[1]
     param2 = df_vars$val[2]
-    
+    param3 = paste0(AIRHome, "/graphtxt.txt")
+
     rust_bin = paste0(AIRHome, "identify")
     # system2() returns the output as a character vector (one element per line).
     json_output <- system2(rust_bin,
                            args = c(paste0("--param1=", param1),
-                                    paste0("--param2=", param2)),
+                                    paste0("--param2=", param2),
+				    paste0("--param3=", param3)),
                            stdout = TRUE)
     
     # json_output is a character vector. If the Rust program only prints a single line

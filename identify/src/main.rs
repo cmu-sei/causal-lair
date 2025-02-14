@@ -25,6 +25,9 @@ struct Cli {
     // Second input parameter
     #[arg(long)]
     param2: String,
+
+    #[arg(long)]
+    param3: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]struct OutputData {
@@ -35,10 +38,11 @@ struct Cli {
 fn main() {
     let tv = Cli::parse().param1.clone();
     let ov = Cli::parse().param2.clone();
+    let graph_path = Cli::parse().param3.clone();
     //let tv = "scenario_main_base".to_string();
     //let ov = "images_acquired".to_string();
 
-    let graph = read_graph_from_file();
+    let graph = read_graph_from_file(graph_path);
     
     /*
     // print nodes and edges to verify
@@ -150,9 +154,9 @@ fn get_node_index_by_name(
     graph.node_indices().find(|&i| graph[i] == name)
 }
 
-fn read_graph_from_file() -> Graph<String, ()> {
+fn read_graph_from_file(path: String) -> Graph<String, ()> {
     // Read the entire file content
-    let file_content = fs::read_to_string("graphtxt.txt").expect("Cannot read stupid file");
+    let file_content = fs::read_to_string(path).expect("Cannot read stupid file");
         
     // Split the sections by "Graph Nodes:" and "Graph Edges:"
     // Note: This is a simplistic approach that assumes the file is structured
