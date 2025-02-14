@@ -549,7 +549,7 @@ observeEvent(input$updateButton, {
     param1 = df_vars$val[1]
     param2 = df_vars$val[2]
     
-    rust_bin = paste0(AIRHome, "/scripts/identify")
+    rust_bin = paste0(AIRHome, "identify")
     # system2() returns the output as a character vector (one element per line).
     json_output <- system2(rust_bin,
                            args = c(paste0("--param1=", param1),
