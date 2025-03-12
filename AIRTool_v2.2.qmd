@@ -511,7 +511,7 @@ output$ui_goButton = renderUI({
   actionBttn(
     inputId = "goButton",
     label = "Calculate Results",
-    style = "unite", 
+    style = "jelly", 
     color = "primary"
   )
 })
@@ -521,7 +521,7 @@ output$ui_buildButton = renderUI({
   actionBttn(
     inputId = "buildButton",
     label = "Build Graph",
-    style = "unite", 
+    style = "jelly", 
     color = "primary"
     )
 })
@@ -531,7 +531,7 @@ output$ui_updateButton = renderUI({
   actionBttn(
     inputId = "updateButton",
     label = "Update Graph",
-    style = "unite",
+    style = "jelly",
     color = "primary"
     )
 })
@@ -600,6 +600,17 @@ observeEvent(input$updateButton, {
   grViz(dot)
   })
 
+  sendSweetAlert(
+    session = shiny::getDefaultReactiveDomain(),,
+    title = "Causal Graph Updated",
+    text = NULL,
+    type = "success",
+    btn_labels = "Continue",
+    btn_colors = "#3085d6",
+    closeOnClickOutside = TRUE,
+    showCloseButton = FALSE,
+    )
+
 })
 
 observeEvent(input$buildButton, {
@@ -626,6 +637,16 @@ observeEvent(input$buildButton, {
   dot <- readLines("dotfile.txt")  
   grViz(dot)
   })
+  sendSweetAlert(
+    session = shiny::getDefaultReactiveDomain(),,
+    title = "Causal Graph Successfully Built",
+    text = NULL,
+    type = "success",
+    btn_labels = "Continue",
+    btn_colors = "#3085d6",
+    closeOnClickOutside = TRUE,
+    showCloseButton = FALSE,
+    )
 })
   
 observeEvent(input$goButton, {
@@ -686,6 +707,16 @@ observeEvent(input$goButton, {
     
     
     calc_complete(TRUE)
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Causal Estimates Successfully Calculated",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
   })
 })
 
