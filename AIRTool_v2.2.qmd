@@ -182,14 +182,15 @@ graph_update <- reactiveVal(FALSE)
 model_in <- reactive({
   req(input$model_in)
   #loading the model
-  # model_in = read_rds(input$model_in$datapath)
-  ext <- tools::file_ext(input$modelFile$datapath)
+  model_in = read_rds(input$model_in$datapath)
+  # model_in = read_rds("input/model.rda")
+  # ext <- tools::file_ext(input$modelFile$datapath)
     
-    switch(ext,
-           "rds" = read_rds(input$modelFile$datapath),  # R models
-           "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
-           stop("Unsupported file type")
-    )
+  #model_in <- switch(ext,
+  #         "rds" = read_rds(input$modelFile$datapath),  # R models
+  #         "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
+  #         stop("Unsupported file type")
+  #  )
   
   return(model_in)
 })
@@ -547,12 +548,14 @@ observeEvent(input$updateButton, {
   if (Sys.info()["sysname"] == "Linux") {
     param1 = df_vars$val[1]
     param2 = df_vars$val[2]
-    
-    rust_bin = paste0(AIRHome, "/scripts/identify")
+    param3 = paste0(AIRHome, "/graphtxt.txt")
+
+    rust_bin = "identify"
     # system2() returns the output as a character vector (one element per line).
     json_output <- system2(rust_bin,
                            args = c(paste0("--param1=", param1),
-                                    paste0("--param2=", param2)),
+                                    paste0("--param2=", param2),
+				    paste0("--param3=", param3)),
                            stdout = TRUE)
     
     # json_output is a character vector. If the Rust program only prints a single line
@@ -658,6 +661,7 @@ observeEvent(input$goButton, {
     ### AIR Step 3 ----------------
     
     write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
 
     incProgress(0.1, message = "Estimating Causal Effects")
     assign("model_yn",
@@ -668,8 +672,7 @@ observeEvent(input$goButton, {
            input$ate_in,
            envir = .GlobalEnv)
 
-    # assign("model_yn", model_exist, envir = .GlobalEnv)
-    # assign("model_ate", ate_in, envir = .GlobalEnv)
+    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
 
     write.csv(file = "Results.csv",
               x = data.frame("Row" = vector(),
@@ -924,8 +927,8 @@ output$ui_interpretation = renderUI({
   flagdir <- case_when(maxflag < 0 ~ "a negative",
                        minflag > 0 ~ "a positive",
                        TRUE ~ "no")
-  effect_estimation <- case_when(any(abs(min(dfr$flag)) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
-                                 any(abs(max(dfr$flag)) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+  effect_estimation <- case_when(any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
                                  TRUE ~ "correctly estimating")
   effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
                           effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
@@ -969,9 +972,9 @@ output$ui_interpretation = renderUI({
          df_vars[1,][[2]],
          " changes. ",
          case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
-                   inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z2, collapse = ", "), " (see graph)."),
-                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z1, collapse = ", "), " (see graph)."),
-                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Z1, collapse = ", "), " and/or ", paste0(Z2, collapse = ", ")," (see graph)."))
+                   inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
+                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
+                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
          )
 
   tagList(

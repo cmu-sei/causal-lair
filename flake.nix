@@ -67,9 +67,11 @@
         flake-utils.follows = "flake-utils";
       };
     };
+
+    identify.url = "path:./identify";
   };
 
-  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, tetrad, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, tetrad, identify, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -387,7 +389,9 @@
 
             sl3
             rWithPkgs
-            tetrad.packages.x86_64-linux.default
+            #tetrad.packages.x86_64-linux.default
+            tetrad.packages.${system}.default
+            identify.packages.${system}.default
           ];
           pathsToLink = [
             "/bin"
