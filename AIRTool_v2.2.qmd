@@ -214,7 +214,32 @@ output$ui_file2 = renderUI({
 })
 
 knowledge <- reactive({
-  return(read_csv(input$file2$datapath, col_names = T))
+  path2 <- input$file2$datapath
+  extension <- tools::file_ext(path2)
+  if (extension == "csv"){
+    knowledge <- read_csv(path2, col_names = T)
+  } else if (extension == "xlsx"){
+    knowledge <- readxl::read_excel(path2, col_names = T)
+  }
+  k1_class <- knowledge |> pull(1) |> class()
+  k2_class <- knowledge |> pull(2) |> class()
+  k_names <- names(knowledge)
+  
+  if(any(!is.na(suppressWarnings(as.numeric(colnames(knowledge)))))){
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Upload Failed",
+      text = "Header missing in knowledge file. Please add a header with the following column names and reupload: level, variable",
+      type = "warning",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+    return(NA)
+  } else{
+    return(knowledge)
+  }
   # knowledge <- read_csv("input/knowledge.csv", col_names = T)
 })
 
