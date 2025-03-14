@@ -1,0 +1,176 @@
+<h1>Introduction </h1>
+
+-   **Brief Overview:** Modern analytic methods, including Artificial Intelligence (AI) and Machine Learning (ML) classifiers, depend on correlations; however, such approaches often fail to account for confounding in the data, which prevents accurate modeling of cause and effect. This often leads to prediction bias. The AI Robustness (AIR) tool allows users to gauge AI/ML classifier performance with unprecedented confidence.
+
+-   **Target Audience:** Projects that have an established AI classifier workflow, complete with data dictionaries and subject-matter experts. These release notes are for potential partners that would like to install the AIR tool in their own environment.
+
+<h1>New Features </h1>
+
+-   **Detailed Descriptions:** Initial release.
+-   **Benefits:** NA for this release.
+-   **Screenshots or Visuals:** (see tutorial)
+
+<h1>System Requirements and Installation</h1>
+
+AIR tool can be installed at partner sites or run in the SEI environment. Classified options are not available at the SEI at this point.
+
+**Requirements for running AIR:**
+
+-   **Hardware:**
+    -   10+ GiB of storage plus any additional space for your data
+    -   12 GiB+ memory (Estimate is based on our testing, but may vary)
+-   **Software:**
+    -   Docker-capable system (i.e., Linux/Mac/Windows)
+    -   WSL2 / Docker / Docker Desktop software
+    -   A text editor
+    -   A web browser (used for viewing/interacting with local HTML files)
+-   **User:**
+    -   Permissions to run a Docker container and any other supporting tools
+    -   Local copies of datasets to use with the AIR tool
+
+<h1>Model and Data Requirements</h1>
+
+The AIR Tool has requirements for data and model that must be followed for it to work properly. This is important for the user to understand before using the tool.
+
+**Model:**
+
+-   The model must be an AI/ML classifier that operates on structured or tabular data, relying on numerical, categorical\*, or time-series features rather than unstructured data such as images, audio, or natural language text.
+-   Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported.
+-   Must have a single outcome variable that the classifier is predicting. This could be something like mission success, threat assessment, component failure, etc.
+-   Must be run against multiple scenarios to predict outcome differences. For example, does location affect mission success? Does operating system affect threat assessment? Does weather affect component failure?
+-   Must be compatible with use in an R environment and be able to utilize a `predict()` function OR allow the user to predict output given user-defined input (to predict ATE).
+-   Must not require GPU acceleration or external hardware not currently supported by the tool.
+
+**Data:**
+
+-   Must be in .csv format.
+-   Must be tabular with a header specifying variable names.
+-   Must contain all variables used in the provided model (where applicable).
+-   Variable names in the data file must be identical to those in the provided model (where applicable).
+-   Data and model are recommended to contain less than 1,000 variables. Above this threshold, causal discovery algorithms may slow significantly.
+-   All categorical variables must be one-hot encoded.
+-   All time-series data must be consistently formatted.
+-   No missing or null entries in the data.
+-   Features must have variability (i.e., no constant columns) and not be intentional duplicates of one another.
+
+<h2>Installation Instructions</h2>
+
+Having met the usage requirements above, installation is a matter of copying the container to a location that is accessible from the Docker host. You'll want to have your data and knowledge files accessible to the Docker host as well. A sample run command for using the container would be:
+
+``` bash
+docker run -it -p 4173:4173 -u root --rm --name airtool airtool-image:latest
+```
+
+**Flag definitions:**
+
+-   **4173:** Default port that the development server runs on. It can be re-mapped if this port is inconvenient in your environment by simply changing the docker command.
+
+-   **-u root:** Indicates what user the process inside the container will run as (Note: Does not mean you need root permissions to run the container).
+
+-   **--rm:** Indicates to remove the container after you've finished with it. If you wish to keep it around, remove this parameter.
+
+-   **--name:** Provides the name Docker will use to refer to this container. This is important because if you don't choose a name, a new one will be assigned every time you run the container. Without removal, you may eventually run out of storage.
+
+-   **airtool-image:latest:** Is the tagged name for the container. If you loaded the image to a local registry using:
+
+    ``` bash
+    docker load < airtool.tar
+    docker tag airtool-image:latest
+    ```
+
+    then the container will be viewable in your local Docker registry via `docker images`.
+
+You may wish to add a data volume to your container. A limitation of the current release is that intermediate products are not stored within the container (i.e., every run starts from a new state).
+
+<h1>Getting Started</h1>
+
+**Step 1: Building your Causal Graph**
+
+<img src="image1.png" style="width:6.5in; height:2.8in;" alt="Description of image1" />
+
+
+The tool will first prompt the user for their data file. This file should conform to the characteristics outlined in the "Model and Data Requirements" section above. It is most helpful if it is either the same data that was used to build the AI classifier or if it is data that could be fed to the AI classifier to make predictions.
+
+After a data file is uploaded, the user will then select their knowledge file for upload. Knowledge files define rough hierarchies of three or more levels of causation as determined logically or by subject matter experts. Levels are defined as follows:
+
+-   **Tier 0 — Exogenous variables:** These variables are not influenced by any other variables. Often used as starting points for causal graphs.
+-   **Tier 1 — Endogenous variables:** Variables in this tier are potentially influenced by those in Tier 0 and possibly other Tier 1 variables.
+-   **Tier 2 and up — Higher-tier variables:** These variables may be influenced by preceding tiers or even within the same tier. Although there can be any number of tiers, three tiers are strictly necessary.
+
+Currently, all knowledge assertions must be done ahead of time by the user as in-place editing is not yet supported. The file format should be similar to the data file (i.e., CSV with a header), but will contain only two columns: `level` and `variable` (where `level` contains a numeric tier and `variable` contains the variable name exactly as in the data file). Each variable name should appear exactly once.
+
+Once both files are uploaded and accepted, a new button "Build Graph" will appear. Clicking it will run causal discovery algorithms to build your causal graph and display it in the main panel. If you are unsatisfied with the graph and feel that updating your data or knowledge file might help, you can select new files and re-build your graph until satisfied.
+
+**Step 2: Identifying potential sources of bias**
+
+<img src="./readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2" />
+
+The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.
+
+> **Note:** In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.
+
+Once the user has completed their definitions for the experimental/treatment (x) and outcome (y) variables, they may click the "Update Graph" button to proceed. Activating this button will run the causal identification algorithms in AIR, which will update the causal graph by highlighting: - Both x and y variables (in yellow) - Two separate adjustment sets: - Potential confounders that are parents of x and y (displayed in medium gray) - Potential confounders that are parents of x and intermediate variables and/or y (displayed in light gray)
+
+As with Step 1, the user may continue editing until satisfied, but must always click "Update Graph" for changes to take effect.
+
+**Step 3: Estimating the causal effect to compare with your AI Classifier**
+
+<img src="./readme_md_files/image3.png" style="width:6.5in; height:2.8in;" alt="Description of image3" />
+
+The tool will now prompt the user for information about their classifier to be tested. This section is context-dependent, so the input boxes will change according to the user's selection. Currently, three options are available:
+
+-   **Uploading a model:** This prompts the user to upload a copy of the model used to estimate the average treatment effect (ATE) predicted by the classifier. (Currently, only models in the `.rda` format are accepted; additional formats can be added upon request.)
+-   **Providing an ATE:** If the user can calculate their own ATE, they may input that value directly. (See "Generating your own ATE" below for more details.)
+-   **No information (do it all for me):** For users who don't have a specific model, the tool will generate several commonly used machine learning models and compare them against the causally-derived model of AIR. No additional input is required.
+
+After making a selection, click the "Calculate Results" button to finish the causal estimation portion. Once initiated, the process cannot be undone, so ensure you are ready. In our trials with a fairly simple model, this process usually takes 2-5 minutes. Once complete, the progress bar will disappear and the view will navigate to the "Results" tab using the blue ribbon at the top of the tool screen.
+
+<h2>Results</h2>
+
+<img src="./readme_md_files/image4.png" style="width:6.5in; height:2.8in;" alt="Description of image4" />
+
+This page requires no user input but displays the full health report. It contains:
+
+-   **Left:** The causal graph with both x and y variables highlighted in yellow. Additional nodes contributing significant bias (if found) will be highlighted in red, with further details provided in the "Interpreting your results" section.
+-   **Top Right:** A 'ribbon plot' that displays a summary of the ATE and its associated 95% confidence interval for both adjustment sets (medium and light gray). Values within both intervals are shaded green; those within only one interval are yellow; and values outside both are red. The classifier's ATE is indicated by an arrow on the line. These causal intervals provide independent checks on classifier behavior. If one interval is violated, it may be a statistical anomaly; if both are violated, caution is advised regarding that use case. The adjustment sets output in Step 2 recommend which variables/features to focus on for subsequent classifier retraining.
+-   **Bottom Right:** A custom text-based interpretation summarizing results from all steps. These interpretations are generated automatically and are unique to each session.
+
+<h3>Generating your own ATE</h3>
+
+If you provide your own ATE, the AIR Tool accepts values calculated using potential outcome prediction. In practice, you cannot observe both ($Y\_{1}$) (observed treated outcome) and ($Y\_{0}$) (observed untreated outcome) for the same individual. Instead, the model simulates these outcomes. For each individual:
+
+-   ($\widehat{Y}\_{1}$): The predicted outcome when treatment ( T = 1 ) is manually set for all individuals.
+-   ($\widehat{Y}\_{0}$): The predicted outcome when treatment ( T = 0 ) is manually set for all individuals.
+
+The ATE is then computed as the average difference between these potential outcomes:
+$$
+ATE = \frac{1}{N}\sum*{i = 1}^{N}* \left( \widehat{Y}{1i} - \widehat{Y}\_{0i} \right)
+$$
+<h1>Known Issues/Limitations</h1>
+
+**Existing Problems:** Issues that remain in the current release will be identified as testing continues.
+
+**Limitations:**
+
+-   The tool currently only handles binary (on/off or true/false) treatment and outcome variables. This is due to differences in analysis requirements. A built-in tool to transform continuous variables into binary format is provided as part of Step 2.
+-   Only `.rda` files are accepted for model uploads. If you have another model format you’d like to use, please let us know.
+-   The tool does not fix your model but provides a health report that identifies potential sources of bias. It is up to the user to apply appropriate remedies based on this information.
+
+<h1>Contact and Support Information</h1>
+
+-   **Support Channels:** How users can reach out for help (e.g., email, support portal).
+-   **Feedback Mechanism:** [tailor-help\@sei.cmu.edu](mailto:tailor-help@sei.cmu.edu){.email}
+
+<h1>Roadmap or Future Updates</h1>
+
+-   **Upcoming Features:** Coming soon.
+-   **Planned Enhancements:** Coming soon.
+
+<h1>Security Information</h1>
+
+In the current AIR tool, data is not saved or used beyond the purposes specified above. Once the tool has finished running, its state is not saved for future use. Users are responsible for the handling of their source data.
+
+<h1>Licensing and Legal Information</h1>
+
+-   **Licensing Terms:** Clarify usage rights and any licensing requirements.
+-   **Legal Disclaimers:** Include any necessary legal notices.

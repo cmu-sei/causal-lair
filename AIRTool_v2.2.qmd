@@ -2,9 +2,11 @@
 title: "AIRTOOL PROTOTYPE--not intended for public consumption"
 format: 
   dashboard:
-    theme: lumen
+    theme: spacelab
     orientation: columns
     # embed-resources: true
+resources:
+  - readme_md_files
 server: shiny
 ---
 
@@ -40,7 +42,7 @@ suppressMessages(library(AIPW))
 suppressMessages(library(DiagrammeR))
 suppressMessages(library(dplyr))
 suppressMessages(library(e1071))
-suppressMessages(library(earth))
+# suppressMessages(library(earth))
 suppressMessages(library(ggplot2))
 suppressMessages(library(hal9001))
 suppressMessages(library(here))
@@ -106,6 +108,15 @@ if (Sys.info()["sysname"] == "Linux") {
 
   } 
 ```
+
+# About
+```{r include-info, echo=FALSE, results='asis'}
+# Read the file and output its content as-is
+# cat(paste(readLines("info.qmd"), collapse = "\n"))
+knitr::opts_knit$set(root.dir = AIRHome)
+cat(knitr::knit_child("info.qmd", quiet = TRUE))
+```
+
 
 # Setup
 
@@ -338,10 +349,10 @@ output$blankGraph <- renderGrViz({
   req(graph_complete())
   dot <- readLines("dotfile.txt")  
   if (graph_update()) {
-    dot <- change_node_color(dot, input$xvar, "yellow")
-    dot <- change_node_color(dot, input$yvar, "yellow")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "gray30")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "gray80")
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
   }
   grViz(dot)
 })
@@ -385,12 +396,12 @@ output$histogram_x <- renderPlot({
     )
     
     # Define colors
-    colors <- c("Treated" = "red", "Untreated" = "gray")
+    colors <- c("Treated" = "#5D9AFF", "Untreated" = "#EAE1D7")
     
     # Generate the histogram
     ggplot(plot_df, aes(x = x, fill = Treatment, color = Treatment)) +
       geom_rug(sides = "b") +
-      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black", alpha = 0.7) +
+      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
       scale_fill_manual(values = colors, labels = c(untreated_label, treated_label)) +
       scale_color_manual(values = colors, labels = c(untreated_label, treated_label)) +
       geom_vline(xintercept = input$tv_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
@@ -443,12 +454,12 @@ output$histogram_y <- renderPlot({
     )
     
     # Define colors
-    colors <- c("Success" = "red", "Fail" = "gray")
+    colors <- c("Success" = "#5D9AFF", "Fail" = "#EAE1D7")
     
     # Generate the histogram
     ggplot(plot_df, aes(x = x, fill = success, color = success)) +
       geom_rug(sides = "b") +
-      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black", alpha = 0.7) +
+      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
       scale_fill_manual(values = colors, labels = c(fail_label, success_label)) +
       scale_color_manual(values = colors, labels = c(fail_label, success_label)) +
       geom_vline(xintercept = input$ov_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
@@ -620,10 +631,10 @@ observeEvent(input$updateButton, {
   req(graph_complete())
   dot <- readLines("dotfile.txt")  
   if (graph_update()) {
-    dot <- change_node_color(dot, input$xvar, "yellow")
-    dot <- change_node_color(dot, input$yvar, "yellow")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "gray30")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "gray80")
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
   }
   grViz(dot)
   })
@@ -752,8 +763,8 @@ output$graphViz = renderGrViz({
   req(calc_complete())
   
   dot <- read_file("dotfile.txt")
-  dot <- change_node_color(dot, input$xvar, "yellow")
-  dot <- change_node_color(dot, input$yvar, "yellow")
+  dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+  dot <- change_node_color(dot, input$yvar, "'#FFC107'")
   # dot <- change_node_color(dot, xvar, "yellow")
   # dot <- change_node_color(dot, yvar, "yellow")
 
@@ -763,9 +774,9 @@ output$graphViz = renderGrViz({
 
   # code for generating ribbon plot
   if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
-    dot <- change_node_color(dot, Z2, "'#FCB514'")
+    dot <- change_node_color(dot, Z2, "'#FFC107'")
   } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
-    dot <- change_node_color(dot, Z1, "'#FCB514'")
+    dot <- change_node_color(dot, Z1, "'#FFC107'")
   } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
     dot <- change_node_color(dot, Z1, "'#C00000'")
     dot <- change_node_color(dot, Z2, "'#C00000'")
@@ -1029,3 +1040,21 @@ output$second_column_content <- renderUI({
     )
   })
 ```
+
+# Key
+
+- Graph Colors
+    - <span style="color: #FFC107; font-weight: bold;">Yellow</span>: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
+    - <span style="color: #9394A2; font-weight: bold;">Dark Gray</span>: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
+    - <span style="color: #D4C7C7; font-weight: bold;">Light Gray</span>: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
+    - <span style="color: #C00000; font-weight: bold;">Red</span>: Any nodes with this color have been flagged as introducing bias into the results of the input classifier. Nodes will change from (dark/light) gray to red if the classifier ATE falls outside the 95% confidence interval for a given adjustment set. 
+
+- Histogram Colors
+    - <span style="color: #5D9AFF; font-weight: bold;">Blue</span>: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
+    - <span style="color: #EAE1D7; font-weight: bold;">Gray</span>: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc... 
+
+- Ribbon Plot Colors
+    - <span style="color: #C00000; font-weight: bold;">Red</span>: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
+    - <span style="color: #FCB514; font-weight: bold;">Yellow</span>: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias. 
+    - <span style="color: #378855; font-weight: bold;">Green</span>: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
+
