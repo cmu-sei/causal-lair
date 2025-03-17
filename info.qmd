@@ -109,11 +109,12 @@ Once both files are uploaded and accepted, a new button "Build Graph" will appea
 
 **Step 2: Identifying potential sources of bias**
 
-```{r}
-shiny::addResourcePath(prefix = "readme_md_files", directoryPath = "readme_md_files")
-```
+<!-- ```{r} -->
+<!-- shiny::addResourcePath(prefix = "readme_md_files", directoryPath = "readme_md_files") -->
+<!-- ``` -->
+
 <img src="readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2"/>
-![](readme_md_files/image2.png)
+<!-- ![](readme_md_files/image2.png) -->
 
 The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.
 

@@ -239,7 +239,7 @@ knowledge <- reactive({
 
   if(is.character(fixed)){
     sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
+      session = shiny::getDefaultReactiveDomain(),
       title = "Upload Failed",
       text = fixed,
       type = "warning",
