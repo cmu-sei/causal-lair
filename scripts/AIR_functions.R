@@ -21,6 +21,158 @@
 # its own license.
 #
 # DM24-1686
+getLocalTags <- function() {
+  if (!isLocal()) {
+    return(NULL)
+  }
+  
+  htmltools::tagList(
+    htmltools::tags$script(paste0(
+      "$(function() {",
+      "  $(document).on('shiny:disconnected', function(event) {",
+      "    $('#ss-connect-dialog').show();",
+      "    $('#ss-overlay').show();",
+      "  })",
+      "});"
+    )),
+    htmltools::tags$div(
+      id="ss-connect-dialog", style="display: none;",
+      htmltools::tags$a(id="ss-reload-link", href="#", onclick="window.location.reload(true);")
+    ),
+    htmltools::tags$div(id="ss-overlay", style="display: none;")
+  )
+}
+
+isLocal <- function() {
+  Sys.getenv("SHINY_PORT", "") == ""
+}
+
+disconnectMessage <- function(
+    text = "An error occurred. Please refresh the page and try again.",
+    refresh = "Refresh",
+    width = 450,
+    top = 50,
+    size = 22,
+    background = "white",
+    colour = "#444444",
+    overlayColour = "black",
+    overlayOpacity = 0.6,
+    refreshColour = "#337ab7",
+    css = ""
+) {
+  
+  checkmate::assert_string(text, min.chars = 1)
+  checkmate::assert_string(refresh)
+  checkmate::assert_numeric(size, lower = 0)
+  checkmate::assert_string(background)
+  checkmate::assert_string(colour)
+  checkmate::assert_string(overlayColour)
+  checkmate::assert_number(overlayOpacity, lower = 0, upper = 1)
+  checkmate::assert_string(refreshColour)
+  checkmate::assert_string(css)
+  
+  if (width == "full") {
+    width <- "100%"
+  } else if (is.numeric(width) && width >= 0) {
+    width <- paste0(width, "px")
+  } else {
+    stop("disconnectMessage: 'width' must be either an integer, or the string \"full\".", call. = FALSE)
+  }
+  
+  if (top == "center") {
+    top <- "50%"
+    ytransform <- "-50%"
+  } else if (is.numeric(top) && top >= 0) {
+    top <- paste0(top, "px")
+    ytransform <- "0"
+  } else {
+    stop("disconnectMessage: 'top' must be either an integer, or the string \"center\".", call. = FALSE)
+  }
+  
+  htmltools::tagList(
+    getLocalTags(),
+    htmltools::tags$head(
+      htmltools::tags$style(
+        glue::glue(
+          .open = "{{", .close = "}}",
+          
+          "#shiny-disconnected-overlay { display: none !important; }",
+          
+          "#ss-overlay {
+             background-color: {{overlayColour}} !important;
+             opacity: {{overlayOpacity}} !important;
+             position: fixed !important;
+             top: 0 !important;
+             left: 0 !important;
+             bottom: 0 !important;
+             right: 0 !important;
+             z-index: 99998 !important;
+             overflow: hidden !important;
+             cursor: not-allowed !important;
+          }",
+          
+          "#ss-connect-dialog {
+             background: {{background}} !important;
+             color: {{colour}} !important;
+             width: {{width}} !important;
+             transform: translateX(-50%) translateY({{ytransform}}) !important;
+             font-size: {{size}}px !important;
+             top: {{top}} !important;
+             position: fixed !important;
+             bottom: auto !important;
+             left: 50% !important;
+             padding: 0.8em 1.5em !important;
+             text-align: center !important;
+             height: auto !important;
+             opacity: 1 !important;
+             z-index: 99999 !important;
+             border-radius: 3px !important;
+             box-shadow: rgba(0, 0, 0, 0.3) 3px 3px 10px !important;
+          }",
+          
+          "#ss-connect-dialog::before { content: '{{text}}' }",
+          
+          "#ss-connect-dialog label { display: none !important; }",
+          
+          "#ss-connect-dialog a {
+             display: {{ if (refresh == '') 'none' else 'block' }} !important;
+             color: {{refreshColour}} !important;
+             font-size: 0 !important;
+             margin-top: {{size}}px !important;
+             font-weight: normal !important;
+          }",
+          
+          "#ss-connect-dialog a::before {
+            content: '{{refresh}}';
+            font-size: {{size}}px;
+          }",
+          
+          "#ss-connect-dialog { {{ htmltools::HTML(css) }} }"
+        )
+      )
+    )
+  )
+}
+
+#' Show a nice message when a shiny app disconnects or errors
+#'
+#' This function is a version of [`disconnectMessage()`] with a pre-set combination
+#' of parameters that results in a large centered message.
+#' @export
+disconnectMessage2 <- function() {
+  disconnectMessage(
+    text = "Your session has timed out.",
+    refresh = "",
+    size = 70,
+    colour = "white",
+    background = "rgba(64, 64, 64, 0.9)",
+    width = "full",
+    top = "center",
+    overlayColour = "#999",
+    overlayOpacity = 0.7,
+    css = "padding: 15px !important; box-shadow: none !important;"
+  )
+}
 
 fix_knowledge <- function(df){
   # Store original column names

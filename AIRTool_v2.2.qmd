@@ -65,10 +65,14 @@ AIRHome <- here()
 setwd(AIRHome)
 set.seed(123)
 
+
 # Nick, I significantly reduced the complexity of tetrad_utils. Most of what it
 # was doing is no longer needed.
 
 source("scripts/AIR_functions.R")
+disconnectMessage()
+actionButton("disconnect", "Disconnect the app")
+
 if (!dir.exists(paste0(AIRHome, "/data/"))) {
   dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
 }
@@ -188,9 +192,14 @@ uiOutput("second_column_content")
 ```{r}
 #| context: server
 
+observeEvent(input$disconnect, {
+    session$close()
+  })
+
 calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
+file_check <- reactiveVal(FALSE)
 
 model_in <- reactive({
   req(input$model_in)
@@ -226,19 +235,33 @@ output$ui_file2 = renderUI({
   fileInput("file2", "", accept = ".csv")
 })
 
+# knowledge <- read_csv("input/knowledge.csv", col_names = T)
 knowledge <- reactive({
+  req(input$file2)  # Make sure the file is uploaded
   path2 <- input$file2$datapath
-  extension <- tools::file_ext(path2)
+  extension <- tolower(tools::file_ext(path2))
+  
   if (extension == "csv") {
-    knowledge <- read_csv(path2, col_names = T)
+    knowledge_in <- read_csv(path2, col_names = TRUE)
   } else if (extension == "xlsx") {
-    knowledge <- readxl::read_excel(path2, col_names = T)
+    knowledge_in <- readxl::read_excel(path2, col_names = TRUE)
+  } else {
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "Upload Failed",
+      text = "Unsupported file extension. Please upload a CSV or XLSX file.",
+      type = "warning",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE
+    )
+    return(NA)
   }
-  k1_class <- knowledge |> pull(1) |> class()
-  k2_class <- knowledge |> pull(2) |> class()
-  # k_names <- names(knowledge)
-  fixed <- fix_knowledge(knowledge)
-
+  
+  # Process the data with fix_knowledge
+  fixed <- fix_knowledge(knowledge_in)
+  # Check the outcome of fix_knowledge
   if (is.character(fixed)) {
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
@@ -249,12 +272,19 @@ knowledge <- reactive({
       btn_colors = "#3085d6",
       closeOnClickOutside = TRUE,
       showCloseButton = FALSE
-      )
+    )
     return(NA)
-  } else{
-    return(knowledge)
+  } else {
+    file_check(TRUE)  # Set the reactiveVal if all is good
+    return(fixed)
   }
-  knowledge <- read_csv("input/knowledge.csv", col_names = T)
+})
+
+observeEvent(input$file2, {
+  # Call the reactive to force its evaluation
+  result <- knowledge()
+  # Optionally, you can print or log the result for debugging
+  #print(result)
 })
 
 output$step3 = renderUI({
@@ -557,7 +587,7 @@ output$ui_goButton = renderUI({
 })
 
 output$ui_buildButton = renderUI({
-  req(input$file2)
+  req(file_check())
   actionBttn(
     inputId = "buildButton",
     label = "Build Graph",
@@ -656,23 +686,24 @@ observeEvent(input$updateButton, {
 })
 
 observeEvent(input$buildButton, {
+  # req(knowledge())
   ### AIR Step 1 ----------------
-  if (Sys.info()["sysname"] == "Linux") {
-    graph <- AIR_getGraph(df(), knowledge()) # prod
-    dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
-  } else {
-    graph <- read_file("graphtxt.txt") # test
-    dot <- read_file("dotfile.txt") # test
-  }
-  # graph <- AIR_getGraph(df, knowledge)
+  # if (!is.na(knowledge())){
+    if (Sys.info()["sysname"] == "Linux") {
+      graph <- AIR_getGraph(df(), knowledge()) # prod
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
+    } else {
+      graph <- read_file("graphtxt.txt") # test
+      dot <- read_file("dotfile.txt") # test
+    }
+    # graph <- AIR_getGraph(df, knowledge)
+    
+    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
+    # writeLines(graph_data, "graphtxt.txt")
   
-  # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
-  # writeLines(graph_data, "graphtxt.txt")
-
-  # Visualize the resulting graph
-  # visualize_graph(graph)
-  write(dot, "dotfile.txt")
-  if (!is.na(knowledge())){
+    # Visualize the resulting graph
+    # visualize_graph(graph)
+    write(dot, "dotfile.txt")
     graph_complete(TRUE)
   
     output$blankGraph <- renderGrViz({
@@ -680,6 +711,7 @@ observeEvent(input$buildButton, {
     dot <- readLines("dotfile.txt")  
     grViz(dot)
     })
+    
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),,
       title = "Your Causal Graph is Ready",
@@ -690,18 +722,18 @@ observeEvent(input$buildButton, {
       closeOnClickOutside = TRUE,
       showCloseButton = FALSE,
       )
-  } else {
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
-      title = "Missing Knowledge File",
-      text = "Knowledge file is missing or corrupt. Please upload a valid knowledge file.",
-      type = "fail",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
-      )
-  }
+  # } else {
+  #   sendSweetAlert(
+  #     session = shiny::getDefaultReactiveDomain(),,
+  #     title = "Missing Knowledge File",
+  #     text = "Knowledge file is missing or corrupt. Please upload a valid knowledge file.",
+  #     type = "fail",
+  #     btn_labels = "Continue",
+  #     btn_colors = "#3085d6",
+  #     closeOnClickOutside = TRUE,
+  #     showCloseButton = FALSE,
+  #     )
+  # }
 })
   
 observeEvent(input$goButton, {
