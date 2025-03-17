@@ -42,7 +42,6 @@ suppressMessages(library(AIPW))
 suppressMessages(library(DiagrammeR))
 suppressMessages(library(dplyr))
 suppressMessages(library(e1071))
-# suppressMessages(library(earth))
 suppressMessages(library(ggplot2))
 suppressMessages(library(hal9001))
 suppressMessages(library(here))
@@ -59,6 +58,8 @@ suppressMessages(library(tidyr))
 suppressMessages(library(tmle3))
 suppressMessages(library(xgboost))
 suppressMessages(library(jsonlite))
+suppressMessages(library(foreach))
+suppressMessages(library(doParallel))
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -81,6 +82,7 @@ if (!dir.exists(paste0(AIRHome, "/plots/"))) {
 }
 
 if (Sys.info()["sysname"] == "Linux") {
+  suppressMessages(library(earth))
   source("scripts/tetrad_utils.R")
   source("scripts/TetradSearch.R")
   
@@ -227,9 +229,9 @@ output$ui_file2 = renderUI({
 knowledge <- reactive({
   path2 <- input$file2$datapath
   extension <- tools::file_ext(path2)
-  if (extension == "csv"){
+  if (extension == "csv") {
     knowledge <- read_csv(path2, col_names = T)
-  } else if (extension == "xlsx"){
+  } else if (extension == "xlsx") {
     knowledge <- readxl::read_excel(path2, col_names = T)
   }
   k1_class <- knowledge |> pull(1) |> class()
@@ -237,7 +239,7 @@ knowledge <- reactive({
   # k_names <- names(knowledge)
   fixed <- fix_knowledge(knowledge)
 
-  if(is.character(fixed)){
+  if (is.character(fixed)) {
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "Upload Failed",
@@ -740,8 +742,16 @@ observeEvent(input$goButton, {
     ### have to figure out how many cores there are
     ## for now, just hardcode that in
     ### parallelize this loop -----------
-    for (i in unique(Zvars$name)) {
-      for (j in unique(Zvars$grp)) {
+    # How many cores does your CPU have
+    n_cores <- detectCores()
+    n_cores
+    
+    # Register cluster
+    cluster <- makeCluster(n_cores - 1)
+    registerDoParallel(cluster)
+    
+    foreach(i = unique(Zvars$name)) %dopar% {
+      foreach(j = unique(Zvars$grp)) %dopar% {
         settings <- data.frame(doc_title = paste0(i,"-",j),
                                   nfold = 20,
                                   Z_level = j,
@@ -756,6 +766,8 @@ observeEvent(input$goButton, {
         # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
       }
     }
+    # Don't fotget to stop the cluster
+    stopCluster(cl = cluster)
     
     incProgress(0.2, message = "Processing Results")
     processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
