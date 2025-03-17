@@ -22,6 +22,40 @@
 #
 # DM24-1686
 
+fix_knowledge <- function(df){
+  # Store original column names
+  original_colnames <- colnames(df)
+  
+  # Detect numeric vs non-numeric columns
+  numeric_cols <- sapply(df, function(col) all(!is.na(suppressWarnings(as.numeric(as.character(col))))))
+  # check if column header is missing and data conform to expectations. If so, process and return
+  if (any(!is.na(suppressWarnings(as.numeric(original_colnames))))) {
+    
+    # Confirm exactly one numeric and one character-type column exist
+    if (sum(numeric_cols) == 1 && sum(!numeric_cols) == 1) {
+      new_colnames <- c("level", "variable")
+      new_colnames_ordered <- rep(NA, length(df))
+      new_colnames_ordered[numeric_cols] <- "level"
+      new_colnames_ordered[!numeric_cols] <- "variable"
+      
+      # Move original column names to first row
+      df <- rbind(setNames(as.list(original_colnames), names(df)), df)
+      
+      # Now assign the new column names
+      colnames(df) <- new_colnames_ordered
+    } else {
+      return("Unable to read knowledge file data. Please make sure file contains a header with the following column names: level, variable. 'variable' should contain the name of each variable used, and 'level' should be a numeric value to represent an estimated causal hierarchy (see readme file for a detailed description).")
+    }  
+  } else if (sum(numeric_cols) == 1 && sum(!numeric_cols) == 1) {
+      colnames(df)[numeric_cols] <- "level"
+      colnames(df)[!numeric_cols] <- "variable"
+    } else {
+      return("Unable to read knowledge file data. Please make sure file contains a header with the following column names: level, variable. 'variable' should contain the name of each variable used, and 'level' should be a numeric value to represent an estimated causal hierarchy (see readme file for a detailed description).")
+    }
+  
+  return(df)
+}
+
 # change color of nodes in graph
 change_node_color <- function(dot_code, node, color) {
   for (i in 1:length(node)) {

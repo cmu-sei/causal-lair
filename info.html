@@ -205,7 +205,11 @@ Getting Started
 <p>Currently, all knowledge assertions must be done ahead of time by the user as in-place editing is not yet supported. The file format should be similar to the data file (i.e., CSV with a header), but will contain only two columns: <code>level</code> and <code>variable</code> (where <code>level</code> contains a numeric tier and <code>variable</code> contains the variable name exactly as in the data file). Each variable name should appear exactly once.</p>
 <p>Once both files are uploaded and accepted, a new button “Build Graph” will appear. Clicking it will run causal discovery algorithms to build your causal graph and display it in the main panel. If you are unsatisfied with the graph and feel that updating your data or knowledge file might help, you can select new files and re-build your graph until satisfied.</p>
 <p><strong>Step 2: Identifying potential sources of bias</strong></p>
-<p><img src="./readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2"></p>
+<!-- <img src="./readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2" /> -->
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">addResourcePath</span>(<span class="at">prefix =</span> <span class="st">"readme_md_files"</span>, <span class="at">directoryPath =</span> <span class="st">"./readme_md_files/"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p><img src="%22readme_md_files/image2.png%22" class="img-fluid"></p>
 <p>The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.</p>
 <blockquote class="blockquote">
 <p><strong>Note:</strong> In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes “treated” vs.&nbsp;“untreated” and “success” vs.&nbsp;“fail” for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
