@@ -156,7 +156,7 @@ disconnectMessage <- function(
 
 #' Show a nice message when a shiny app disconnects or errors
 #'
-#' This function is a version of [`disconnectMessage()`] with a pre-set combination
+#' This function is a version of disconnectMessage() with a pre-set combination
 #' of parameters that results in a large centered message.
 #' @export
 disconnectMessage2 <- function() {
@@ -252,6 +252,7 @@ scale_ <- function(x){
 }
 
 runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold){ 
+  write.csv(paste0(Sys.time(), " -- started superlearner"), file = "settings_log.csv", append = TRUE)
   Z_level <- settings$Z_level
   doc_title <- settings$doc_title
   
@@ -259,8 +260,8 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   treatment <- settings$varName
   outcome =  df_vars[df_vars$var == "OV",]$val
   # mediators = df |> select(-c(treatment, outcome, confounders)) |> colnames() # unnecessary unless doing mediation analysis
-  
   df <- read_csv(paste0(AIRHome,"/data/datafile.csv")) # can probably remove this as it's likely redundant
+  write.csv(paste0(Sys.time(), " -- read in data"), file = "settings_log.csv", append = TRUE)
   if (tv_dir == ">") {
     df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
   } else if (tv_dir == ">=") {
@@ -288,19 +289,18 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   ##### Define Superlearner -------------------
   # sl3_list_learners("binomial") 
   
-  lrnr_mean <- make_learner(Lrnr_mean)
-  lrnr_glm <- make_learner(Lrnr_glm)
-  # lrnr_pois <- make_learner(Lrnr_glm, family = 'poisson')
-  lrnr_hal <- make_learner(Lrnr_hal9001)
-  lrnr_nnet <- make_learner(Lrnr_nnet)
-  lrnr_rforest <- make_learner(Lrnr_randomForest)
-  lrnr_ranger <- make_learner(Lrnr_ranger)
-  lrnr_glmnet <- make_learner(Lrnr_glmnet)
-  lrnr_xgboost <- make_learner(Lrnr_xgboost, max_depth = 4, eta = 0.01, nrounds = 100)  
-  lrnr_earth <- make_learner(Lrnr_earth)  
-  
+  lrnr_mean <- sl3::make_learner(sl3::Lrnr_mean)
+  lrnr_glm <- sl3::make_learner(sl3::Lrnr_glm)
+  lrnr_hal <- sl3::make_learner(sl3::Lrnr_hal9001)
+  lrnr_nnet <- sl3::make_learner(sl3::Lrnr_nnet)
+  lrnr_rforest <- sl3::make_learner(sl3::Lrnr_randomForest)
+  lrnr_ranger <- sl3::make_learner(sl3::Lrnr_ranger)
+  lrnr_glmnet <- sl3::make_learner(sl3::Lrnr_glmnet)
+  lrnr_xgboost <- sl3::make_learner(sl3::Lrnr_xgboost, max_depth = 4, eta = 0.01, nrounds = 100)  
+  lrnr_earth <- sl3::make_learner(sl3::Lrnr_earth)  
+  write.csv(paste0(Sys.time(), " -- built learners"), file = "settings_log.csv", append = TRUE)
   if (length(confounders) > 1) {
-    sl_ <- make_learner(Stack, unlist(list(lrnr_mean, 
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
                                            lrnr_glm,
                                            lrnr_hal,
                                            lrnr_ranger, 
@@ -311,7 +311,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
                                            lrnr_nnet), 
                                       recursive = TRUE))
   } else {
-    sl_ <- make_learner(Stack, unlist(list(lrnr_mean, 
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
                                            lrnr_glm,
                                            lrnr_hal,
                                            lrnr_ranger, 
@@ -324,15 +324,15 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   # DEFINE SL_Y AND SL_A 
   # We only need one, because they're the same
   ##### Define Formulae --------------------------
-  Q_learner <- Lrnr_sl$new(learners = sl_, 
-                           metalearner = Lrnr_nnls$new(convex = T)) # output model
-  g_learner <- Lrnr_sl$new(learners = sl_, 
-                           metalearner = Lrnr_nnls$new(convex = T)) # treatment model
+  Q_learner <- sl3::Lrnr_sl$new(learners = sl_, 
+                           metalearner = sl3::Lrnr_nnls$new(convex = T)) # output model
+  g_learner <- sl3::Lrnr_sl$new(learners = sl_, 
+                           metalearner = sl3::Lrnr_nnls$new(convex = T)) # treatment model
   learner_list <- list(Y = Q_learner,
                        A = g_learner)
   
   # PREPARE THE THINGS WE WANT TO FEED IN TO TMLE3
-  ate_spec <- tmle_ATE(treatment_level = 1, control_level = 0)
+  ate_spec <- tmle3::tmle_ATE(treatment_level = 1, control_level = 0)
   
 
   
@@ -344,11 +344,27 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   
   ##### RUN TMLE3 -------------------------------
   set.seed(123)
-  tmle_fit_ <- tmle3(tmle_spec = ate_spec, 
-                     data = df, 
-                     node_list = nodes_, 
-                     learner_list = learner_list)
+  write.csv(paste0(Sys.time(), " -- built TMLE"), file = "settings_log.csv", append = TRUE)
+  ### this is where the parellel is breaking
+  cat("About to call tmle3...\n", file = "error_log.txt", append = TRUE)
+  cat("Lrnr_nnls class: ", class(sl3::Lrnr_nnls), "\n", file = "error_log.txt", append = TRUE)
+  cat("tmle_spec:", class(ate_spec), "\n", file = "error_log.txt", append = TRUE)
+  cat("df: ", class(df), "\n", file = "error_log.txt", append = TRUE)
+  cat("nodes_: ", class(nodes_), "\n", file = "error_log.txt", append = TRUE)
+  cat("learner_list: ", class(learner_list), "\n", file = "error_log.txt", append = TRUE)
   
+  tmle_fit_ <- tryCatch({
+    tmle3::tmle3(tmle_spec = ate_spec, 
+                 data = df, 
+                 node_list = nodes_, 
+                 learner_list = learner_list)
+  }, error = function(e) {
+    cat(sprintf("Error in tmle3 call: %s\n", conditionMessage(e)), 
+        file = "error_log.txt", append = TRUE)
+    stop(e)
+  })
+  cat("tmle3 call completed successfully\n", file = "error_log.txt", append = TRUE)
+  write.csv(paste0(Sys.time(), " -- ran TMLE"), file = "settings_log.csv", append = TRUE)
   tmle_task <- ate_spec$make_tmle_task(df, nodes_)
   
   initial_likelihood <- ate_spec$make_initial_likelihood(
@@ -364,7 +380,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
                   pscore = propensity_score |> pull())
   
   plap_$sw <- plap_$exposure * (mean(plap_$exposure)/propensity_score) + (1 - plap_$exposure) * ((1 - mean(plap_$exposure)) / (1 - propensity_score))
-  
+  write.csv(paste0(Sys.time(), " -- grabbed propensity scores"), file = "settings_log.csv", append = TRUE)
   ##### Save results ----------------------------
   # results to results file
   write.table(cbind(treatment, Z_level, tmle_fit_$summary[,c(8:10)], deparse.level = 0), 
@@ -377,11 +393,11 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   initial_likelihood_preds <- initial_likelihood$get_likelihoods(tmle_task,"Y")
   # define and fit likelihood
   factor_list <- list(
-    define_lf(LF_emp, "W"),
-    define_lf(LF_fit, "A", sl_),
-    define_lf(LF_fit, "Y", sl_, type = "mean")
+    tmle3::define_lf(LF_emp, "W"),
+    tmle3::define_lf(LF_fit, "A", sl_),
+    tmle3::define_lf(LF_fit, "Y", sl_, type = "mean")
   )
-  likelihood_def <- Likelihood$new(factor_list)
+  likelihood_def <- tmle3::Likelihood$new(factor_list)
   likelihood <- likelihood_def$train(tmle_task)
   likelihood_values <- rowMeans(likelihood$get_likelihoods(tmle_task,"Y"))
   
@@ -395,22 +411,22 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   
   ## generate counterfactuals
   ### counterfactual where all treatments set to 1
-  intervention1 <- define_lf(LF_static, "A", value = 1)
+  intervention1 <- tmle3::define_lf(LF_static, "A", value = 1)
   
-  cf_likelihood1 <- make_CF_Likelihood(likelihood, intervention1)
+  cf_likelihood1 <- tmle3::make_CF_Likelihood(likelihood, intervention1)
   
   cf_likelihood_values1 <- cf_likelihood1$get_likelihoods(tmle_task, "A")
   
   # We can then use this to construct a counterfactual likelihood:
   ### counterfactual where all treatments set to 0
   # set values
-  intervention0 <- define_lf(LF_static, "A", value = 0)
+  intervention0 <- tmle3::define_lf(LF_static, "A", value = 0)
   # generate counterfactual likelihood object
-  cf_likelihood0 <- make_CF_Likelihood(likelihood, intervention0)
+  cf_likelihood0 <- tmle3::make_CF_Likelihood(likelihood, intervention0)
   # get likelihoods from object
   cf_likelihood_values0 <- cf_likelihood0$get_likelihoods(tmle_task, "A")
   # We see that the likelihood values for the A node are all either 0 or 1, as would be expected from an indicator likelihood function. In addition, the likelihood values for the non-intervention nodes have not changed.
-  
+  write.csv(paste0(Sys.time(), " -- grabbed likelihood values"), file = "settings_log.csv", append = TRUE)
   
   ## output individual row values
   # df_out <- df[,c(nodes_$A, nodes_$Y, nodes_$W)]
@@ -427,7 +443,9 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   df_out$g_fit_pred <- g_fit$predict() 
   df_out$Q_fit_pred <- Q_fit$predict()
   
+  write.csv(paste0(Sys.time(), " -- defined df_out"), file = "settings_log.csv", append = TRUE)
   write_csv(df_out, paste0(AIRHome, "/data/", settings$doc_title,"-data.csv"))
+  write.csv(paste0(Sys.time(), " -- completed superlearner"), file = "settings_log.csv", append = TRUE)
 }
 
 processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in){
@@ -547,17 +565,17 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
       covariates = covariate_list
     )
 
-    lrnr_glm <- Lrnr_glm$new()
-    lrnr_hal <- Lrnr_hal9001$new()
-    lrnr_ranger <- Lrnr_ranger$new()
-    lrnr_rforest <- Lrnr_randomForest$new()
-    lrnr_glmnet <- Lrnr_glmnet$new()
-    lrnr_xgboost <- Lrnr_xgboost$new()
-    lrnr_earth <- Lrnr_earth$new()
-    lrnr_nnet <- Lrnr_nnet$new()
-    lrnr_svm <- Lrnr_svm$new()
+    lrnr_glm <- sl3::Lrnr_glm$new()
+    lrnr_hal <- sl3::Lrnr_hal9001$new()
+    lrnr_ranger <- sl3::Lrnr_ranger$new()
+    lrnr_rforest <- sl3::Lrnr_randomForest$new()
+    lrnr_glmnet <- sl3::Lrnr_glmnet$new()
+    lrnr_xgboost <- sl3::Lrnr_xgboost$new()
+    lrnr_earth <- sl3::Lrnr_earth$new()
+    lrnr_nnet <- sl3::Lrnr_nnet$new()
+    lrnr_svm <- sl3::Lrnr_svm$new()
     
-    sl_ <- sl3::make_learner(Stack, unlist(list(lrnr_glm,
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_glm,
                                                 # lrnr_ranger,
                                                 lrnr_rforest,
                                                 lrnr_glmnet,
@@ -567,11 +585,11 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
                                                 lrnr_svm),
                                            recursive = TRUE))
     
-    stack <- Stack$new(lrnr_glm, lrnr_ranger,
-                       lrnr_rforest, lrnr_glmnet, lrnr_xgboost,
-                       lrnr_earth, lrnr_nnet, lrnr_svm )
+    stack <- sl3::Stack$new(lrnr_glm, lrnr_ranger,
+                            lrnr_rforest, lrnr_glmnet, lrnr_xgboost,
+                            lrnr_earth, lrnr_nnet, lrnr_svm )
     
-    sl <- Lrnr_sl$new(learners = stack, metalearner = Lrnr_nnls$new())
+    sl <- sl3::Lrnr_sl$new(learners = stack, metalearner = sl3::Lrnr_nnls$new())
     
     sl_fit <- sl_$train(task = task)
 

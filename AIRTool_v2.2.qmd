@@ -60,6 +60,8 @@ suppressMessages(library(xgboost))
 suppressMessages(library(jsonlite))
 suppressMessages(library(foreach))
 suppressMessages(library(doParallel))
+suppressMessages(library(earth))
+
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -70,7 +72,8 @@ set.seed(123)
 # was doing is no longer needed.
 
 source("scripts/AIR_functions.R")
-disconnectMessage()
+
+disconnectMessage2()
 actionButton("disconnect", "Disconnect the app")
 
 if (!dir.exists(paste0(AIRHome, "/data/"))) {
@@ -192,15 +195,15 @@ uiOutput("second_column_content")
 ```{r}
 #| context: server
 
-observeEvent(input$disconnect, {
-    session$close()
-  })
 
+### variable declarations --------------------------------------------------------------
 calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
 
+
+### input reactives -------------------------------------------------------------------
 model_in <- reactive({
   req(input$model_in)
   #loading the model
@@ -223,16 +226,6 @@ df <- reactive({
   continuous_columns <- c(1, ncol(df))
   df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
   return(df)
-})
-
-output$step2 = renderUI({
-  req(input$file1)
-  h4("Upload knowledge file:")
-})
-
-output$ui_file2 = renderUI({
-  req(input$file1)
-  fileInput("file2", "", accept = ".csv")
 })
 
 # knowledge <- read_csv("input/knowledge.csv", col_names = T)
@@ -280,6 +273,24 @@ knowledge <- reactive({
   }
 })
 
+
+
+### event observations ----------------------------------------------------------------
+options(shiny.error = function() {
+  tb <- traceback()  # Capture the call stack
+  showModal(modalDialog(
+    title = "An error occurred",
+    paste0("Error details:", tb,
+          " 
+          Warning details:", warnings()),
+    easyClose = TRUE
+  ))
+})
+
+observeEvent(input$disconnect, {
+    session$close()
+  })
+
 observeEvent(input$file2, {
   # Call the reactive to force its evaluation
   result <- knowledge()
@@ -287,6 +298,231 @@ observeEvent(input$file2, {
   #print(result)
 })
 
+observeEvent(input$updateButton, {
+  # assign global variables
+  assign("df_vars",
+         data.frame("var" = c("TV","OV"),
+                    "val" = c(input$xvar, input$yvar)),
+         envir = .GlobalEnv)
+  # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
+  # source_python(paste0(AIRHome, "/scripts/identify.py"))
+  if (Sys.info()["sysname"] == "Linux") {
+    param1 = df_vars$val[1]
+    param2 = df_vars$val[2]
+    param3 = paste0(AIRHome, "/graphtxt.txt")
+
+    rust_bin = "identify"
+    # system2() returns the output as a character vector (one element per line).
+    json_output <- system2(rust_bin,
+                           args = c(paste0("--param1=", param1),
+                                    paste0("--param2=", param2),
+				    paste0("--param3=", param3)),
+                           stdout = TRUE)
+    
+    # json_output is a character vector. If the Rust program only prints a single line
+    # of JSON, json_output[1] will hold the entire JSON string.
+    parsed <- fromJSON(json_output[1])
+    
+    # Now `parsed` should be a list with two elements: $vector1 and $vector2
+    Z1 <- parsed$vector1
+    Z2 <- parsed$vector2
+  } else {
+    source("scripts/identify.R")
+  }
+  Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
+  Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
+  # Z1 = "region_sensitivity"
+  # Z2 = "mission_urgency"
+  ### overlaps in function with df_vars. consider combining and slimming down. consider appending to df_vars ---------
+  Zvars_loc <- data.frame("name" = character(),
+                          "grp" = character(),
+                          "Z" = character())
+
+  for (i in Z1) {
+    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z1", i))
+  }
+
+  for (i in Z2) {
+    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z2", i))
+  }
+
+  colnames(Zvars_loc) <- c("name", "grp", "Z")
+  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
+
+  graph_update(TRUE)
+
+  # updatte the graph
+  output$blankGraph <- renderGrViz({
+  req(graph_complete())
+  dot <- readLines("dotfile.txt")  
+  if (graph_update()) {
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+  }
+  grViz(dot)
+  })
+
+  sendSweetAlert(
+    session = shiny::getDefaultReactiveDomain(),,
+    title = "Causal Graph Updated",
+    text = NULL,
+    type = "success",
+    btn_labels = "Continue",
+    btn_colors = "#3085d6",
+    closeOnClickOutside = TRUE,
+    showCloseButton = FALSE,
+    )
+
+})
+
+observeEvent(input$buildButton, {
+  ### AIR Step 1 ----------------
+    if (Sys.info()["sysname"] == "Linux") {
+      graph <- AIR_getGraph(df(), knowledge()) # prod
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
+    } else {
+      graph <- read_file("graphtxt.txt") # test
+      dot <- read_file("dotfile.txt") # test
+    }
+    # graph <- AIR_getGraph(df, knowledge)
+    
+    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
+    # writeLines(graph_data, "graphtxt.txt")
+  
+    # Visualize the resulting graph
+    # visualize_graph(graph)
+    write(dot, "dotfile.txt")
+    graph_complete(TRUE)
+  
+    output$blankGraph <- renderGrViz({
+    req(graph_complete())
+    dot <- readLines("dotfile.txt")  
+    grViz(dot)
+    })
+    
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Your Causal Graph is Ready",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+})
+  
+observeEvent(input$goButton, {
+    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+
+    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
+
+    ### AIR Step 3 ----------------
+    
+    write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+
+    incProgress(0.1, message = "Estimating Causal Effects")
+    assign("model_yn",
+           input$model_exist,
+           envir = .GlobalEnv)
+
+    assign("model_ate",
+           input$ate_in,
+           envir = .GlobalEnv)
+
+    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
+
+    write.csv(file = "Results.csv",
+              x = data.frame("Row" = vector(),
+                             "Treatment" = vector(),
+                             "Group" = vector(),
+                             "Mean" = vector(),
+                             "LCI" = vector(),
+                             "UCI" = vector()),
+              row.names = FALSE)
+    
+    if (Sys.info()["sysname"] == "Linux") {
+      Sys.chmod("Results.csv", mode = "0777")
+    }
+
+    ### have to figure out how many cores there are
+    ## for now, just hardcode that in
+    # How many cores does your CPU have
+    n_cores <- detectCores()
+    n_cores
+    
+    # Register cluster
+    cluster <- makeCluster(n_cores - 1)
+    clusterEvalQ(cluster, {
+      library(tmle3)
+      library(sl3)
+    })
+    registerDoParallel(cluster)
+    
+    # foreach(i = unique(Zvars$name)) %dopar% {
+    #   foreach(j = unique(Zvars$grp)) %do% {
+    combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp)) 
+    tv_dir_val <- input$tv_dir
+    tv_threshold_val <- input$tv_threshold
+    ov_dir_val <- input$ov_dir
+    ov_threshold_val <- input$ov_threshold
+
+    tryCatch({
+      incProgress(0.3, detail = paste0("\nCalculating ATE for multiple Adjustment Sets"))
+      }, error = function(e) {
+        NULL
+    })
+    
+    foreach(k = 1:nrow(combos), 
+            .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2", "hal9001", "nnet", "randomForest", "readr", "scales", "sl3", "tidyr", "tmle3", "xgboost", "foreach", "doParallel", "shiny"),
+            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars")) %dopar% {
+        i <- combos[k, "i"]
+        j <- combos[k, "j"]
+        settings <- data.frame(doc_title = paste0(i,"-",j),
+                                  nfold = 20,
+                                  Z_level = j,
+                                  varName = i,
+                                  confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
+        # write.csv(settings, file = "settings_log.csv", append = TRUE)
+        tryCatch({
+          runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val)
+        }, error = function(e) {
+          errMsg <- sprintf("Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
+          cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+          NULL
+        })
+        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
+      }
+    # }
+    # Don't fotget to stop the cluster
+    stopCluster(cl = cluster)
+    
+    incProgress(0.2, message = "Processing Results")
+    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
+    # processResults(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in)
+    
+    
+    calc_complete(TRUE)
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Causal Estimates Successfully Calculated",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+  })
+})
+
+
+
+
+### output definitions ------------------------------------------------------------------
 output$step3 = renderUI({
   req(graph_complete())
   tagList(
@@ -378,8 +614,19 @@ output$ui_threshold_y = renderUI({
     # ov_threshold = 0
 })
 
+output$step2 = renderUI({
+  req(input$file1)
+  h4("Upload knowledge file:")
+})
+
+output$ui_file2 = renderUI({
+  req(input$file1)
+  fileInput("file2", "", accept = ".csv")
+})
+
 output$blankGraph <- renderGrViz({
   req(graph_complete())
+  
   dot <- readLines("dotfile.txt")  
   if (graph_update()) {
     dot <- change_node_color(dot, input$xvar, "'#FFC107'")
@@ -506,10 +753,6 @@ output$histogram_y <- renderPlot({
       theme_minimal()
   })
 
-# output$ui_fillerOutput = renderUI({
-#   
-# })
-
 output$ui_model_exist = renderUI({
   req(graph_update())
   radioGroupButtons(
@@ -529,6 +772,7 @@ output$ui_model_exist = renderUI({
 
 output$ui_ate_upload = renderUI({
   req(graph_update())
+  req(input$model_exist)
   if (input$model_exist == "ATE") {
     numericInput("ate_in", label = "ATE: ", value = 0, min = -1, max = 1, step = 0.1)
     # model_exist <- "ATE"
@@ -605,221 +849,6 @@ output$ui_updateButton = renderUI({
     color = "primary"
     )
 })
-
-observeEvent(input$updateButton, {
-  # assign global variables
-  assign("df_vars",
-         data.frame("var" = c("TV","OV"),
-                    "val" = c(input$xvar, input$yvar)),
-         envir = .GlobalEnv)
-  # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
-  # source_python(paste0(AIRHome, "/scripts/identify.py"))
-  if (Sys.info()["sysname"] == "Linux") {
-    param1 = df_vars$val[1]
-    param2 = df_vars$val[2]
-    param3 = paste0(AIRHome, "/graphtxt.txt")
-
-    rust_bin = "identify"
-    # system2() returns the output as a character vector (one element per line).
-    json_output <- system2(rust_bin,
-                           args = c(paste0("--param1=", param1),
-                                    paste0("--param2=", param2),
-				    paste0("--param3=", param3)),
-                           stdout = TRUE)
-    
-    # json_output is a character vector. If the Rust program only prints a single line
-    # of JSON, json_output[1] will hold the entire JSON string.
-    parsed <- fromJSON(json_output[1])
-    
-    # Now `parsed` should be a list with two elements: $vector1 and $vector2
-    Z1 <- parsed$vector1
-    Z2 <- parsed$vector2
-  } else {
-    source("scripts/identify.R")
-  }
-  Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
-  Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
-  # Z1 = "region_sensitivity"
-  # Z2 = "mission_urgency"
-  ### overlaps in function with df_vars. consider combining and slimming down. consider appending to df_vars ---------
-  Zvars_loc <- data.frame("name" = character(),
-                          "grp" = character(),
-                          "Z" = character())
-
-  for (i in Z1) {
-    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z1", i))
-  }
-
-  for (i in Z2) {
-    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z2", i))
-  }
-
-  colnames(Zvars_loc) <- c("name", "grp", "Z")
-  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
-
-  graph_update(TRUE)
-
-  # updatte the graph
-  output$blankGraph <- renderGrViz({
-  req(graph_complete())
-  dot <- readLines("dotfile.txt")  
-  if (graph_update()) {
-    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
-    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
-  }
-  grViz(dot)
-  })
-
-  sendSweetAlert(
-    session = shiny::getDefaultReactiveDomain(),,
-    title = "Causal Graph Updated",
-    text = NULL,
-    type = "success",
-    btn_labels = "Continue",
-    btn_colors = "#3085d6",
-    closeOnClickOutside = TRUE,
-    showCloseButton = FALSE,
-    )
-
-})
-
-observeEvent(input$buildButton, {
-  # req(knowledge())
-  ### AIR Step 1 ----------------
-  # if (!is.na(knowledge())){
-    if (Sys.info()["sysname"] == "Linux") {
-      graph <- AIR_getGraph(df(), knowledge()) # prod
-      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
-    } else {
-      graph <- read_file("graphtxt.txt") # test
-      dot <- read_file("dotfile.txt") # test
-    }
-    # graph <- AIR_getGraph(df, knowledge)
-    
-    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
-    # writeLines(graph_data, "graphtxt.txt")
-  
-    # Visualize the resulting graph
-    # visualize_graph(graph)
-    write(dot, "dotfile.txt")
-    graph_complete(TRUE)
-  
-    output$blankGraph <- renderGrViz({
-    req(graph_complete())
-    dot <- readLines("dotfile.txt")  
-    grViz(dot)
-    })
-    
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
-      title = "Your Causal Graph is Ready",
-      text = NULL,
-      type = "success",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
-      )
-  # } else {
-  #   sendSweetAlert(
-  #     session = shiny::getDefaultReactiveDomain(),,
-  #     title = "Missing Knowledge File",
-  #     text = "Knowledge file is missing or corrupt. Please upload a valid knowledge file.",
-  #     type = "fail",
-  #     btn_labels = "Continue",
-  #     btn_colors = "#3085d6",
-  #     closeOnClickOutside = TRUE,
-  #     showCloseButton = FALSE,
-  #     )
-  # }
-})
-  
-observeEvent(input$goButton, {
-    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
-
-    incProgress(0.1, message = "Calculating Adjustment Sets")
-
-
-    ### AIR Step 3 ----------------
-    
-    write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
-    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
-
-    incProgress(0.1, message = "Estimating Causal Effects")
-    assign("model_yn",
-           input$model_exist,
-           envir = .GlobalEnv)
-
-    assign("model_ate",
-           input$ate_in,
-           envir = .GlobalEnv)
-
-    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
-
-    write.csv(file = "Results.csv",
-              x = data.frame("Row" = vector(),
-                             "Treatment" = vector(),
-                             "Group" = vector(),
-                             "Mean" = vector(),
-                             "LCI" = vector(),
-                             "UCI" = vector()),
-              row.names = FALSE)
-    
-    if (Sys.info()["sysname"] == "Linux") {
-      Sys.chmod("Results.csv", mode = "0777")
-    }
-
-    ### have to figure out how many cores there are
-    ## for now, just hardcode that in
-    ### parallelize this loop -----------
-    # How many cores does your CPU have
-    n_cores <- detectCores()
-    n_cores
-    
-    # Register cluster
-    cluster <- makeCluster(n_cores - 1)
-    registerDoParallel(cluster)
-    
-    foreach(i = unique(Zvars$name)) %dopar% {
-      foreach(j = unique(Zvars$grp)) %dopar% {
-        settings <- data.frame(doc_title = paste0(i,"-",j),
-                                  nfold = 20,
-                                  Z_level = j,
-                                  varName = i,
-                                  confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
-        tryCatch({
-          incProgress(0.3, detail = paste0("\nCalculating ATE for ",j," Adjustment Set"))
-          }, error = function(e) {
-            NULL
-            })
-        runSuperLearner(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold)
-        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
-      }
-    }
-    # Don't fotget to stop the cluster
-    stopCluster(cl = cluster)
-    
-    incProgress(0.2, message = "Processing Results")
-    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
-    # processResults(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in)
-    
-    
-    calc_complete(TRUE)
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
-      title = "Causal Estimates Successfully Calculated",
-      text = NULL,
-      type = "success",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
-      )
-  })
-})
-
 
 output$graphViz = renderGrViz({
   req(calc_complete())
