@@ -59,19 +59,10 @@
       };
     };
 
-    # Rust static analysis tools and scripts
-    staticanalysis = {
-      url = "github:rmdettmar/polar-static-analysis";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
-
     identify.url = "path:./identify";
   };
 
-  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, staticanalysis, tetrad, identify, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, identify, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -383,9 +374,6 @@
               # other architectures, this is where you do it.
               # targets = [ "wasm32-unknown-unknown" ];
             }))
-
-            # -- Rust Static Analysis Tools --
-            staticanalysis.packages.${system}.default
 
             sl3
             rWithPkgs

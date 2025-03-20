@@ -1218,4 +1218,3 @@ output$second_column_content <- renderUI({
     - <span style="color: #C00000; font-weight: bold;">Red</span>: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
     - <span style="color: #FCB514; font-weight: bold;">Yellow</span>: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias. 
     - <span style="color: #378855; font-weight: bold;">Green</span>: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
-

@@ -171,33 +171,6 @@
         "type": "path"
       }
     },
-    "l3x": {
-      "inputs": {
-        "flake-utils": [
-          "staticanalysis",
-          "flake-utils"
-        ],
-        "nixpkgs": [
-          "staticanalysis",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "dir": "l3x",
-        "lastModified": 1719525135,
-        "narHash": "sha256-Ryn8a9MVTx8sgJ9vBdSnQgy5P5uOW7kRv5I1wm7cpwI=",
-        "owner": "rmdettmar",
-        "repo": "l3x",
-        "rev": "8ff3a97af4da3af5df3b6e00520913546c0e53fd",
-        "type": "github"
-      },
-      "original": {
-        "dir": "l3x",
-        "owner": "rmdettmar",
-        "repo": "l3x",
-        "type": "github"
-      }
-    },
     "luvit-meta": {
       "flake": false,
       "locked": {
@@ -360,7 +333,6 @@
         "nix-vscode-extensions": "nix-vscode-extensions",
         "nixpkgs": "nixpkgs_3",
         "rust-overlay": "rust-overlay",
-        "staticanalysis": "staticanalysis",
         "tetrad": "tetrad"
       }
     },
@@ -385,52 +357,6 @@
         "owner": "oxalica",
         "repo": "rust-overlay",
         "rev": "260ff391290a2b23958d04db0d3e7015c8417401",
-        "type": "github"
-      }
-    },
-    "rust-overlay_2": {
-      "inputs": {
-        "nixpkgs": [
-          "staticanalysis",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1725589472,
-        "narHash": "sha256-+OB00N6Yql/ZRQQkQ0PNnxfW2tH89DHnv29hBS7tXMM=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "2b00881d2ff72174cffdc007238cb6bedd6e1d8e",
-        "type": "github"
-      },
-      "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
-      }
-    },
-    "staticanalysis": {
-      "inputs": {
-        "flake-utils": [
-          "flake-utils"
-        ],
-        "l3x": "l3x",
-        "nixpkgs": [
-          "nixpkgs"
-        ],
-        "rust-overlay": "rust-overlay_2"
-      },
-      "locked": {
-        "lastModified": 1725899340,
-        "narHash": "sha256-u9cwuhF2KJIlVpRcho/82NO2yiHZE/s6HMiZ3Ix2rAg=",
-        "owner": "rmdettmar",
-        "repo": "polar-static-analysis",
-        "rev": "ee8f8dca62accdc7e476f6f7c98358f3245d75c1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "rmdettmar",
-        "repo": "polar-static-analysis",
         "type": "github"
       }
     },
