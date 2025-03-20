@@ -251,10 +251,15 @@ scale_ <- function(x){
   (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
 }
 
-runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold){ 
+runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, log_file){ 
+  cat(paste0("Started superlearner with ",
+             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold), collapse = ", ")), "\n", 
+      file = log_file, 
+      append = TRUE)
   Z_level <- settings$Z_level
   doc_title <- settings$doc_title
   
+  cat("Reading in data\n", file = log_file, append = TRUE)
   confounders <- as.character(strsplit(x = settings$confounders, split = " ")[[1]])
   treatment <- as.character(settings$varName)
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
@@ -287,6 +292,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   ##### Define Superlearner -------------------
   # sl3_list_learners("binomial") 
   
+  cat("Building learner list\n", file = log_file, append = TRUE)
   lrnr_mean <- sl3::make_learner(sl3::Lrnr_mean)
   lrnr_glm <- sl3::make_learner(sl3::Lrnr_glm)
   lrnr_hal <- sl3::make_learner(sl3::Lrnr_hal9001)
@@ -342,7 +348,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   ##### RUN TMLE3 -------------------------------
   set.seed(123)
   ### this is where the parallel is breaking
-  
+  cat("Starting TMLE\n", file = log_file, append = TRUE)
   tryCatch({
     tmle_fit_ <- tmle3::tmle3(tmle_spec = ate_spec,
                  data = df,
@@ -350,9 +356,10 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
                  learner_list = learner_list)
   }, error = function(e) {
     cat(sprintf("Error in tmle3 call: %s\n", conditionMessage(e)), 
-        file = "error_log.txt", append = TRUE)
+        file = log_file, append = TRUE)
     stop(e)
   })
+  cat("Pulling out TMLE scores\n", file = log_file, append = TRUE)
   tmle_task <- ate_spec$make_tmle_task(df, nodes_)
   
   initial_likelihood <- ate_spec$make_initial_likelihood(
@@ -413,7 +420,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   # get likelihoods from object
   cf_likelihood_values0 <- cf_likelihood0$get_likelihoods(tmle_task, "A")
   # We see that the likelihood values for the A node are all either 0 or 1, as would be expected from an indicator likelihood function. In addition, the likelihood values for the non-intervention nodes have not changed.
-
+  cat("Building Output\n", file = log_file, append = TRUE)
   ## output individual row values
   # df_out <- df[,c(nodes_$A, nodes_$Y, nodes_$W)]
   df_out <- df |> select(nodes_$A, nodes_$Y, nodes_$W)
@@ -430,12 +437,16 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   df_out$Q_fit_pred <- Q_fit$predict()
   
   write_csv(df_out, paste0(AIRHome, "/data/", settings$doc_title,"-data.csv"))
+  cat("Finished SuperLearner\n", file = log_file, append = TRUE)
 }
 
-processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate){
+processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file){
   
   # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
-  cat("Started processResults()\n", file = "error_log.txt", append = TRUE)
+  cat(paste0("Started processResults() with ",
+             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate, log_file), collapse = ", ")), "\n", 
+      file = log_file, 
+      append = TRUE)
   
   treatment <- as.character(settings$varName)
   outcome <- as.character(df_vars[df_vars$var == "OV",]$val)
@@ -443,7 +454,7 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
   doc_title <- settings$doc_title
   
   set.seed(123)
-  cat("Assigned variables\n", file = "error_log.txt", append = TRUE)
+  cat("Assigned variables\n", file = log_file, append = TRUE)
   df <- read_csv(paste0(AIRHome, "/data/datafile.csv"))
   if (tv_dir == ">") {
     df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
@@ -501,11 +512,13 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
   
   xtest_0 = mutate(x_test, !!treatment := 0)
   xtest_1 = mutate(x_test, !!treatment := 1)
-  cat("Read in and stratified data\n", file = "error_log.txt", append = TRUE)
+  cat("Read in and stratified data\n", file = log_file, append = TRUE)
 
   #### check if models need to be created, then do ------------
   if (model_yn == "No") {
-    cat("model_yn == no\n", file = "error_log.txt", append = TRUE)
+    cat("model_yn == no\n", file = log_file, append = TRUE)
+    cat("Setting up ML Classifiers\n", file = log_file, append = TRUE)
+    
     ### Regression ----------------
     model_lm <- lm(label~., data = train)
     pred_lm0 = predict(model_lm, xtest_0)
@@ -578,8 +591,12 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
     
     sl <- sl3::Lrnr_sl$new(learners = stack, metalearner = sl3::Lrnr_nnls$new())
     
+    cat("Fitting ML Classifiers\n", file = log_file, append = TRUE)
+    
     sl_fit <- sl3::sl_$train(task = task)
 
+    cat("Pulling ML Classifier Scores\n", file = log_file, append = TRUE)
+    
     sl_preds <- sl3::sl_fit$predict(task = task)
     
     prediction_task_0 <- sl3::make_sl3_Task(
@@ -597,6 +614,8 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
     sl_ate = mean(sl_preds_1) - mean(sl_preds_0)
     #[1] -0.0158611
     # }
+    cat("Processing ML Output\n", file = log_file, append = TRUE)
+    
     ### combine and clean all results data ---------------
     results <- read_csv(paste0(AIRHome, "/Results.csv"))
     
@@ -622,9 +641,9 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
       write_csv(paste0(AIRHome, "/ResultsOut.csv"))
     
   } else {
-    cat("model_yn != no\n", file = "error_log.txt", append = TRUE)
+    cat("model_yn != no\n", file = log_file, append = TRUE)
     if (model_yn == "Yes") {
-      cat("model_yn == yes\n", file = "error_log.txt", append = TRUE)
+      cat("model_yn == yes\n", file = log_file, append = TRUE)
       # model_in <- read_rds("input/model.rda")
       pred_m0 = predict(model_in, xtest_0)
       pred_m1 = predict(model_in, xtest_1)
@@ -633,10 +652,10 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
       
       m_ate = mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
     } else if (model_yn == "ATE") {
-      cat("model_yn == ate\n", file = "error_log.txt", append = TRUE)
+      cat("model_yn == ate\n", file = log_file, append = TRUE)
       m_ate = model_ate
     }
-    cat("process ate results\n", file = "error_log.txt", append = TRUE)
+    cat("process ate results\n", file = log_file, append = TRUE)
     ### combine and clean all results data ---------------
     results <- read_csv(paste0(AIRHome, "/Results.csv"))
     # results <- read_csv("../airtool_streamlined/data/Results.csv")
@@ -663,7 +682,7 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
       write_csv(paste0(AIRHome, "/ResultsOut.csv"))
   }
   
-  cat("moving results files\n", file = "error_log.txt", append = TRUE)
+  cat("moving results files\n", file = log_file, append = TRUE)
   file.rename(from = paste0(AIRHome, "/Results.csv"),
               to = paste0(AIRHome, "/data/Results.csv"))
   

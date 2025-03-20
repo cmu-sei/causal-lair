@@ -201,7 +201,8 @@ calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
-cat("Begin Error Logging\n", file = "error_log.txt", append = FALSE)
+log_file <- paste0("logs/", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), "_error_log.txt")
+cat("Begin Log\n", file = log_file, append = FALSE)
 
 
 ### input reactives -------------------------------------------------------------------
@@ -209,6 +210,8 @@ model_in <- reactive({
   req(input$model_in)
   #loading the model
   model_in = read_rds(input$model_in$datapath)
+  cat(paste0("Read in model: " ,input$model_in$datapath, "\n"), file = log_file, append = TRUE)
+
   # model_in = read_rds("input/model.rda")
   # ext <- tools::file_ext(input$modelFile$datapath)
     
@@ -223,6 +226,7 @@ model_in <- reactive({
 
 df <- reactive({
   df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
+  cat(paste0("Read in data file: " ,input$file1$datapath, "\n"), file = log_file, append = TRUE)
   # df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
   continuous_columns <- c(1, ncol(df))
   df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
@@ -233,6 +237,8 @@ df <- reactive({
 knowledge <- reactive({
   req(input$file2)  # Make sure the file is uploaded
   path2 <- input$file2$datapath
+  cat(paste0("Read in knowledge file: " ,input$file2$datapath, "\n"), file = log_file, append = TRUE)
+
   extension <- tolower(tools::file_ext(path2))
   
   if (extension == "csv") {
@@ -349,6 +355,8 @@ observeEvent(input$updateButton, {
 
   colnames(Zvars_loc) <- c("name", "grp", "Z")
   assign("Zvars", Zvars_loc, envir = .GlobalEnv)
+  cat("Graph Updated\n", file = log_file, append = TRUE)
+
 
   graph_update(TRUE)
 
@@ -375,6 +383,10 @@ observeEvent(input$updateButton, {
     closeOnClickOutside = TRUE,
     showCloseButton = FALSE,
     )
+  cat(paste0("Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
 
 })
 
@@ -387,6 +399,7 @@ observeEvent(input$buildButton, {
       graph <- read_file("graphtxt.txt") # test
       dot <- read_file("dotfile.txt") # test
     }
+  
     # graph <- AIR_getGraph(df, knowledge)
     
     # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
@@ -399,6 +412,8 @@ observeEvent(input$buildButton, {
   
     output$blankGraph <- renderGrViz({
     req(graph_complete())
+    cat("Graph Built\n", file = log_file, append = TRUE)
+
     dot <- readLines("dotfile.txt")  
     grViz(dot)
     })
@@ -413,10 +428,14 @@ observeEvent(input$buildButton, {
       closeOnClickOutside = TRUE,
       showCloseButton = FALSE,
       )
+    
 })
   
 observeEvent(input$goButton, {
-    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+  cat(paste0("Selected model_exist: ", input$model_exist,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected ate_in: ", input$ate_in,"\n"), file = log_file, append = TRUE)
+
+  withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
 
     incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
 
@@ -449,6 +468,8 @@ observeEvent(input$goButton, {
       Sys.chmod("Results.csv", mode = "0777")
     }
     incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
+      cat("Calculating Adjustment Sets\n", file = log_file, append = TRUE)
+
     ### have to figure out how many cores there are
     ## for now, just hardcode that in
     
@@ -475,7 +496,7 @@ observeEvent(input$goButton, {
         
         }, error = function(e) {
           errMsg <- sprintf("Failed setting up parallel clusters", conditionMessage(e))
-          cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
           NULL
         })
 
@@ -487,7 +508,7 @@ observeEvent(input$goButton, {
     
     foreach(k = 1:nrow(combos), 
             .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2", "hal9001", "nnet", "randomForest", "readr", "scales", "sl3", "tidyr", "tmle3", "xgboost", "foreach", "doParallel", "shiny"),
-            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars", "processResults", "model_yn")) %dopar% {
+            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars", "processResults", "model_yn", "log_file")) %dopar% {
         i <- combos[k, "i"]
         j <- combos[k, "j"]
         settings <- data.frame(doc_title = paste0(i,"-",j),
@@ -497,11 +518,11 @@ observeEvent(input$goButton, {
                                   confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
         # write.csv(settings, file = "settings_log.csv", append = TRUE)
         tryCatch({
-          runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val)
+          runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, log_file)
         # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
         }, error = function(e) {
           errMsg <- sprintf("SuperLearner: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
-          cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
           NULL
         })
       }
@@ -509,7 +530,7 @@ observeEvent(input$goButton, {
     # Don't fotget to stop the cluster
     stopCluster(cl = cluster)
     incProgress(0.2, message = "Processing Results")
-    cat("Successfully closed parallel cluster\n", file = "error_log.txt", append = TRUE)
+    cat("Successfully closed parallel cluster\n", file = log_file, append = TRUE)
 
 
     for (i in unique(Zvars$name)) {
@@ -520,10 +541,10 @@ observeEvent(input$goButton, {
                                varName = i,
                                confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
         tryCatch({
-          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate)
+          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate, log_file)
           }, error = function(e) {
             errMsg <- sprintf("Results Processing: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
-            cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+            cat(errMsg, file = log_file, sep = "\n", append = TRUE)
             NULL
           })
         }
@@ -561,6 +582,7 @@ output$xvar = renderUI({
   selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
               selected = ""
               )
+
   # xvar = "scenario_main_base"
   # xvar = "humidity"
 })
@@ -603,6 +625,7 @@ output$ui_threshold_x = renderUI({
                      width = "80px")
         )
     )
+  
     # tv_dir = "<="
     # tv_threshold = 0
 })
@@ -635,6 +658,7 @@ output$ui_threshold_y = renderUI({
                      width = "80px")
         )
     )
+  
     # ov_dir = "<="
     # ov_threshold = 0
 })
@@ -803,6 +827,7 @@ output$ui_ate_upload = renderUI({
     # model_exist <- "ATE"
     # ate_in <- 0
   } else (return(NULL))
+  
 })
 
 output$ui_model_upload = renderUI({
