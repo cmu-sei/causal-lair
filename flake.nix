@@ -111,7 +111,6 @@
           vscodeExtensions = [
             extensions.open-vsx-release.rust-lang.rust-analyzer
             extensions.vscode-marketplace.vadimcn.vscode-lldb
-            extensions.vscode-marketplace.fill-labs.dependi
             extensions.vscode-marketplace.tamasfe.even-better-toml
             extensions.vscode-marketplace.jnoortheen.nix-ide
             extensions.vscode-marketplace.jinxdash.prettier-rust
