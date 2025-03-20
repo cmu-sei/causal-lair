@@ -1,16 +1,16 @@
-About to call tmle3...
-Lrnr_nnls class:  R6ClassGenerator 
-tmle_spec: tmle3_Spec_ATE tmle3_Spec R6 
-df:  spec_tbl_df tbl_df tbl data.frame 
-nodes_:  list 
-learner_list:  list 
-Error in tmle3 call: 'new' is not a character vector or a function
-Error in combination i=scenario_main_base, j=Z1: 'new' is not a character vector or a function
-About to call tmle3...
-Lrnr_nnls class:  R6ClassGenerator 
-tmle_spec: tmle3_Spec_ATE tmle3_Spec R6 
-df:  spec_tbl_df tbl_df tbl data.frame 
-nodes_:  list 
-learner_list:  list 
-Error in tmle3 call: 'new' is not a character vector or a function
-Error in combination i=scenario_main_base, j=Z2: 'new' is not a character vector or a function
+Begin Error Logging
+Successfully closed parallel cluster
+Started processResults()
+Assigned variables
+Read in and stratified data
+model_yn != no
+model_yn == ate
+process ate results
+moving results files
+Started processResults()
+Assigned variables
+Read in and stratified data
+model_yn != no
+model_yn == ate
+process ate results
+Results Processing: Error in combination i=scenario_main_base, j=Z2: 'C:/Users/ntesta/OneDrive - Software Engineering Institute/Documents/Projects/20240117-TAILOR/Code/tailor---air/Results.csv' does not exist.

@@ -201,6 +201,7 @@ calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
+cat("Begin Error Logging\n", file = "error_log.txt", append = FALSE)
 
 
 ### input reactives -------------------------------------------------------------------
@@ -351,7 +352,7 @@ observeEvent(input$updateButton, {
 
   graph_update(TRUE)
 
-  # updatte the graph
+  # update the graph
   output$blankGraph <- renderGrViz({
   req(graph_complete())
   dot <- readLines("dotfile.txt")  
@@ -447,38 +448,46 @@ observeEvent(input$goButton, {
     if (Sys.info()["sysname"] == "Linux") {
       Sys.chmod("Results.csv", mode = "0777")
     }
-
+    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
     ### have to figure out how many cores there are
     ## for now, just hardcode that in
-    # How many cores does your CPU have
-    n_cores <- detectCores()
-    n_cores
     
-    # Register cluster
-    cluster <- makeCluster(n_cores - 1)
-    clusterEvalQ(cluster, {
-      library(tmle3)
-      library(sl3)
-    })
-    registerDoParallel(cluster)
-    
-    # foreach(i = unique(Zvars$name)) %dopar% {
-    #   foreach(j = unique(Zvars$grp)) %do% {
-    combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp)) 
-    tv_dir_val <- input$tv_dir
-    tv_threshold_val <- input$tv_threshold
-    ov_dir_val <- input$ov_dir
-    ov_threshold_val <- input$ov_threshold
+    tryCatch({
+        # foreach(i = unique(Zvars$name)) %dopar% {
+        #   foreach(j = unique(Zvars$grp)) %do% {
+        combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = F) 
+        tv_dir_val <- input$tv_dir
+        tv_threshold_val <- input$tv_threshold
+        ov_dir_val <- input$ov_dir
+        ov_threshold_val <- input$ov_threshold
+        
+        # How many cores does your CPU have
+        n_cores <- detectCores()
+        n_cores <- min(nrow(combos), n_cores - 1)
+        
+        # Register cluster
+        cluster <- makeCluster(n_cores)
+        clusterEvalQ(cluster, {
+          library(tmle3)
+          library(sl3)
+        })
+        registerDoParallel(cluster)
+        
+        }, error = function(e) {
+          errMsg <- sprintf("Failed setting up parallel clusters", conditionMessage(e))
+          cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+          NULL
+        })
 
     tryCatch({
-      incProgress(0.3, detail = paste0("\nCalculating ATE for multiple Adjustment Sets"))
+      incProgress(0.1, detail = paste0("\nCalculating ATE for multiple Adjustment Sets"))
       }, error = function(e) {
         NULL
     })
     
     foreach(k = 1:nrow(combos), 
             .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2", "hal9001", "nnet", "randomForest", "readr", "scales", "sl3", "tidyr", "tmle3", "xgboost", "foreach", "doParallel", "shiny"),
-            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars")) %dopar% {
+            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars", "processResults", "model_yn")) %dopar% {
         i <- combos[k, "i"]
         j <- combos[k, "j"]
         settings <- data.frame(doc_title = paste0(i,"-",j),
@@ -489,20 +498,36 @@ observeEvent(input$goButton, {
         # write.csv(settings, file = "settings_log.csv", append = TRUE)
         tryCatch({
           runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val)
+        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
         }, error = function(e) {
-          errMsg <- sprintf("Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
+          errMsg <- sprintf("SuperLearner: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
           cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
           NULL
         })
-        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
       }
     # }
     # Don't fotget to stop the cluster
     stopCluster(cl = cluster)
-    
     incProgress(0.2, message = "Processing Results")
-    processResults(settings, AIRHome, input$tv_dir, input$tv_threshold, input$ov_dir, input$ov_threshold, model_in())
-    # processResults(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in)
+    cat("Successfully closed parallel cluster\n", file = "error_log.txt", append = TRUE)
+
+
+    for (i in unique(Zvars$name)) {
+      for (j in unique(Zvars$grp)) {
+        settings <- data.frame(doc_title = paste0(i,"-",j),
+                               nfold = 20,
+                               Z_level = j,
+                               varName = i,
+                               confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
+        tryCatch({
+          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate)
+          }, error = function(e) {
+            errMsg <- sprintf("Results Processing: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
+            cat(errMsg, file = "error_log.txt", sep = "\n", append = TRUE)
+            NULL
+          })
+        }
+      }
     
     
     calc_complete(TRUE)
