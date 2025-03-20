@@ -89,7 +89,6 @@ if (!dir.exists(paste0(AIRHome, "/plots/"))) {
 }
 
 if (Sys.info()["sysname"] == "Linux") {
-  suppressMessages(library(earth))
   source("scripts/tetrad_utils.R")
   source("scripts/TetradSearch.R")
   
@@ -103,6 +102,10 @@ if (Sys.info()["sysname"] == "Linux") {
   
   if (!dir.exists(paste0(AIRHome, "/plots/"))) {
     dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
+  }
+  
+   if (!dir.exists(paste0(AIRHome, "/logs/"))) {
+    dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
   }
   # Setup Java and Tetrad
   ## if running on local machine, uncomment out the next line
