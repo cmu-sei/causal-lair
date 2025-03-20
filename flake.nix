@@ -155,6 +155,7 @@
             pkgs.rPackages.AIPW
             pkgs.rPackages.devtools
             pkgs.rPackages.DiagrammeR
+            pkgs.rPackages.doParallel
             pkgs.rPackages.e1071
             pkgs.rPackages.earth
             pkgs.rPackages.gifski
