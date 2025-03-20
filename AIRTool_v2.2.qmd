@@ -115,7 +115,28 @@ if (Sys.info()["sysname"] == "Linux") {
   java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
   # print(paste("Java version:", java_version))
 
-  } 
+} 
+
+## create a log file, then remove any logs over 30 days old
+log_file <- paste0("logs/", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), "_error_log.txt")
+cat("Begin Log\n", file = log_file, append = FALSE)
+# Define the log directory and calculate the time threshold (7 days ago)
+log_dir <- "logs"
+time_threshold <- Sys.time() - 30 * 24 * 60 * 60  # 30 days in seconds
+
+# List all log files in the directory
+log_files <- list.files(log_dir, full.names = TRUE)
+
+# Get file information for each file
+files_info <- file.info(log_files)
+
+# Identify files where the modification time is older than the threshold
+old_files <- rownames(files_info)[files_info$mtime < time_threshold]
+
+# Remove the old log files
+if (length(old_files) > 0) {
+  file.remove(old_files)
+}
 ```
 
 # Docs
@@ -201,8 +222,6 @@ calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
-log_file <- paste0("logs/", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), "_error_log.txt")
-cat("Begin Log\n", file = log_file, append = FALSE)
 
 
 ### input reactives -------------------------------------------------------------------

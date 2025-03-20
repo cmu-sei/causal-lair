@@ -1,0 +1,4 @@
+Begin Log
+Read in knowledge file: C:\Users\ntesta\AppData\Local\Temp\RtmpK48O0X/60faf1637b79a95d02062089/0.csv
+Read in data file: C:\Users\ntesta\AppData\Local\Temp\RtmpK48O0X/82857f6eb11337cd0ab9bd63/0.csv
+Graph Built
