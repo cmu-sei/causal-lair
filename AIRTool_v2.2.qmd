@@ -104,7 +104,7 @@ if (Sys.info()["sysname"] == "Linux") {
     dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
   }
   
-   if (!dir.exists(paste0(AIRHome, "/logs/"))) {
+  if (!dir.exists(paste0(AIRHome, "/logs/"))) {
     dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
   }
   # Setup Java and Tetrad
