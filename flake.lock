@@ -162,12 +162,12 @@
       },
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-feoVr8FHl3uxK0Ck6SY8DJQjJVYZleajgQep3nHY2Ew=",
-        "path": "./identify",
+        "narHash": "sha256-q9X8YKPkveJH/S/O8qJiMvoTChYdM+JluHly32krRhk=",
+        "path": "identify",
         "type": "path"
       },
       "original": {
-        "path": "./identify",
+        "path": "identify",
         "type": "path"
       }
     },

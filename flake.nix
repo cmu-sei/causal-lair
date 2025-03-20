@@ -59,7 +59,7 @@
       };
     };
 
-    identify.url = "path:./identify";
+    identify.url = "path:identify";
   };
 
   outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, identify, ... }:
