@@ -1,5 +1,0 @@
-Begin Log
-Read in knowledge file: C:\Users\ntesta\AppData\Local\Temp\RtmpuEUErp/5b3e235c689e36c038569a5d/0.csv
-Read in data file: C:\Users\ntesta\AppData\Local\Temp\RtmpuEUErp/dfbed3e0043600297e663937/0.csv
-Selected X variable: 
-Graph Built
