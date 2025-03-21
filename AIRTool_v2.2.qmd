@@ -61,6 +61,8 @@ suppressMessages(library(jsonlite))
 suppressMessages(library(foreach))
 suppressMessages(library(doParallel))
 suppressMessages(library(earth))
+suppressMessages(library(hash))
+suppressMessages(library(sets))
 
 
 AIRHome <- here()
@@ -383,7 +385,7 @@ observeEvent(input$updateButton, {
 
   if (graph_update()) {
     sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
+      session = shiny::getDefaultReactiveDomain(),
       title = "Causal Graph Updated",
       text = NULL,
       type = "success",
@@ -616,7 +618,8 @@ output$xvar = renderUI({
 
 output$yvar = renderUI({
   req(input$xvar)  
-  choices <- df() |> select(-input$xvar) |> names()
+  x_desc <- get_X_descendents(input$xvar, AIRHome)
+  choices <- setdiff(x_desc, input$xvar)
   selectInput('yvar', 'Outcome (Y) variable:', c("",choices), 
               selected = ""
               )

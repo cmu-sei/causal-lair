@@ -690,3 +690,79 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
               to = paste0(AIRHome, "/data/ResultsOut.csv"))
   
 }
+
+
+
+## Create four simple methods to help parse a line
+
+# Is the first character of a line a nonzero digit? If yes, then that line specifies an edge.
+is_edge_line <- function(line) {
+  # regular expression
+  return(grepl("^[1-9]", line))
+}
+
+# Split a string of space-delimited substrings into a list of those substrings
+split_line <- function(input_string) {
+  return(strsplit(input_string, " "))
+}
+
+# Return the first node from a line specifying an edge (after the line number)
+first_node <- function(line) {
+  line_components <- split_line(line)
+  return(line_components[[1]][2])
+}
+# Return the second node from a line specifying an edge (after the line number)
+second_node <- function(line) {
+  line_components <- split_line(line)
+  return(line_components[[1]][4])
+}
+
+## The key methods defined here are descendants (and its dual: ancestors)
+descendants <- function(node, children) {
+  checked_so_far <- set()
+  seen_not_checked <- set(node)
+  while (!set_is_empty(seen_not_checked)) {
+    check_these <- seen_not_checked
+    for (n in check_these) {
+      for (m in children[[n]]) {
+        if ( !(m %e% checked_so_far)) {
+          seen_not_checked <- seen_not_checked | set(m)
+        }
+      }
+      seen_not_checked <- seen_not_checked - set(n)
+      checked_so_far <- checked_so_far | set(n)
+    }
+  }
+  return(checked_so_far)
+}
+
+get_X_descendents <- function(TV, PATH) {
+  lines <- readLines(paste(PATH, "/graphtxt.txt", sep = ""))
+  
+  nodes <- set()
+  for (line in lines) {
+    if (is_edge_line(line)) {
+      if (!(first_node(line)  %e% nodes)) {
+        nodes <- nodes | set(first_node(line))
+      }
+      if (!(second_node(line) %e% nodes)) {
+        nodes <- nodes | set(second_node(line))
+      }
+    }
+  }
+
+  ## Create children and parents dictionaries
+  children <- hash()
+  for (n in nodes) {
+    children_of_n <- set()
+    for (line in lines) {
+      if (is_edge_line(line)) {
+        if ((first_node(line)  == n) && (!(second_node(line) %e% children_of_n))) {
+          children_of_n <- children_of_n | set(second_node(line))
+        }
+      }
+    }
+    children[[n]] <- children_of_n
+  }
+  return(unlist(descendants(TV, children)))
+}
