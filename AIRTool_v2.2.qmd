@@ -88,6 +88,10 @@ if (!dir.exists(paste0(AIRHome, "/plots/"))) {
   dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
 }
 
+if (!dir.exists(paste0(AIRHome, "/logs/"))) {
+  dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
+}
+
 if (Sys.info()["sysname"] == "Linux") {
   source("scripts/tetrad_utils.R")
   source("scripts/TetradSearch.R")
@@ -377,7 +381,18 @@ observeEvent(input$updateButton, {
   assign("Zvars", Zvars_loc, envir = .GlobalEnv)
   cat("Graph Updated\n", file = log_file, append = TRUE)
 
-
+  if (graph_update()) {
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Causal Graph Updated",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+  }
   graph_update(TRUE)
 
   # update the graph
@@ -393,16 +408,6 @@ observeEvent(input$updateButton, {
   grViz(dot)
   })
 
-  sendSweetAlert(
-    session = shiny::getDefaultReactiveDomain(),,
-    title = "Causal Graph Updated",
-    text = NULL,
-    type = "success",
-    btn_labels = "Continue",
-    btn_colors = "#3085d6",
-    closeOnClickOutside = TRUE,
-    showCloseButton = FALSE,
-    )
   cat(paste0("Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
   cat(paste0("Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
   cat(paste0("Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
@@ -428,7 +433,6 @@ observeEvent(input$buildButton, {
     # Visualize the resulting graph
     # visualize_graph(graph)
     write(dot, "dotfile.txt")
-    graph_complete(TRUE)
   
     output$blankGraph <- renderGrViz({
     req(graph_complete())
@@ -438,16 +442,19 @@ observeEvent(input$buildButton, {
     grViz(dot)
     })
     
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
-      title = "Your Causal Graph is Ready",
-      text = NULL,
-      type = "success",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
-      )
+    if (graph_complete()) {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),,
+        title = "Your Causal Graph is Ready",
+        text = NULL,
+        type = "success",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE,
+        )
+    }
+    graph_complete(TRUE)
     
 })
   
