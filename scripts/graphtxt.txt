@@ -1,7 +1,7 @@
-Graph Nodes:
-image_A_captured;image_B_captured;A_dist;images_acquired;fuel_consumed;altitude;A_B_dist;region_sensitivity;ice_accrual;ice_sublimation;hard_landing;mission_duration;speed_avg;temp;mission_urgency;heavy_winds;humidity;scenario_main_base;bird_strike
-
-Graph Edges:
+Graph Nodes:
+image_A_captured;image_B_captured;A_dist;images_acquired;fuel_consumed;altitude;A_B_dist;region_sensitivity;ice_accrual;ice_sublimation;hard_landing;mission_duration;speed_avg;temp;mission_urgency;heavy_winds;humidity;scenario_main_base;bird_strike
+
+Graph Edges:
 1. A_B_dist --> altitude
 2. A_B_dist --> bird_strike
 3. A_B_dist --> fuel_consumed
@@ -58,5 +58,5 @@ Graph Edges:
 54. temp --> bird_strike
 55. temp --> fuel_consumed
 56. temp --> ice_accrual
-
+
 

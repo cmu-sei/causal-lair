@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ---
 title: "AIRTOOL PROTOTYPE--not intended for public consumption"
 format: 
@@ -1229,3 +1230,1225 @@ output$second_column_content <- renderUI({
     - <span style="color: #FCB514; font-weight: bold;">Yellow</span>: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias. 
     - <span style="color: #378855; font-weight: bold;">Green</span>: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
 
+=======
+---
+title: "AIRTOOL PROTOTYPE--not intended for public consumption"
+format: 
+  dashboard:
+    theme: spacelab
+    orientation: columns
+    # embed-resources: true
+resources:
+  - readme_md_files
+server: shiny
+---
+
+```{=html}
+<style>
+  .plot-container, .shiny-text-output, .panel, .card {
+    border: none;
+    box-shadow: none;
+  }
+  .custom-text {
+    font-size: 20px;
+    color: green;
+    font-weight: bold;
+  }
+</style>
+```
+
+```{=html}
+<style> .main-container { max-width: unset; } </style>
+```
+
+```{=html}
+<style> .main-container { max-height: unset; } </style>
+```
+
+```{r}
+#| context: setup
+#| echo: false
+#| include: false
+
+# suppressMessages(library(tidyverse))
+suppressMessages(library(AIPW))
+suppressMessages(library(DiagrammeR))
+suppressMessages(library(dplyr))
+suppressMessages(library(e1071))
+suppressMessages(library(ggplot2))
+suppressMessages(library(hal9001))
+suppressMessages(library(here))
+suppressMessages(library(nnet))
+suppressMessages(library(randomForest))
+suppressMessages(library(readr))
+suppressMessages(library(rJava))
+suppressMessages(library(rpart))
+suppressMessages(library(scales))
+suppressMessages(library(shiny))
+suppressMessages(library(shinyWidgets))
+suppressMessages(library(sl3))
+suppressMessages(library(tidyr))
+suppressMessages(library(tmle3))
+suppressMessages(library(xgboost))
+suppressMessages(library(jsonlite))
+suppressMessages(library(foreach))
+suppressMessages(library(doParallel))
+suppressMessages(library(earth))
+
+
+AIRHome <- here()
+setwd(AIRHome)
+set.seed(123)
+
+
+# Nick, I significantly reduced the complexity of tetrad_utils. Most of what it
+# was doing is no longer needed.
+
+source("scripts/AIR_functions.R")
+
+disconnectMessage2()
+actionButton("disconnect", "Disconnect the app")
+
+if (!dir.exists(paste0(AIRHome, "/data/"))) {
+  dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
+}
+
+if (!dir.exists(paste0(AIRHome, "/input/"))) {
+  dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
+}
+
+if (!dir.exists(paste0(AIRHome, "/plots/"))) {
+  dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
+}
+
+if (Sys.info()["sysname"] == "Linux") {
+  source("scripts/tetrad_utils.R")
+  source("scripts/TetradSearch.R")
+  
+  if (!dir.exists(paste0(AIRHome, "/data/"))) {
+    dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
+  }
+  
+  if (!dir.exists(paste0(AIRHome, "/input/"))) {
+    dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
+  }
+  
+  if (!dir.exists(paste0(AIRHome, "/plots/"))) {
+    dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
+  }
+  
+  if (!dir.exists(paste0(AIRHome, "/logs/"))) {
+    dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
+  }
+  # Setup Java and Tetrad
+  ## if running on local machine, uncomment out the next line
+  # setup_tetrad_environment()
+  
+  .jinit()
+  # .jinit(parameters = "-verbose:class")
+  .jaddClassPath(TETRAD_PATH)
+  
+  java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
+  # print(paste("Java version:", java_version))
+
+} 
+
+## create a log file, then remove any logs over 30 days old
+log_file <- paste0("logs/", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), "_error_log.txt")
+cat("Begin Log\n", file = log_file, append = FALSE)
+# Define the log directory and calculate the time threshold (7 days ago)
+log_dir <- "logs"
+time_threshold <- Sys.time() - 30 * 24 * 60 * 60  # 30 days in seconds
+
+# List all log files in the directory
+log_files <- list.files(log_dir, full.names = TRUE)
+
+# Get file information for each file
+files_info <- file.info(log_files)
+
+# Identify files where the modification time is older than the threshold
+old_files <- rownames(files_info)[files_info$mtime < time_threshold]
+
+# Remove the old log files
+if (length(old_files) > 0) {
+  file.remove(old_files)
+}
+```
+
+# Docs
+```{r include-info, echo=FALSE, results='asis'}
+# Read the file and output its content as-is
+# cat(paste(readLines("info.qmd"), collapse = "\n"))
+knitr::opts_knit$set(root.dir = AIRHome)
+cat(knitr::knit_child("info.qmd", quiet = TRUE))
+```
+
+
+# Setup
+
+##  {.sidebar}
+
+```{r}
+h4("Step 1: Upload your data")
+fileInput("file1", "", accept = ".csv")
+br()
+uiOutput('step2')
+uiOutput('ui_file2')
+br()
+uiOutput('ui_buildButton')
+br()
+uiOutput('step3')
+uiOutput('xvar')
+uiOutput('ui_threshold_x')
+br()
+uiOutput('yvar')
+uiOutput('ui_threshold_y')
+br()
+uiOutput('ui_updateButton')
+uiOutput('step4')
+uiOutput('ui_model_exist')
+uiOutput('ui_model_upload')
+uiOutput('ui_ate_upload')
+uiOutput('ui_goButton')
+
+```
+
+## Column {width = "40%"}
+
+```{r}
+grVizOutput('blankGraph')
+```
+
+## Column {width = "60%"}
+
+```{r}
+plotOutput('histogram_x', height = "50%")
+```
+
+#### Row
+
+```{r}
+plotOutput('histogram_y', height = "50%")
+```
+
+# Results
+
+## Column {width="60%"}
+
+```{r}
+#| padding: 0px
+##| title: "Causal Discovery"
+uiOutput('ui_graphViz')
+```
+
+## Column {width="40%"}
+
+```{r}
+#| padding: 0px
+# UI Output for ribbon plot
+uiOutput("second_column_content")
+```
+
+```{r}
+#| context: server
+
+
+### variable declarations --------------------------------------------------------------
+calc_complete <- reactiveVal(FALSE)
+graph_complete <- reactiveVal(FALSE)
+graph_update <- reactiveVal(FALSE)
+file_check <- reactiveVal(FALSE)
+
+
+### input reactives -------------------------------------------------------------------
+model_in <- reactive({
+  req(input$model_in)
+  #loading the model
+  model_in = read_rds(input$model_in$datapath)
+  cat(paste0("Read in model: " ,input$model_in$datapath, "\n"), file = log_file, append = TRUE)
+
+  # model_in = read_rds("input/model.rda")
+  # ext <- tools::file_ext(input$modelFile$datapath)
+    
+  #model_in <- switch(ext,
+  #         "rds" = read_rds(input$modelFile$datapath),  # R models
+  #         "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
+  #         stop("Unsupported file type")
+  #  )
+  
+  return(model_in)
+})
+
+df <- reactive({
+  df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
+  cat(paste0("Read in data file: " ,input$file1$datapath, "\n"), file = log_file, append = TRUE)
+  # df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
+  continuous_columns <- c(1, ncol(df))
+  df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
+  return(df)
+})
+
+# knowledge <- read_csv("input/knowledge.csv", col_names = T)
+knowledge <- reactive({
+  req(input$file2)  # Make sure the file is uploaded
+  path2 <- input$file2$datapath
+  cat(paste0("Read in knowledge file: " ,input$file2$datapath, "\n"), file = log_file, append = TRUE)
+
+  extension <- tolower(tools::file_ext(path2))
+  
+  if (extension == "csv") {
+    knowledge_in <- read_csv(path2, col_names = TRUE)
+  } else if (extension == "xlsx") {
+    knowledge_in <- readxl::read_excel(path2, col_names = TRUE)
+  } else {
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "Upload Failed",
+      text = "Unsupported file extension. Please upload a CSV or XLSX file.",
+      type = "warning",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE
+    )
+    return(NA)
+  }
+  
+  # Process the data with fix_knowledge
+  fixed <- fix_knowledge(knowledge_in)
+  # Check the outcome of fix_knowledge
+  if (is.character(fixed)) {
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "Upload Failed",
+      text = fixed,
+      type = "warning",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE
+    )
+    return(NA)
+  } else {
+    file_check(TRUE)  # Set the reactiveVal if all is good
+    return(fixed)
+  }
+})
+
+
+
+### event observations ----------------------------------------------------------------
+options(shiny.error = function() {
+  tb <- traceback()  # Capture the call stack
+  showModal(modalDialog(
+    title = "An error occurred",
+    paste0("AIR Tool crashed. See log file, ", log_file, ", for details"),
+    easyClose = TRUE
+  ))
+})
+
+observeEvent(input$disconnect, {
+    session$close()
+  })
+
+observeEvent(input$file2, {
+  # Call the reactive to force its evaluation
+  result <- knowledge()
+  # Optionally, you can print or log the result for debugging
+  #print(result)
+})
+
+observeEvent(input$updateButton, {
+  # assign global variables
+  assign("df_vars",
+         data.frame("var" = c("TV","OV"),
+                    "val" = c(input$xvar, input$yvar)),
+         envir = .GlobalEnv)
+  # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
+  # source_python(paste0(AIRHome, "/scripts/identify.py"))
+  if (Sys.info()["sysname"] == "Linux") {
+    param1 = df_vars$val[1]
+    param2 = df_vars$val[2]
+    param3 = paste0(AIRHome, "/graphtxt.txt")
+
+    rust_bin = "identify"
+    # system2() returns the output as a character vector (one element per line).
+    json_output <- system2(rust_bin,
+                           args = c(paste0("--param1=", param1),
+                                    paste0("--param2=", param2),
+				    paste0("--param3=", param3)),
+                           stdout = TRUE)
+    
+    # json_output is a character vector. If the Rust program only prints a single line
+    # of JSON, json_output[1] will hold the entire JSON string.
+    parsed <- fromJSON(json_output[1])
+    
+    # Now `parsed` should be a list with two elements: $vector1 and $vector2
+    Z1 <- parsed$vector1
+    Z2 <- parsed$vector2
+  } else {
+    source("scripts/identify.R")
+  }
+  Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
+  Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
+  # Z1 = "region_sensitivity"
+  # Z2 = "mission_urgency"
+  ### overlaps in function with df_vars. consider combining and slimming down. consider appending to df_vars ---------
+  Zvars_loc <- data.frame("name" = character(),
+                          "grp" = character(),
+                          "Z" = character())
+
+  for (i in Z1) {
+    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z1", i))
+  }
+
+  for (i in Z2) {
+    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z2", i))
+  }
+
+  colnames(Zvars_loc) <- c("name", "grp", "Z")
+  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
+  cat("Graph Updated\n", file = log_file, append = TRUE)
+
+
+  graph_update(TRUE)
+
+  # update the graph
+  output$blankGraph <- renderGrViz({
+  req(graph_complete())
+  dot <- readLines("dotfile.txt")  
+  if (graph_update()) {
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+  }
+  grViz(dot)
+  })
+
+  sendSweetAlert(
+    session = shiny::getDefaultReactiveDomain(),,
+    title = "Causal Graph Updated",
+    text = NULL,
+    type = "success",
+    btn_labels = "Continue",
+    btn_colors = "#3085d6",
+    closeOnClickOutside = TRUE,
+    showCloseButton = FALSE,
+    )
+  cat(paste0("Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
+
+})
+
+observeEvent(input$buildButton, {
+  ### AIR Step 1 ----------------
+    if (Sys.info()["sysname"] == "Linux") {
+      graph <- AIR_getGraph(df(), knowledge()) # prod
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
+    } else {
+      graph <- read_file("graphtxt.txt") # test
+      dot <- read_file("dotfile.txt") # test
+    }
+  
+    # graph <- AIR_getGraph(df, knowledge)
+    
+    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
+    # writeLines(graph_data, "graphtxt.txt")
+  
+    # Visualize the resulting graph
+    # visualize_graph(graph)
+    write(dot, "dotfile.txt")
+    graph_complete(TRUE)
+  
+    output$blankGraph <- renderGrViz({
+    req(graph_complete())
+    cat("Graph Built\n", file = log_file, append = TRUE)
+
+    dot <- readLines("dotfile.txt")  
+    grViz(dot)
+    })
+    
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Your Causal Graph is Ready",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+    
+})
+  
+observeEvent(input$goButton, {
+  cat(paste0("Selected model_exist: ", input$model_exist,"\n"), file = log_file, append = TRUE)
+  cat(paste0("Selected ate_in: ", input$ate_in,"\n"), file = log_file, append = TRUE)
+
+  withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+
+    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
+
+    ### AIR Step 3 ----------------
+    
+    write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+
+    incProgress(0.1, message = "Estimating Causal Effects")
+    assign("model_yn",
+           input$model_exist,
+           envir = .GlobalEnv)
+
+    assign("model_ate",
+           input$ate_in,
+           envir = .GlobalEnv)
+
+    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
+
+    write.csv(file = "Results.csv",
+              x = data.frame("Row" = vector(),
+                             "Treatment" = vector(),
+                             "Group" = vector(),
+                             "Mean" = vector(),
+                             "LCI" = vector(),
+                             "UCI" = vector()),
+              row.names = FALSE)
+    
+    if (Sys.info()["sysname"] == "Linux") {
+      Sys.chmod("Results.csv", mode = "0777")
+    }
+    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
+      cat("Calculating Adjustment Sets\n", file = log_file, append = TRUE)
+
+    ### have to figure out how many cores there are
+    ## for now, just hardcode that in
+    
+    tryCatch({
+        # foreach(i = unique(Zvars$name)) %dopar% {
+        #   foreach(j = unique(Zvars$grp)) %do% {
+        combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = F) 
+        tv_dir_val <- input$tv_dir
+        tv_threshold_val <- input$tv_threshold
+        ov_dir_val <- input$ov_dir
+        ov_threshold_val <- input$ov_threshold
+        
+        # How many cores does your CPU have
+        n_cores <- detectCores()
+        n_cores <- min(nrow(combos), n_cores - 1)
+        
+        # Register cluster
+        cluster <- makeCluster(n_cores)
+        clusterEvalQ(cluster, {
+          library(tmle3)
+          library(sl3)
+        })
+        registerDoParallel(cluster)
+        
+        }, error = function(e) {
+          errMsg <- sprintf("Failed setting up parallel clusters", conditionMessage(e))
+          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
+          NULL
+        })
+
+    tryCatch({
+      incProgress(0.1, detail = paste0("\nCalculating ATE for multiple Adjustment Sets"))
+      }, error = function(e) {
+        NULL
+    })
+    
+    foreach(k = 1:nrow(combos), 
+            .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2", "hal9001", "nnet", "randomForest", "readr", "scales", "sl3", "tidyr", "tmle3", "xgboost", "foreach", "doParallel", "shiny"),
+            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars", "processResults", "model_yn", "log_file")) %dopar% {
+        i <- combos[k, "i"]
+        j <- combos[k, "j"]
+        settings <- data.frame(doc_title = paste0(i,"-",j),
+                                  nfold = 20,
+                                  Z_level = j,
+                                  varName = i,
+                                  confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
+        # write.csv(settings, file = "settings_log.csv", append = TRUE)
+        tryCatch({
+          runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, log_file)
+        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
+        }, error = function(e) {
+          errMsg <- sprintf("SuperLearner: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
+          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
+          NULL
+        })
+      }
+    # }
+    # Don't fotget to stop the cluster
+    stopCluster(cl = cluster)
+    incProgress(0.2, message = "Processing Results")
+    cat("Successfully closed parallel cluster\n", file = log_file, append = TRUE)
+
+
+    for (i in unique(Zvars$name)) {
+      for (j in unique(Zvars$grp)) {
+        settings <- data.frame(doc_title = paste0(i,"-",j),
+                               nfold = 20,
+                               Z_level = j,
+                               varName = i,
+                               confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
+        tryCatch({
+          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate, log_file)
+          }, error = function(e) {
+            errMsg <- sprintf("Results Processing: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
+            cat(errMsg, file = log_file, sep = "\n", append = TRUE)
+            NULL
+          })
+        }
+      }
+    
+    
+    calc_complete(TRUE)
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),,
+      title = "Causal Estimates Successfully Calculated",
+      text = NULL,
+      type = "success",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE,
+      )
+  })
+})
+
+
+
+
+### output definitions ------------------------------------------------------------------
+output$step3 = renderUI({
+  req(graph_complete())
+  tagList(
+    hr(),
+    h4("Step 2: Select your variables of interest:")
+  )
+})
+
+output$xvar = renderUI({
+  req(graph_complete())  
+  selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
+              selected = ""
+              )
+
+  # xvar = "scenario_main_base"
+  # xvar = "humidity"
+})
+
+output$yvar = renderUI({
+  req(input$xvar)  
+  choices <- df() |> select(-input$xvar) |> names()
+  selectInput('yvar', 'Outcome (Y) variable:', c("",choices), 
+              selected = ""
+              )
+  # yvar = "images_acquired"
+})
+
+
+output$ui_threshold_x = renderUI({
+  req(input$xvar)
+  slider_range <- c(min(df()[[input$xvar]]), max(df()[[input$xvar]]))
+  slider_step <- (slider_range[2] - slider_range[1]) / 10
+   # Use Flexbox for inline alignment
+    tags$div(
+      style = "display: flex; align-items: center; flex-wrap: wrap;",
+      
+      # Part 1: Variable Selection
+      tags$span(""),
+      tags$span("is considered treated when it is "),
+      
+      # Part 2: Operator Selection
+      tags$div(
+        style = "margin-right: 5px;",
+        selectInput("tv_dir", NULL, 
+                    choices = c(">", ">=", "<", "<=", "="), 
+                    width = "60px")
+        ),
+      # Part 3: Threshold Input
+      tags$div(
+        style = "margin-right: 5px;",
+        numericInput("tv_threshold", NULL, 
+                     value = mean(slider_range), 
+                     step = slider_step,
+                     width = "80px")
+        )
+    )
+  
+    # tv_dir = "<="
+    # tv_threshold = 0
+})
+
+output$ui_threshold_y = renderUI({
+  req(input$yvar)
+  slider_range <- c(min(df()[[input$yvar]]), max(df()[[input$yvar]]))
+  slider_step <- (slider_range[2] - slider_range[1]) / 10
+   # Use Flexbox for inline alignment
+    tags$div(
+      style = "display: flex; align-items: center; flex-wrap: wrap;",
+      
+      # Part 1: Variable Selection
+      tags$span(""),
+      tags$span("is considered a success when it is "),
+      
+      # Part 2: Operator Selection
+      tags$div(
+        style = "margin-right: 5px;",
+        selectInput("ov_dir", NULL, 
+                    choices = c(">", ">=", "<", "<=", "="), 
+                    width = "60px")
+        ),
+      # Part 3: Threshold Input
+      tags$div(
+        style = "margin-right: 5px;",
+        numericInput("ov_threshold", NULL, 
+                     value = mean(slider_range), 
+                     step = slider_step,
+                     width = "80px")
+        )
+    )
+  
+    # ov_dir = "<="
+    # ov_threshold = 0
+})
+
+output$step2 = renderUI({
+  req(input$file1)
+  h4("Upload knowledge file:")
+})
+
+output$ui_file2 = renderUI({
+  req(input$file1)
+  fileInput("file2", "", accept = ".csv")
+})
+
+output$blankGraph <- renderGrViz({
+  req(graph_complete())
+  
+  dot <- readLines("dotfile.txt")  
+  if (graph_update()) {
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+  }
+  grViz(dot)
+})
+
+output$histogram_x <- renderPlot({
+    req(input$xvar, input$tv_dir, input$tv_threshold)
+    data <- df()[[input$xvar]]
+    
+    # Ensure the selected variable is numeric
+    # validate(
+    #   need(is.numeric(data), "Selected variable must be numeric.")
+    # )
+    
+    # Define treatment condition based on operator and threshold
+    if (input$tv_dir == ">") {
+      treated <- data > input$tv_threshold
+      treated_label <- paste0("Treated (>", input$tv_threshold, ")")
+      untreated_label <- paste0("Untreated (≤ ", input$tv_threshold, ")")
+    } else if (input$tv_dir == "<") {
+      treated <- data < input$tv_threshold
+      treated_label <- paste0("Treated (<", input$tv_threshold, ")")
+      untreated_label <- paste0("Untreated (≥ ", input$tv_threshold, ")")
+    } else if (input$tv_dir == ">=") {
+      treated <- data >= input$tv_threshold
+      treated_label <- paste0("Treated (>=", input$tv_threshold, ")")
+      untreated_label <- paste0("Untreated (> ", input$tv_threshold, ")")
+    } else if (input$tv_dir == "<=") {
+      treated <- data < input$tv_threshold
+      treated_label <- paste0("Treated (<=", input$tv_threshold, ")")
+      untreated_label <- paste0("Untreated (> ", input$tv_threshold, ")")
+    } else if (input$tv_dir == "=") {
+      treated <- data == input$tv_threshold
+      treated_label <- paste0("Treated (= ", input$tv_threshold, ")")
+      untreated_label <- "Untreated (≠)"
+    }
+    
+    # Create a dataframe for plotting
+    plot_df <- data.frame(
+      x = data,
+      Treatment = ifelse(treated, "Treated", "Untreated")
+    )
+    
+    # Define colors
+    colors <- c("Treated" = "#5D9AFF", "Untreated" = "#EAE1D7")
+    
+    # Generate the histogram
+    ggplot(plot_df, aes(x = x, fill = Treatment, color = Treatment)) +
+      geom_rug(sides = "b") +
+      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+      scale_fill_manual(values = colors, labels = c(untreated_label, treated_label)) +
+      scale_color_manual(values = colors, labels = c(untreated_label, treated_label)) +
+      geom_vline(xintercept = input$tv_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+      labs(
+        title = paste("Distribution of ", input$xvar),
+        x = NULL,
+        # y = "Count",
+        fill = "Treatment Status"
+      ) +
+      guides(color = "none") +  
+      theme_minimal()
+  })
+
+output$histogram_y <- renderPlot({
+    req(input$yvar, input$ov_dir, input$ov_threshold)
+    data <- df()[[input$yvar]]
+    
+    # Ensure the selected variable is numeric
+    # validate(
+    #   need(is.numeric(data), "Selected variable must be numeric.")
+    # )
+    
+    # Define treatment condition based on operator and threshold
+    if (input$ov_dir == ">") {
+      success <- data > input$ov_threshold
+      success_label <- paste0("Success (>", input$ov_threshold, ")")
+      fail_label <- paste0("Fail (≤ ", input$ov_threshold, ")")
+    } else if (input$ov_dir == "<") {
+      success <- data < input$ov_threshold
+      success_label <- paste0("Success (<", input$ov_threshold, ")")
+      fail_label <- paste0("Fail (≥ ", input$ov_threshold, ")")
+    } else if (input$ov_dir == ">=") {
+      success <- data >= input$ov_threshold
+      success_label <- paste0("Success (>=", input$ov_threshold, ")")
+      fail_label <- paste0("Fail (> ", input$ov_threshold, ")")
+    } else if (input$ov_dir == "<=") {
+      success <- data < input$ov_threshold
+      success_label <- paste0("Success (<=", input$ov_threshold, ")")
+      fail_label <- paste0("Fail (> ", input$ov_threshold, ")")
+    } else if (input$ov_dir == "=") {
+      success <- data == input$ov_threshold
+      success_label <- paste0("Success (= ", input$ov_threshold, ")")
+      fail_label <- "Fail (≠)"
+    }
+    
+    # Create a dataframe for plotting
+    plot_df <- data.frame(
+      x = data,
+      success = ifelse(success, "Success", "Fail")
+    )
+    
+    # Define colors
+    colors <- c("Success" = "#5D9AFF", "Fail" = "#EAE1D7")
+    # Generate the histogram
+    
+    ggplot(plot_df, aes(x = x, fill = success, color = success)) +
+      geom_rug(sides = "b") +
+      geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+      scale_fill_manual(values = colors, labels = c(fail_label, success_label)) +
+      scale_color_manual(values = colors, labels = c(fail_label, success_label)) +
+      geom_vline(xintercept = input$ov_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+      labs(
+        title = paste("Distribution of ", input$yvar),
+        x = NULL,
+        # y = "Count",
+        fill = "Treatment Status"
+      ) +
+      guides(color = "none") +  
+      theme_minimal()
+  })
+
+output$ui_model_exist = renderUI({
+  req(graph_update())
+  radioGroupButtons(
+    inputId = "model_exist",
+    label = "Do you have an existing model?",
+    choiceNames = c("Yes: I can upload it", "Yes: I can provide an ATE", "No: Do it all for me"),
+    choiceValues = c("Yes", "ATE", "No"), 
+    selected = "ATE",
+    individual = TRUE,
+    checkIcon = list(
+      yes = tags$i(class = "fa fa-circle", 
+                   style = "color: steelblue"),
+      no = tags$i(class = "fa fa-circle-o", 
+                  style = "color: steelblue"))
+  )
+})
+
+output$ui_ate_upload = renderUI({
+  req(graph_update())
+  req(input$model_exist)
+  if (input$model_exist == "ATE") {
+    numericInput("ate_in", label = "ATE: ", value = 0, min = -1, max = 1, step = 0.1)
+    # model_exist <- "ATE"
+    # ate_in <- 0
+  } else (return(NULL))
+  
+})
+
+output$ui_model_upload = renderUI({
+  req(input$model_exist)
+  if (input$model_exist == "Yes") {
+    fileInput("model_in", "", 
+              accept = c(".rds", ".rda", ".model"))
+  } else (return(NULL))
+})
+
+output$step4 = renderUI({
+  req(graph_update())
+  tagList(
+    hr(),
+    h4("Step 3: Tell us about your model:")
+  )
+})
+
+
+output$ui_graphViz = renderUI({
+  req(calc_complete())  
+  h4("Causal graph")
+  grVizOutput("graphViz")
+})
+
+output$ui_ci_plot = renderUI({
+  req(calc_complete())  
+  h4("Comparison of ATE for AIR and ML")
+  plotOutput("ci_plot")
+})
+
+output$ui_ribbon_plot = renderUI({
+  req(calc_complete())  
+  h4("Comparison of ATE for AIR and ML")
+  imageOutput("ribbon_plot")
+})
+
+output$ui_figurecaption = renderUI({
+  req(calc_complete())
+  uiOutput("figurecaption")
+})
+
+output$ui_goButton = renderUI({
+  req(graph_update())
+  actionBttn(
+    inputId = "goButton",
+    label = "Calculate Results",
+    style = "jelly", 
+    color = "primary"
+  )
+})
+
+output$ui_buildButton = renderUI({
+  req(file_check())
+  actionBttn(
+    inputId = "buildButton",
+    label = "Build Graph",
+    style = "jelly", 
+    color = "primary"
+    )
+})
+
+output$ui_updateButton = renderUI({
+  req(input$yvar)
+  actionBttn(
+    inputId = "updateButton",
+    label = "Update Graph",
+    style = "jelly",
+    color = "primary"
+    )
+})
+
+output$graphViz = renderGrViz({
+  req(calc_complete())
+  
+  dot <- read_file("dotfile.txt")
+  dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+  dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+  # dot <- change_node_color(dot, xvar, "yellow")
+  # dot <- change_node_color(dot, yvar, "yellow")
+
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  Z1 <- Zvars[Zvars$grp == "Z1",]$Z
+  Z2 <- Zvars[Zvars$grp == "Z2",]$Z
+
+  # code for generating ribbon plot
+  if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z2, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
+    dot <- change_node_color(dot, Z1, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } 
+
+  grViz(dot)
+})
+  
+
+# output$ribbon_plot = renderImage({
+output$ribbon_plot = renderPlot({
+  req(calc_complete())  
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+
+  # code for generating ribbon plot
+  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI)) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI)) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  summary_color <- case_when(
+    inZ1 == TRUE & inZ2 == TRUE ~ "#378855",
+    inZ1 == TRUE | inZ2 == TRUE ~ "#FCB514",
+    inZ1 == FALSE & inZ2 == FALSE ~ "#C00000"
+  )
+
+  dfr0 <- dfr[1,]
+  p <- ggplot(dfr0, aes(x = Treatment)) +
+  # ggplot(dfr0, aes(x = Treatment)) +
+    ## background
+    geom_linerange(aes(ymin = -1.05, ymax = 1.05),
+                   lwd = 6,
+                   col = "black",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    ## Annotations for '-' and '+'
+    # annotate("text", x = 0.92, y = -1.07, label = "-", hjust = 0, vjust = 0, size = 5, color = "white") +
+    # annotate("text", x = 0.88, y = 1.025,  label = "+", hjust = 0, vjust = 0, size = 5, color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the left side within the black background
+             y = -1,  # Center vertically within the black background
+             label = "-", 
+             hjust = 2.5, 
+             vjust = 0.25, 
+             size = 5, 
+             color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the right side within the black background (adjust based on x-axis limits)
+             y = 1,  # Center vertically within the black background
+             label = "+", 
+             hjust = -0.75, 
+             vjust = 0.4, 
+             size = 5, 
+             color = "white") +## algorithm estimates
+    ## Z1
+    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#292929",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 1)) +
+    geom_point(aes(y = z1_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 1)) +
+    ## Z2
+    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#777777",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0.5)) +
+    geom_point(aes(y = z2_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 0.5)) +
+    # creating the ribbon
+    geom_linerange(aes(ymin = -1, ymax = 1),
+                   lwd = 3.5,
+                   col = "#C00000",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#FCB514",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = max(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = min(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#378855",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
+    ## algorithm estimates
+    labs(y = "",
+         x = "") +
+    geom_segment(data = dfr,
+                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
+                 arrow = arrow(length = unit(0.5, "cm")),
+                 lwd = 1.2,
+                 color = "#0F9ED5") +
+    geom_point(data = dfr,
+               aes(x = 2.5, y = flag, shape = algorithm),
+               size = 3,  # Adjust size as needed
+               color = "#0F9ED5") +  # Or any desired color
+    coord_flip(clip = "off") +
+    ## Adjust Scales to Remove Expansion and Compress Vertically
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       limits = c(-1.1, 1.1)) +  # Tighten y-axis limits
+    ## Theme Adjustments to Minimize White Space
+    theme_void(base_size = 10) +
+    # theme(
+    #   # panel.spacing = unit(0, "pt"),
+    #   panel.background = element_rect(fill = "transparent", color = NA),
+    #   plot.background = element_rect(fill = "transparent", color = NA),
+    #   aspect.ratio = 0.2
+    # )
+    theme(
+      panel.background = element_rect(fill = "transparent", color = NA),
+      plot.background = element_rect(fill = "transparent", color = NA),
+      aspect.ratio = 0.2
+    )
+  
+  p  
+})
+
+output$figurecaption = renderUI({
+  req(calc_complete())
+  caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to 'no significant effect.")
+  tags$div(style = "font-size:12px;", caption)
+
+  })
+
+output$ui_interpretation = renderUI({
+  req(calc_complete())  
+
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+
+  interpretation <- "What we can learn from these results"
+  dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
+  dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
+  
+  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
+      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
+    interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
+  } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
+    interpretation <- "Classifier Predictions match Causally-Derived ATE estimates. Your Classifier is healthy!"
+  } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
+    interpretation <- "Classifier Predictions do not match Causally-Derived ATE estimates. Your Classifier is to be considered unreliable. Consider looking into why this might be."
+  } else {
+    interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
+  }
+  
+  
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  flagdir <- case_when(maxflag < 0 ~ "a negative",
+                       minflag > 0 ~ "a positive",
+                       TRUE ~ "no")
+  effect_estimation <- case_when(any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+                                 TRUE ~ "correctly estimating")
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
+                          effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
+                          TRUE ~ "")
+  effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
+                              TRUE ~ "Unfortunately")
+  
+  result_text <- paste0("Your classifier is ",
+         effect_estimation, 
+         " the effect that ", 
+         df_vars[1,][[2]], 
+         " is having on ", 
+         df_vars[2,][[2]], 
+         effect_percent, 
+         ". AIR predicts that ", 
+         df_vars[1,][[2]], 
+         " should be having ", 
+         flagdir, 
+         " effect on ", 
+         df_vars[2,][[2]],
+         ". As ", 
+         df_vars[1,][[2]], 
+         " changes, the outcome of ", 
+         df_vars[2,][[2]], 
+         " is ", 
+         case_when(flagdir == "a negative" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% less likely to occur. "),
+                   flagdir == "a positive" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% more likely to occur. "),
+                   TRUE ~ "unlikely to change. "),
+         effect_fortune,
+         ", your classifier is producing ",
+         case_when(inZ1 & inZ2 ~ "un",
+                   inZ1 | inZ2 ~ "potentially-",
+                   TRUE ~ ""),
+         "biased results, suggesting ",
+         case_when(effect_estimation == "underestimating" ~ "a decreased ",
+                   effect_estimation == "overestimating" ~ "an increased ",
+                   TRUE ~ "an appropriate "),
+         "change in likelihood of ", 
+         df_vars[2,][[2]],
+         " as ",
+         df_vars[1,][[2]],
+         " changes. ",
+         case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
+                   inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
+                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
+                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
+         )
+
+  tagList(
+    tags$h3("Interpreting your results:"),
+    tags$div(style = "font-size:24px;", result_text)
+  )
+})
+
+output$second_column_content <- renderUI({
+    tags$div(
+      style = "display: flex; flex-direction: column; height: 100%;",
+      tags$div(
+        style = "flex: 0 0 25%;",
+        uiOutput("ui_ribbon_plot")
+      ),
+      tags$div(
+        style = "flex: 0 0 25%;",
+        uiOutput("ui_figurecaption")
+      ),
+      tags$hr(
+        style = "border: none; border-top: 1px solid #ccc; margin: 5px 0;"
+      ),
+      tags$div(
+        style = "flex: 1;",
+        uiOutput("ui_interpretation")
+      )
+    )
+  })
+```
+
+# Key
+
+- Graph Colors
+    - <span style="color: #FFC107; font-weight: bold;">Yellow</span>: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
+    - <span style="color: #9394A2; font-weight: bold;">Dark Gray</span>: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
+    - <span style="color: #D4C7C7; font-weight: bold;">Light Gray</span>: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
+    - <span style="color: #C00000; font-weight: bold;">Red</span>: Any nodes with this color have been flagged as introducing bias into the results of the input classifier. Nodes will change from (dark/light) gray to red if the classifier ATE falls outside the 95% confidence interval for a given adjustment set. 
+
+- Histogram Colors
+    - <span style="color: #5D9AFF; font-weight: bold;">Blue</span>: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
+    - <span style="color: #EAE1D7; font-weight: bold;">Gray</span>: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc... 
+
+- Ribbon Plot Colors
+    - <span style="color: #C00000; font-weight: bold;">Red</span>: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
+    - <span style="color: #FCB514; font-weight: bold;">Yellow</span>: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias. 
+    - <span style="color: #378855; font-weight: bold;">Green</span>: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
+>>>>>>> c6100b773860464ecf3e0c2942ad2fd5a0b879fb
