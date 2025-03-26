@@ -233,7 +233,7 @@ AIR_getGraph <- function(data, knowledge){
   
   # Run the BOSS algorithm
   # graph <- ts$run_boss(penalty_discount = 2)
-  ts$use_sem_bic(penalty_discount = 2)
+  ts$use_sem_bic(penalty_discount = 1)
   ts$use_fisher_z(alpha = 0.01)
   graph <- ts$run_boss()
   
