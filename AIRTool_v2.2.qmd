@@ -5,6 +5,9 @@ format:
     theme: spacelab
     orientation: columns
     # embed-resources: true
+    header-includes:
+      - '<meta name="color-scheme" content="light">'
+
 resources:
   - readme_md_files
 server: shiny
@@ -119,7 +122,6 @@ if (Sys.info()["sysname"] == "Linux") {
   
   java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
   # print(paste("Java version:", java_version))
-
 } 
 
 ## create a log file, then remove any logs over 30 days old
@@ -228,6 +230,16 @@ graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
 
+sendSweetAlert(
+  session = shiny::getDefaultReactiveDomain(),
+  title = "Welcome to the AIR Tool!",
+  text = "For best results, please view the tool without forced darkmode readers.",
+  type = "info",
+  btn_labels = "Continue",
+  btn_colors = "#3085d6",
+  closeOnClickOutside = TRUE,
+  showCloseButton = FALSE
+  )
 
 ### input reactives -------------------------------------------------------------------
 model_in <- reactive({
@@ -443,7 +455,7 @@ observeEvent(input$buildButton, {
     
     if (graph_complete()) {
       sendSweetAlert(
-        session = shiny::getDefaultReactiveDomain(),,
+        session = shiny::getDefaultReactiveDomain(),
         title = "Your Causal Graph is Ready",
         text = NULL,
         type = "success",
@@ -579,7 +591,7 @@ observeEvent(input$goButton, {
     
     calc_complete(TRUE)
     sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),,
+      session = shiny::getDefaultReactiveDomain(),
       title = "Causal Estimates Successfully Calculated",
       text = NULL,
       type = "success",
