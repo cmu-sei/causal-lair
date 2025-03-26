@@ -28,10 +28,6 @@ server: shiny
 <style> .main-container { max-width: unset; } </style>
 ```
 
-```{=html}
-<style> .main-container { max-height: unset; } </style>
-```
-
 ```{r}
 #| context: setup
 #| echo: false
@@ -332,6 +328,7 @@ observeEvent(input$file2, {
 })
 
 observeEvent(input$updateButton, {
+  ### AIR Step 2 ---------------
   # assign global variables
   assign("df_vars",
          data.frame("var" = c("TV","OV"),
