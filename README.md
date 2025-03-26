@@ -1,3 +1,9 @@
+---
+editor: 
+  markdown: 
+    wrap: 72
+---
+
 **Title: AI Robustness (AIR) Tool**
 
 **Version: 2.3.0**
@@ -76,12 +82,12 @@ before using the tool.
 
     -   Must have a single outcome variable that the classifier is
         predicting. This could be something like mission success, threat
-        assessment, component failure, etc\...
+        assessment, component failure, etc...
 
     -   Must be run against multiple scenarios to predict outcome above.
         For example, does location affect mission success, does
         operating system affect threat assessment, does weather affect
-        component failure, etc\...
+        component failure, etc...
 
     -   Must be compatible with use in an R environment and be able to
         utilize a predict() function OR allow the user to predict output
@@ -123,7 +129,7 @@ host. You'll want to have your data and knowledge files accessible to
 the Docker host as well. A sample run command for using the container
 would be:
 
-*docker run -it -p 4173:4173 -u root \--rm \--name airtool
+*docker run -it -p 4173:4173 -u root --rm --name airtool
 airtool-image:latest*
 
 Flag definitions:
@@ -136,10 +142,10 @@ Flag definitions:
     think it is running as (Note: Does not mean you need root
     permissions to run the container)
 
--   '\--rm': Indicates to remove the container after you've finished
-    with it. If you wish to keep it around, remove this parameter.
+-   '--rm': Indicates to remove the container after you've finished with
+    it. If you wish to keep it around, remove this parameter.
 
--   '\--name': provides the name Docker will use to refer to this
+-   '--name': provides the name Docker will use to refer to this
     container. This is important, as if you don't choose a name, a new
     one will be assigned every time you run the container. If you are
     not removing the container, you will soon find you are running out
@@ -376,7 +382,8 @@ release will be revealed with further testing.
 -   **Support Channels:** How users can reach out for help (e.g., email,
     support portal).
 
--   **Feedback Mechanism:** <tailor-help@sei.cmu.edu>
+-   **Feedback Mechanism:**
+    [tailor-help\@sei.cmu.edu](mailto:tailor-help@sei.cmu.edu){.email}
 
 ## Roadmap or Future Updates
 

@@ -15,6 +15,8 @@ resources:
 -   **Detailed Descriptions:** Initial release.
 -   **Benefits:** NA for this release.
 
+> **Note:** Tool functions optimally when dark mode readers are turned off. For best results, disable any forced dark mode readers in your browser's extensions.
+
 <h1>Getting Started</h1>
 
 **Step 1: Building your Causal Graph**
@@ -41,7 +43,9 @@ Once both files are uploaded and accepted, a new button "Build Graph" will appea
 <!-- ![](readme_md_files/image2.png) -->
 The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.
 
-> **Note:** In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.
+<blockquote>
+  <p><strong>Note:</strong> In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
+</blockquote>
 
 Once the user has completed their definitions for the experimental/treatment (x) and outcome (y) variables, they may click the "Update Graph" button to proceed. Activating this button will run the causal identification algorithms in AIR, which will update the causal graph by highlighting: - Both x and y variables (in yellow) - Two separate adjustment sets: - Potential confounders that are parents of x and y (displayed in medium gray) - Potential confounders that are parents of x and intermediate variables and/or y (displayed in light gray)
 
@@ -69,14 +73,14 @@ This page requires no user input but displays the full health report. It contain
 
 <h3>Generating your own ATE</h3>
 
-If you provide your own ATE, the AIR Tool accepts values calculated using potential outcome prediction. In practice, you cannot observe both ($Y\_{1}$) (observed treated outcome) and ($Y\_{0}$) (observed untreated outcome) for the same individual. Instead, the model simulates these outcomes. For each individual:
+If you provide your own ATE, the AIR Tool accepts values calculated using potential outcome prediction. In practice, you cannot observe both ($Y_{1}$) (observed treated outcome) and ($Y_{0}$) (observed untreated outcome) for the same individual. Instead, the model simulates these outcomes. For each individual:
 
--   ($\widehat{Y}\_{1}$): The predicted outcome when treatment ( T = 1 ) is manually set for all individuals.
--   ($\widehat{Y}\_{0}$): The predicted outcome when treatment ( T = 0 ) is manually set for all individuals.
+-   ($\widehat{Y}_{1}$): The predicted outcome when treatment ( T = 1 ) is manually set for all individuals.
+-   ($\widehat{Y}_{0}$): The predicted outcome when treatment ( T = 0 ) is manually set for all individuals.
 
 The ATE is then computed as the average difference between these potential outcomes:
 $$
-ATE = \frac{1}{N}\sum*{i = 1}^{N}* \left( \widehat{Y}{1i} - \widehat{Y}\_{0i} \right)
+ATE = \frac{1}{N}\sum\limits_{i = 1}^{N} \left( \widehat{Y}_{1i} - \widehat{Y}_{0i} \right)
 $$
 <h1>Known Issues/Limitations</h1>
 

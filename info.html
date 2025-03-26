@@ -20,40 +20,6 @@ ul.task-list li input[type="checkbox"] {
   margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
   vertical-align: middle;
 }
-/* CSS for syntax highlighting */
-pre > code.sourceCode { white-space: pre; position: relative; }
-pre > code.sourceCode > span { line-height: 1.25; }
-pre > code.sourceCode > span:empty { height: 1.2em; }
-.sourceCode { overflow: visible; }
-code.sourceCode > span { color: inherit; text-decoration: inherit; }
-div.sourceCode { margin: 1em 0; }
-pre.sourceCode { margin: 0; }
-@media screen {
-div.sourceCode { overflow: auto; }
-}
-@media print {
-pre > code.sourceCode { white-space: pre-wrap; }
-pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
-}
-pre.numberSource code
-  { counter-reset: source-line 0; }
-pre.numberSource code > span
-  { position: relative; left: -4em; counter-increment: source-line; }
-pre.numberSource code > span > a:first-child::before
-  { content: counter(source-line);
-    position: relative; left: -1em; text-align: right; vertical-align: baseline;
-    border: none; display: inline-block;
-    -webkit-touch-callout: none; -webkit-user-select: none;
-    -khtml-user-select: none; -moz-user-select: none;
-    -ms-user-select: none; user-select: none;
-    padding: 0 4px; width: 4em;
-  }
-pre.numberSource { margin-left: 3em;  padding-left: 4px; }
-div.sourceCode
-  {   }
-@media screen {
-pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
-}
 </style>
 
 
@@ -122,79 +88,12 @@ New Features
 <ul>
 <li><strong>Detailed Descriptions:</strong> Initial release.</li>
 <li><strong>Benefits:</strong> NA for this release.</li>
-<li><strong>Screenshots or Visuals:</strong> (see tutorial)</li>
 </ul>
-<h1>
-System Requirements and Installation
-</h1>
-<p>AIR tool can be installed at partner sites or run in the SEI environment. Classified options are not available at the SEI at this point.</p>
-<p><strong>Requirements for running AIR:</strong></p>
-<ul>
-<li><strong>Hardware:</strong>
-<ul>
-<li>10+ GiB of storage plus any additional space for your data</li>
-<li>12 GiB+ memory (Estimate is based on our testing, but may vary)</li>
-</ul></li>
-<li><strong>Software:</strong>
-<ul>
-<li>Docker-capable system (i.e., Linux/Mac/Windows)</li>
-<li>WSL2 / Docker / Docker Desktop software</li>
-<li>A text editor</li>
-<li>A web browser (used for viewing/interacting with local HTML files)</li>
-</ul></li>
-<li><strong>User:</strong>
-<ul>
-<li>Permissions to run a Docker container and any other supporting tools</li>
-<li>Local copies of datasets to use with the AIR tool</li>
-</ul></li>
-</ul>
-<h1>
-Model and Data Requirements
-</h1>
-<p>The AIR Tool has requirements for data and model that must be followed for it to work properly. This is important for the user to understand before using the tool.</p>
-<p><strong>Model:</strong></p>
-<ul>
-<li>The model must be an AI/ML classifier that operates on structured or tabular data, relying on numerical, categorical*, or time-series features rather than unstructured data such as images, audio, or natural language text.</li>
-<li>Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported.</li>
-<li>Must have a single outcome variable that the classifier is predicting. This could be something like mission success, threat assessment, component failure, etc.</li>
-<li>Must be run against multiple scenarios to predict outcome differences. For example, does location affect mission success? Does operating system affect threat assessment? Does weather affect component failure?</li>
-<li>Must be compatible with use in an R environment and be able to utilize a <code>predict()</code> function OR allow the user to predict output given user-defined input (to predict ATE).</li>
-<li>Must not require GPU acceleration or external hardware not currently supported by the tool.</li>
-</ul>
-<p><strong>Data:</strong></p>
-<ul>
-<li>Must be in .csv format.</li>
-<li>Must be tabular with a header specifying variable names.</li>
-<li>Must contain all variables used in the provided model (where applicable).</li>
-<li>Variable names in the data file must be identical to those in the provided model (where applicable).</li>
-<li>Data and model are recommended to contain less than 1,000 variables. Above this threshold, causal discovery algorithms may slow significantly.</li>
-<li>All categorical variables must be one-hot encoded.</li>
-<li>All time-series data must be consistently formatted.</li>
-<li>No missing or null entries in the data.</li>
-<li>Features must have variability (i.e., no constant columns) and not be intentional duplicates of one another.</li>
-</ul>
-<h2 class="anchored">
-Installation Instructions
-</h2>
-<p>Having met the usage requirements above, installation is a matter of copying the container to a location that is accessible from the Docker host. You’ll want to have your data and knowledge files accessible to the Docker host as well. A sample run command for using the container would be:</p>
-<div class="sourceCode" id="cb1"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> run <span class="at">-it</span> <span class="at">-p</span> 4173:4173 <span class="at">-u</span> root <span class="at">--rm</span> <span class="at">--name</span> airtool airtool-image:latest</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p><strong>Flag definitions:</strong></p>
-<ul>
-<li><p><strong>4173:</strong> Default port that the development server runs on. It can be re-mapped if this port is inconvenient in your environment by simply changing the docker command.</p></li>
-<li><p><strong>-u root:</strong> Indicates what user the process inside the container will run as (Note: Does not mean you need root permissions to run the container).</p></li>
-<li><p><strong>–rm:</strong> Indicates to remove the container after you’ve finished with it. If you wish to keep it around, remove this parameter.</p></li>
-<li><p><strong>–name:</strong> Provides the name Docker will use to refer to this container. This is important because if you don’t choose a name, a new one will be assigned every time you run the container. Without removal, you may eventually run out of storage.</p></li>
-<li><p><strong>airtool-image:latest:</strong> Is the tagged name for the container. If you loaded the image to a local registry using:</p>
-<div class="sourceCode" id="cb2"><pre class="sourceCode bash code-with-copy"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> load <span class="op">&lt;</span> airtool.tar</span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="ex">docker</span> tag airtool-image:latest</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-<p>then the container will be viewable in your local Docker registry via <code>docker images</code>.</p></li>
-</ul>
-<p>You may wish to add a data volume to your container. A limitation of the current release is that intermediate products are not stored within the container (i.e., every run starts from a new state).</p>
 <h1>
 Getting Started
 </h1>
 <p><strong>Step 1: Building your Causal Graph</strong></p>
-<p><img src="image1.png" style="width:6.5in; height:2.8in;" alt="Description of image1"></p>
+<!-- <img src="image1.png" style="width:6.5in; height:2.8in;" alt="Description of image1" /> -->
 <p>The tool will first prompt the user for their data file. This file should conform to the characteristics outlined in the “Model and Data Requirements” section above. It is most helpful if it is either the same data that was used to build the AI classifier or if it is data that could be fed to the AI classifier to make predictions.</p>
 <p>After a data file is uploaded, the user will then select their knowledge file for upload. Knowledge files define rough hierarchies of three or more levels of causation as determined logically or by subject matter experts. Levels are defined as follows:</p>
 <ul>
@@ -205,11 +104,11 @@ Getting Started
 <p>Currently, all knowledge assertions must be done ahead of time by the user as in-place editing is not yet supported. The file format should be similar to the data file (i.e., CSV with a header), but will contain only two columns: <code>level</code> and <code>variable</code> (where <code>level</code> contains a numeric tier and <code>variable</code> contains the variable name exactly as in the data file). Each variable name should appear exactly once.</p>
 <p>Once both files are uploaded and accepted, a new button “Build Graph” will appear. Clicking it will run causal discovery algorithms to build your causal graph and display it in the main panel. If you are unsatisfied with the graph and feel that updating your data or knowledge file might help, you can select new files and re-build your graph until satisfied.</p>
 <p><strong>Step 2: Identifying potential sources of bias</strong></p>
-<!-- <img src="./readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2" /> -->
-<div class="cell">
-<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>shiny<span class="sc">::</span><span class="fu">addResourcePath</span>(<span class="at">prefix =</span> <span class="st">"readme_md_files"</span>, <span class="at">directoryPath =</span> <span class="st">"./readme_md_files/"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
-<p><img src="%22readme_md_files/image2.png%22" class="img-fluid"></p>
+<!-- ```{r} -->
+<!-- shiny::addResourcePath(prefix = "readme_md_files", directoryPath = "readme_md_files") -->
+<!-- ``` -->
+<!-- <img src="readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2"/> -->
+<!-- ![](readme_md_files/image2.png) -->
 <p>The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.</p>
 <blockquote class="blockquote">
 <p><strong>Note:</strong> In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes “treated” vs.&nbsp;“untreated” and “success” vs.&nbsp;“fail” for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
@@ -217,7 +116,7 @@ Getting Started
 <p>Once the user has completed their definitions for the experimental/treatment (x) and outcome (y) variables, they may click the “Update Graph” button to proceed. Activating this button will run the causal identification algorithms in AIR, which will update the causal graph by highlighting: - Both x and y variables (in yellow) - Two separate adjustment sets: - Potential confounders that are parents of x and y (displayed in medium gray) - Potential confounders that are parents of x and intermediate variables and/or y (displayed in light gray)</p>
 <p>As with Step 1, the user may continue editing until satisfied, but must always click “Update Graph” for changes to take effect.</p>
 <p><strong>Step 3: Estimating the causal effect to compare with your AI Classifier</strong></p>
-<p><img src="./readme_md_files/image3.png" style="width:6.5in; height:2.8in;" alt="Description of image3"></p>
+<!-- <img src="./readme_md_files/image3.png" style="width:6.5in; height:2.8in;" alt="Description of image3" /> -->
 <p>The tool will now prompt the user for information about their classifier to be tested. This section is context-dependent, so the input boxes will change according to the user’s selection. Currently, three options are available:</p>
 <ul>
 <li><strong>Uploading a model:</strong> This prompts the user to upload a copy of the model used to estimate the average treatment effect (ATE) predicted by the classifier. (Currently, only models in the <code>.rda</code> format are accepted; additional formats can be added upon request.)</li>
@@ -228,7 +127,7 @@ Getting Started
 <h2 class="anchored">
 Results
 </h2>
-<p><img src="./readme_md_files/image4.png" style="width:6.5in; height:2.8in;" alt="Description of image4"></p>
+<!-- <img src="./readme_md_files/image4.png" style="width:6.5in; height:2.8in;" alt="Description of image4" /> -->
 <p>This page requires no user input but displays the full health report. It contains:</p>
 <ul>
 <li><strong>Left:</strong> The causal graph with both x and y variables highlighted in yellow. Additional nodes contributing significant bias (if found) will be highlighted in red, with further details provided in the “Interpreting your results” section.</li>
