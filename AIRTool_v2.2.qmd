@@ -29,6 +29,19 @@ server: shiny
 
 ```{=html}
 <style> .main-container { max-width: unset; } </style>
+<div id="style-test" style="background-color: white; color: black; position: absolute; left: -9999px;"></div>
+
+```
+
+```{javascript}
+const testElem = document.getElementById("style-test");
+const computedBg = window.getComputedStyle(testElem).backgroundColor;
+const computedColor = window.getComputedStyle(testElem).color;
+
+if (computedBg !== "rgb(255, 255, 255)" || computedColor !== "rgb(0, 0, 0)") {
+  alert("It appears a dark mode extension might be overriding the styles. Please disable it for the best experience.");
+}
+
 ```
 
 ```{r}
@@ -230,16 +243,17 @@ graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
 
-sendSweetAlert(
-  session = shiny::getDefaultReactiveDomain(),
-  title = "Welcome to the AIR Tool!",
-  text = "For best results, please view the tool without forced darkmode readers.",
-  type = "info",
-  btn_labels = "Continue",
-  btn_colors = "#3085d6",
-  closeOnClickOutside = TRUE,
-  showCloseButton = FALSE
-  )
+
+# sendSweetAlert(
+#   session = shiny::getDefaultReactiveDomain(),
+#   title = "Welcome to the AIR Tool!",
+#   text = "For best results, please view the tool without forced darkmode readers.",
+#   type = "info",
+#   btn_labels = "Continue",
+#   btn_colors = "#3085d6",
+#   closeOnClickOutside = TRUE,
+#   showCloseButton = FALSE
+#   )
 
 ### input reactives -------------------------------------------------------------------
 model_in <- reactive({
@@ -262,7 +276,7 @@ model_in <- reactive({
 
 df <- reactive({
   df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
-  cat(paste0("Read in data file: " ,input$file1$datapath, "\n"), file = log_file, append = TRUE)
+  cat(paste0("Read in data file: ", input$file1$datapath, "\n"), file = log_file, append = TRUE)
   # df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
   continuous_columns <- c(1, ncol(df))
   df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
@@ -416,7 +430,7 @@ observeEvent(input$updateButton, {
     dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
     dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
   }
-  grViz(dot)
+  grViz(dot, )
   })
 
   cat(paste0("Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
@@ -450,6 +464,10 @@ observeEvent(input$buildButton, {
     cat("Graph Built\n", file = log_file, append = TRUE)
 
     dot <- readLines("dotfile.txt")  
+    # for (node in names(df())) {
+    #   dot <- change_node_color(dot, node, "'#ffffff'")
+    # }
+
     grViz(dot)
     })
     
@@ -780,8 +798,11 @@ output$histogram_x <- renderPlot({
         fill = "Treatment Status"
       ) +
       guides(color = "none") +  
-      theme_minimal()
-  })
+      theme_minimal() + 
+      theme(text = element_text(color = "#666666", face = "bold"),
+            panel.background = element_rect(fill = "transparent", color = NA),
+            plot.background  = element_rect(fill = "transparent", color = NA)) 
+  }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
     req(input$yvar, input$ov_dir, input$ov_threshold)
@@ -838,8 +859,11 @@ output$histogram_y <- renderPlot({
         fill = "Treatment Status"
       ) +
       guides(color = "none") +  
-      theme_minimal()
-  })
+      theme_minimal() + 
+      theme(text = element_text(color = "#666666", face = "bold"),
+            panel.background = element_rect(fill = "transparent", color = NA),
+            plot.background  = element_rect(fill = "transparent", color = NA)) 
+  }, bg = "transparent")
 
 output$ui_model_exist = renderUI({
   req(graph_update())
@@ -1101,7 +1125,7 @@ output$ribbon_plot = renderPlot({
     )
   
   p  
-})
+}, bg = "transparent")
 
 output$figurecaption = renderUI({
   req(calc_complete())
