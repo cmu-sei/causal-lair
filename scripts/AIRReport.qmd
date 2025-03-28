@@ -1,0 +1,50 @@
+---
+title: "AIR Report"
+format: pdf
+pdf-engine: pdflatex
+params:
+  AIRHome: null
+  xvar: null
+  yvar: null
+  figure_cap: null
+  result_text: null
+---
+
+# AI Robustness Health Report
+
+## Understanding Cause and Effect in your data
+
+Your data looks like this. We built out a graph (below) that represents the cause-effect relationships within your data. Based on your cause (`r params$xvar`) and effect (`r params$yvar`) variables, we discovered two possible adjustment sets, which have the potential to introduce bias into your predictions (shaded in two different gray colors). Your cause variable (lower left) and effect variable (lower right) have been split into binary variables based on user input criteria. 
+
+``` {r}
+#| echo: false
+knitr::include_graphics(paste0(params$AIRHome, "/plots/updatedgraph.png"))
+```
+
+```{r}
+#| echo: false
+#| column: screen-inset-shaded
+#| layout-nrow: 1
+#| layout-ncol: 2
+
+knitr::include_graphics(paste0(params$AIRHome, "/plots/xhist.png"))
+knitr::include_graphics(paste0(params$AIRHome, "/plots/yhist.png"))
+```
+
+## How does your AI/ML Algorithm compare to Causal Methods?
+
+```{r}
+#| echo: false
+
+knitr::include_graphics(paste0(params$AIRHome, "/plots/ribbon.png"))
+
+```
+
+`{r} params$figure_cap`
+
+### Interpreting your results
+`{r} params$result_text`
+
+```{r}
+knitr::include_graphics(paste0(params$AIRHome, "/plots/finalgraph.png"))
+```

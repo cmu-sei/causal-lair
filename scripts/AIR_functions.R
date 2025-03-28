@@ -209,17 +209,37 @@ fix_knowledge <- function(df){
 }
 
 # change color of nodes in graph
+# change_node_color <- function(dot_code, node, color) {
+#   for (i in 1:length(node)) {
+#     # Create the node definition with the color
+#     node_definition <- paste0("\"", node[i], "\" [style=filled, fillcolor=", color, "];")
+#     
+#     # Append the new node definition to the beginning of the DOT code
+#     dot_code <- sub("digraph g \\{", paste0("digraph g {\r\n  ", node_definition), dot_code)
+#   }
+#   
+#   return(dot_code)
+# }
+# 
+# change_node_color <- function(dot_code, node, color) {
+#   # Create all node definitions as a single string with a single newline separator
+#   node_definitions <- paste0("\"", node, "\" [style=filled, fillcolor=", color, "];", collapse = "\n  ")
+#   
+#   # Replace once, inserting all node definitions
+#   dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definitions), dot_code)
+#   
+#   return(dot_code)
+# }
+
 change_node_color <- function(dot_code, node, color) {
-  for (i in 1:length(node)) {
-    # Create the node definition with the color
-    node_definition <- paste0("\"", node[i], "\" [style=filled, fillcolor=", color, "];")
-    
-    # Append the new node definition to the beginning of the DOT code
-    dot_code <- sub("digraph g \\{", paste0("digraph g {\r\n  ", node_definition), dot_code)
-  }
-  
+  # Remove any accidental extra quotes from the color string
+  color <- trimws(gsub("['\"]", "", color))
+  node_definition <- paste0("\"", node, "\" [style=filled, fillcolor=\"", color, "\"];")
+  dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definition), dot_code)
+  dot_code <- gsub("\'", "\"", dot_code)
   return(dot_code)
 }
+
 # AIR Tool Functions
 AIR_getGraph <- function(data, knowledge){
   # Create a BOSS object with the data
@@ -765,4 +785,399 @@ get_X_descendents <- function(TV, PATH) {
     children[[n]] <- children_of_n
   }
   return(unlist(descendants(TV, children)))
+}
+
+
+get_ribbon_plot <- function(AIRHome) {
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  
+  # code for generating ribbon plot
+  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI)) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI)) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  summary_color <- case_when(
+    inZ1 == TRUE & inZ2 == TRUE ~ "#378855",
+    inZ1 == TRUE | inZ2 == TRUE ~ "#FCB514",
+    inZ1 == FALSE & inZ2 == FALSE ~ "#C00000"
+  )
+  
+  dfr0 <- dfr[1,]
+  p <- ggplot(dfr0, aes(x = Treatment)) +
+    # ggplot(dfr0, aes(x = Treatment)) +
+    ## background
+    geom_linerange(aes(ymin = -1.05, ymax = 1.05),
+                   lwd = 6,
+                   col = "black",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    ## Annotations for '-' and '+'
+    # annotate("text", x = 0.92, y = -1.07, label = "-", hjust = 0, vjust = 0, size = 5, color = "white") +
+    # annotate("text", x = 0.88, y = 1.025,  label = "+", hjust = 0, vjust = 0, size = 5, color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the left side within the black background
+             y = -1,  # Center vertically within the black background
+             label = "-", 
+             hjust = 2.5, 
+             vjust = 0.25, 
+             size = 5, 
+             color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the right side within the black background (adjust based on x-axis limits)
+             y = 1,  # Center vertically within the black background
+             label = "+", 
+             hjust = -0.75, 
+             vjust = 0.4, 
+             size = 5, 
+             color = "white") +## algorithm estimates
+    ## Z1
+    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#292929",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 1)) +
+    geom_point(aes(y = z1_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 1)) +
+    ## Z2
+    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#777777",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0.5)) +
+    geom_point(aes(y = z2_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 0.5)) +
+    # creating the ribbon
+    geom_linerange(aes(ymin = -1, ymax = 1),
+                   lwd = 3.5,
+                   col = "#C00000",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#FCB514",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = max(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = min(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#378855",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
+    ## algorithm estimates
+    labs(y = "",
+         x = "") +
+    geom_segment(data = dfr,
+                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
+                 arrow = arrow(length = unit(0.5, "cm")),
+                 lwd = 1.2,
+                 color = "#0F9ED5") +
+    geom_point(data = dfr,
+               aes(x = 2.5, y = flag, shape = algorithm),
+               size = 3,  # Adjust size as needed
+               color = "#0F9ED5") +  # Or any desired color
+    coord_flip(clip = "off") +
+    ## Adjust Scales to Remove Expansion and Compress Vertically
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       limits = c(-1.1, 1.1)) +  # Tighten y-axis limits
+    ## Theme Adjustments to Minimize White Space
+    theme_void(base_size = 10) +
+    # theme(
+    #   # panel.spacing = unit(0, "pt"),
+    #   panel.background = element_rect(fill = "transparent", color = NA),
+    #   plot.background = element_rect(fill = "transparent", color = NA),
+    #   aspect.ratio = 0.2
+    # )
+    theme(
+      panel.background = element_rect(fill = "transparent", color = NA),
+      plot.background = element_rect(fill = "transparent", color = NA),
+      aspect.ratio = 0.2
+    )
+}
+
+get_figure_caption <- function(AIRHome, df_vars) {
+  caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to 'no significant effect.")
+  return(caption)
+}
+
+get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  
+  interpretation <- "What we can learn from these results"
+  dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
+  dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
+  
+  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
+      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
+    interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
+  } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
+    interpretation <- "Classifier Predictions match Causally-Derived ATE estimates. Your Classifier is healthy!"
+  } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
+    interpretation <- "Classifier Predictions do not match Causally-Derived ATE estimates. Your Classifier is to be considered unreliable. Consider looking into why this might be."
+  } else {
+    interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
+  }
+  
+  
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  flagdir <- case_when(maxflag < 0 ~ "a negative",
+                       minflag > 0 ~ "a positive",
+                       TRUE ~ "no")
+  effect_estimation <- case_when(any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+                                 TRUE ~ "correctly estimating")
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
+                              effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
+                              TRUE ~ "")
+  effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
+                              TRUE ~ "Unfortunately")
+  
+  result_text <- paste0("Your classifier is ",
+                        effect_estimation, 
+                        " the effect that ", 
+                        df_vars[1,][[2]], 
+                        " is having on ", 
+                        df_vars[2,][[2]], 
+                        effect_percent, 
+                        ". AIR predicts that ", 
+                        df_vars[1,][[2]], 
+                        " should be having ", 
+                        flagdir, 
+                        " effect on ", 
+                        df_vars[2,][[2]],
+                        ". As ", 
+                        df_vars[1,][[2]], 
+                        " changes, the outcome of ", 
+                        df_vars[2,][[2]], 
+                        " is ", 
+                        case_when(flagdir == "a negative" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% less likely to occur. "),
+                                  flagdir == "a positive" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% more likely to occur. "),
+                                  TRUE ~ "unlikely to change. "),
+                        effect_fortune,
+                        ", your classifier is producing ",
+                        case_when(inZ1 & inZ2 ~ "un",
+                                  inZ1 | inZ2 ~ "potentially-",
+                                  TRUE ~ ""),
+                        "biased results, suggesting ",
+                        case_when(effect_estimation == "underestimating" ~ "a decreased ",
+                                  effect_estimation == "overestimating" ~ "an increased ",
+                                  TRUE ~ "an appropriate "),
+                        "change in likelihood of ", 
+                        df_vars[2,][[2]],
+                        " as ",
+                        df_vars[1,][[2]],
+                        " changes. ",
+                        case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
+                                  inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
+                                  inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
+                                  TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
+  )
+  return(result_text)
+}
+
+get_histogram_x <- function(df, xvar, tv_dir, tv_threshold) {
+  data <- df[[xvar]]
+  
+  # Ensure the selected variable is numeric
+  # validate(
+  #   need(is.numeric(data), "Selected variable must be numeric.")
+  # )
+  
+  # Define treatment condition based on operator and threshold
+  if (tv_dir == ">") {
+    treated <- data > tv_threshold
+    treated_label <- paste0("Treated (>", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (≤ ", tv_threshold, ")")
+  } else if (tv_dir == "<") {
+    treated <- data < tv_threshold
+    treated_label <- paste0("Treated (<", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (≥ ", tv_threshold, ")")
+  } else if (tv_dir == ">=") {
+    treated <- data >= tv_threshold
+    treated_label <- paste0("Treated (>=", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
+  } else if (tv_dir == "<=") {
+    treated <- data < tv_threshold
+    treated_label <- paste0("Treated (<=", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
+  } else if (tv_dir == "=") {
+    treated <- data == tv_threshold
+    treated_label <- paste0("Treated (= ", tv_threshold, ")")
+    untreated_label <- "Untreated (≠)"
+  }
+  
+  # Create a dataframe for plotting
+  plot_df <- data.frame(
+    x = data,
+    Treatment = ifelse(treated, "Treated", "Untreated")
+  )
+  
+  # Define colors
+  colors <- c("Treated" = "#5D9AFF", "Untreated" = "#EAE1D7")
+  
+  # Generate the histogram
+  ggplot(plot_df, aes(x = x, fill = Treatment, color = Treatment)) +
+    geom_rug(sides = "b") +
+    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+    scale_fill_manual(values = colors, labels = c(untreated_label, treated_label)) +
+    scale_color_manual(values = colors, labels = c(untreated_label, treated_label)) +
+    geom_vline(xintercept = tv_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+    labs(
+      title = paste("Distribution of ", xvar),
+      x = NULL,
+      # y = "Count",
+      fill = "Treatment Status"
+    ) +
+    guides(color = "none") +  
+    theme_minimal() + 
+    theme(text = element_text(color = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", color = NA),
+          plot.background  = element_rect(fill = "transparent", color = NA)) 
+}
+
+get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
+  data <- df[[yvar]]
+  
+  # Ensure the selected variable is numeric
+  # validate(
+  #   need(is.numeric(data), "Selected variable must be numeric.")
+  # )
+  
+  # Define treatment condition based on operator and threshold
+  if (ov_dir == ">") {
+    success <- data > ov_threshold
+    success_label <- paste0("Success (>", ov_threshold, ")")
+    fail_label <- paste0("Fail (≤ ", ov_threshold, ")")
+  } else if (ov_dir == "<") {
+    success <- data < ov_threshold
+    success_label <- paste0("Success (<", ov_threshold, ")")
+    fail_label <- paste0("Fail (≥ ", ov_threshold, ")")
+  } else if (ov_dir == ">=") {
+    success <- data >= ov_threshold
+    success_label <- paste0("Success (>=", ov_threshold, ")")
+    fail_label <- paste0("Fail (> ", ov_threshold, ")")
+  } else if (ov_dir == "<=") {
+    success <- data < ov_threshold
+    success_label <- paste0("Success (<=", ov_threshold, ")")
+    fail_label <- paste0("Fail (> ", ov_threshold, ")")
+  } else if (ov_dir == "=") {
+    success <- data == ov_threshold
+    success_label <- paste0("Success (= ", ov_threshold, ")")
+    fail_label <- "Fail (≠)"
+  }
+  
+  # Create a dataframe for plotting
+  plot_df <- data.frame(
+    x = data,
+    success = ifelse(success, "Success", "Fail")
+  )
+  
+  # Define colors
+  colors <- c("Success" = "#5D9AFF", "Fail" = "#EAE1D7")
+  # Generate the histogram
+  
+  ggplot(plot_df, aes(x = x, fill = success, color = success)) +
+    geom_rug(sides = "b") +
+    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+    scale_fill_manual(values = colors, labels = c(fail_label, success_label)) +
+    scale_color_manual(values = colors, labels = c(fail_label, success_label)) +
+    geom_vline(xintercept = ov_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+    labs(
+      title = paste("Distribution of ", yvar),
+      x = NULL,
+      # y = "Count",
+      fill = "Treatment Status"
+    ) +
+    guides(color = "none") +  
+    theme_minimal() + 
+    theme(text = element_text(color = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", color = NA),
+          plot.background  = element_rect(fill = "transparent", color = NA)) 
+}
+
+get_updated_graph <- function(AIRHome, graph_update, xvar, yvar, Zvars) { 
+  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))  
+  if (graph_update) {
+    dot <- change_node_color(dot, xvar, "'#FFC107'")
+    dot <- change_node_color(dot, yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+  }
+  return(dot)
+}
+
+get_final_graph <- function(AIRHome, xvar, yvar, Zvars) {
+  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))
+  dot <- change_node_color(dot, xvar, "'#FFC107'")
+  dot <- change_node_color(dot, yvar, "'#FFC107'")
+  # dot <- change_node_color(dot, xvar, "yellow")
+  # dot <- change_node_color(dot, yvar, "yellow")
+  
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  Z1 <- Zvars[Zvars$grp == "Z1",]$Z
+  Z2 <- Zvars[Zvars$grp == "Z2",]$Z
+  
+  # code for generating ribbon plot
+  if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z2, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
+    dot <- change_node_color(dot, Z1, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } 
+  
+  return(dot)
+}
+
+save_ggplot_to_png <- function(plot_obj, filename, width = 8, height = 6, dpi = 300) {
+  # Use ggsave to write the ggplot object to a file
+  ggsave(filename = filename, plot = plot_obj, width = width, height = height, dpi = dpi)
+}
+
+save_graphviz_to_png <- function(dot_code, filename) {
+  # Write the DOT code to a temporary file
+  dot_file <- tempfile(fileext = ".dot")
+  # writeLines(dot_code, dot_file)
+  dot <- paste(dot_code, collapse = "\n")
+  cat(dot, file = dot_file)
+  
+  # Call Graphviz's dot command to convert DOT to PNG
+  # Ensure that 'dot' is installed and available in your system PATH.
+  cmd <- sprintf('dot -Tpng -o "%s" "%s"', filename, dot_file)
+  system(cmd)
 }
