@@ -145,15 +145,14 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-DEXRcsqPrlVkr/ZCmXFWUER0k0hMimX81myq7ZLTm14=",
         "path": "identify",
         "type": "path"
       },
       "original": {
         "path": "identify",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "luvit-meta": {
       "flake": false,

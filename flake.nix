@@ -292,6 +292,7 @@
             iproute2
             pkg-config
             quarto
+	    tinytex		    # latex distribution to allow pdf downloads
 
             # software-properties-common <- apt-specific, has no corollary in nix?
 

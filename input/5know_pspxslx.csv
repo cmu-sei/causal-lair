@@ -1,0 +1,21 @@
+level,variable
+0, EstDef_10 
+0, EstDef_8 
+0, EstDef_9 
+0,ActDef_10 
+1,ActDef_7 
+1,ActDef_8 
+1,ActDef_9 
+1,ActEffort_10 
+1,ActEffort_7
+2,ActEffort_8 
+2,ActEffort_9 
+2,ActSize_10
+2,ActSize_7
+2,ActSize_8
+2,ActSize_9
+3,EstDef_7 
+3,EstSize_10
+3,EstSize_7
+3,EstSize_8
+3,EstSize_9
