@@ -294,6 +294,7 @@
             quarto
 	    pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
 	    pkgs.texlivePackages.framed
+	    pkgs.texlivePackages.collection-latexextra
 
 
             # software-properties-common <- apt-specific, has no corollary in nix?
