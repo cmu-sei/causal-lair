@@ -293,6 +293,7 @@
             pkg-config
             quarto
 	    pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
+	    pkgs.texlivePackages.framed
 
 
             # software-properties-common <- apt-specific, has no corollary in nix?
