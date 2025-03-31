@@ -292,7 +292,7 @@
             iproute2
             pkg-config
             quarto
-	    pkgs.texlive.combined.scheme-small  # Full TeX distribution added here
+	    pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
 
 
             # software-properties-common <- apt-specific, has no corollary in nix?
