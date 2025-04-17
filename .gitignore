@@ -11,3 +11,11 @@ AIRTool_v2.2_files
 target/
 info.html
 logs/
+Results.csv
+ResultsOut.csv
+data/
+.direnv/
+plots/
+results
+scripts/AIRReport.pdf
+scripts/Zvars_test.csv
