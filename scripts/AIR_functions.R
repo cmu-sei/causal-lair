@@ -838,7 +838,7 @@ get_ribbon_plot <- function(AIRHome) {
     ## Z1
     geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
                    lwd = 3.5,
-                   col = "#292929",
+                   col = "#9394A2",
                    alpha = 1,
                    stat = "unique",
                    lineend = "round",
@@ -852,7 +852,7 @@ get_ribbon_plot <- function(AIRHome) {
     ## Z2
     geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
                    lwd = 3.5,
-                   col = "#777777",
+                   col = "#D4C7C7",
                    alpha = 1,
                    stat = "unique",
                    lineend = "round",
