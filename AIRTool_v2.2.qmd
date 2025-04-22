@@ -598,7 +598,10 @@ observeEvent(input$goButton, {
                                varName = i,
                                confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
         tryCatch({
-          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate, log_file)
+          if (i == tail(unique(Zvars$name), 1) & j == tail(unique(Zvars$name), 1) ) {
+            move_results <- TRUE
+          } else { move_results <- FALSE }
+          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate, log_file, move_results)
           }, error = function(e) {
             errMsg <- sprintf("Results Processing: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
             cat(errMsg, file = log_file, sep = "\n", append = TRUE)

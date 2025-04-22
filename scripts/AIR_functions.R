@@ -460,7 +460,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   cat("Finished SuperLearner\n", file = log_file, append = TRUE)
 }
 
-processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file){
+processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE){
   
   # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
   cat(paste0("Started processResults() with ",
@@ -702,12 +702,14 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
       write_csv(paste0(AIRHome, "/ResultsOut.csv"))
   }
   
-  cat("moving results files\n", file = log_file, append = TRUE)
-  file.rename(from = paste0(AIRHome, "/Results.csv"),
-              to = paste0(AIRHome, "/data/Results.csv"))
-  
-  file.rename(from = paste0(AIRHome, "/ResultsOut.csv"),
-              to = paste0(AIRHome, "/data/ResultsOut.csv"))
+  if (move_results) {
+    cat("moving results files\n", file = log_file, append = TRUE)
+    file.rename(from = paste0(AIRHome, "/Results.csv"),
+                to = paste0(AIRHome, "/data/Results.csv"))
+    
+    file.rename(from = paste0(AIRHome, "/ResultsOut.csv"),
+                to = paste0(AIRHome, "/data/ResultsOut.csv"))
+  }
   
 }
 
