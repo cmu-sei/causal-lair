@@ -917,51 +917,53 @@ output$download_report <- downloadHandler(
   filename = function() {
     paste0('AIRTool-Report_', Sys.Date(), '.pdf')
     },
-  content = function(file) {
-    # Pre-evaluate reactive values
-    loc_xvar <- input$xvar
-    loc_yvar <- input$yvar
-    loc_df <- df()
-    loc_tv_dir <- input$tv_dir
-    loc_tv_threshold <- input$tv_threshold
-    loc_ov_dir <- input$ov_dir
-    loc_ov_threshold <- input$ov_threshold
-    loc_df_vars <- df_vars
-    loc_Zvars <- Zvars
-    loc_graph_update <- graph_update()
-    loc_figure_cap <- get_figure_caption(AIRHome, df_vars)
-    loc_result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
-    loc_final_graph <- get_final_graph(AIRHome, loc_xvar, loc_yvar, Zvars)
-
-    save_ggplot_to_png(get_histogram_x(loc_df, loc_xvar, loc_tv_dir, loc_tv_threshold), "plots/xhist.png")
-    save_ggplot_to_png(get_histogram_y(loc_df, loc_yvar, loc_ov_dir, loc_ov_threshold), "plots/yhist.png")
-    save_ggplot_to_png(get_ribbon_plot(AIRHome), "plots/ribbon.png")
-    save_graphviz_to_png(get_updated_graph(AIRHome, loc_graph_update, loc_xvar, loc_yvar, loc_Zvars), "plots/updatedgraph.png")
-    save_graphviz_to_png(get_final_graph(AIRHome, loc_xvar, loc_yvar, loc_Zvars), "plots/finalgraph.png")
+    content = function(file) {
+      # Pre-evaluate reactive values
+      loc_xvar <- input$xvar
+      loc_yvar <- input$yvar
+      loc_df <- df()
+      loc_tv_dir <- input$tv_dir
+      loc_tv_threshold <- input$tv_threshold
+      loc_ov_dir <- input$ov_dir
+      loc_ov_threshold <- input$ov_threshold
+      loc_df_vars <- df_vars
+      loc_Zvars <- Zvars
+      loc_graph_update <- graph_update()
+      loc_figure_cap <- get_figure_caption(AIRHome, df_vars)
+      loc_result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
     
-    # df = loc_df,
-    # tv_dir = loc_tv_dir,
-    # tv_threshold = loc_tv_threshold,
-    # ov_dir = loc_ov_dir,
-    # ov_threshold = loc_ov_threshold,
-    # df_vars = loc_df_vars,
-    # Zvars = loc_Zvars,
-    # graph_update = loc_graph_update
-    quarto::quarto_render(
-      input = "scripts/AIRReport.qmd",
-      output_format = "pdf",
-      execute_params = list(AIRHome = AIRHome,
-                            xvar = loc_xvar,
-                            yvar = loc_yvar,
-                            figure_cap = loc_figure_cap,
-                            result_text = loc_result_text
-                            )  # Parameters to pass
-    )
-    # copy the quarto generated file to `file` argument.
-    generated_file_name <- paste0('AIRTool-Report_', Sys.Date(), '.pdf')
-    file.copy(generated_file_name, file)
+      # Save plots
+      save_ggplot_to_png(get_histogram_x(loc_df, loc_xvar, loc_tv_dir, loc_tv_threshold), "plots/xhist.png")
+      save_ggplot_to_png(get_histogram_y(loc_df, loc_yvar, loc_ov_dir, loc_ov_threshold), "plots/yhist.png")
+      save_ggplot_to_png(get_ribbon_plot(AIRHome), "plots/ribbon.png")
+      save_graphviz_to_png(get_updated_graph(AIRHome, loc_graph_update, loc_xvar, loc_yvar, loc_Zvars), "plots/updatedgraph.png")
+      save_graphviz_to_png(get_final_graph(AIRHome, loc_xvar, loc_yvar, loc_Zvars), "plots/finalgraph.png")
+    
+      # Render Quarto report
+      quarto::quarto_render(
+        input = "scripts/AIRReport.qmd",
+        output_format = "pdf",
+        execute_params = list(
+          AIRHome = AIRHome,
+          xvar = loc_xvar,
+          yvar = loc_yvar,
+          figure_cap = loc_figure_cap,
+          result_text = loc_result_text
+        )
+      )
+    
+      # Manually find the generated file
+      generated_file_path <- "scripts/AIRReport.pdf"
+    
+      # Make sure it actually exists before copying
+      if (!file.exists(generated_file_path)) {
+        stop("Failed to find generated PDF at ", generated_file_path)
+      }
+    
+      # Now copy it to where Shiny expects it
+      file.copy(generated_file_path, file, overwrite = TRUE)
     }
-  )
+)
 ```
 
 # Key
