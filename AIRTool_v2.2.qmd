@@ -30,7 +30,6 @@ server: shiny
 ```{=html}
 <style> .main-container { max-width: unset; } </style>
 <div id="style-test" style="background-color: white; color: black; position: absolute; left: -9999px;"></div>
-
 ```
 
 ```{javascript}
@@ -160,6 +159,7 @@ if (length(old_files) > 0) {
 ```
 
 # Docs
+
 ```{r include-info, echo=FALSE, results='asis'}
 # Read the file and output its content as-is
 # cat(paste(readLines("info.qmd"), collapse = "\n"))
@@ -167,8 +167,7 @@ knitr::opts_knit$set(root.dir = AIRHome)
 cat(knitr::knit_child("info.qmd", quiet = TRUE))
 ```
 
-
-# Setup
+# Analysis of Bias
 
 ##  {.sidebar}
 
@@ -194,45 +193,50 @@ uiOutput('ui_model_exist')
 uiOutput('ui_model_upload')
 uiOutput('ui_ate_upload')
 uiOutput('ui_goButton')
+uiOutput('ui_dl_btn')
 
 ```
 
 ## Column {width = "40%"}
 
 ```{r}
-grVizOutput('blankGraph')
+# grVizOutput('blankGraph')
+uiOutput('ui_graph_pane')
 ```
 
 ## Column {width = "60%"}
 
 ```{r}
-plotOutput('histogram_x', height = "50%")
+# plotOutput('histogram_x', height = "50%")
+uiOutput('second_column_content')
+# uiOutput('ui_top_right_pane')
 ```
 
-#### Row
+<!-- #### Row -->
 
-```{r}
-plotOutput('histogram_y', height = "50%")
-```
+<!-- ```{r} -->
+<!-- # plotOutput('histogram_y', height = "50%") -->
+<!-- # uiOutput('ui_bottom_right_pane') -->
+<!-- ``` -->
 
-# Results
+<!-- # Results -->
 
-## Column {width="60%"}
+<!-- ## Column {width="60%"} -->
 
-```{r}
-#| padding: 0px
-##| title: "Causal Discovery"
-uiOutput('ui_graphViz')
-```
+<!-- ```{r} -->
+<!-- #| padding: 0px -->
+<!-- ##| title: "Causal Discovery" -->
+<!-- uiOutput('ui_graphViz') -->
+<!-- ``` -->
 
-## Column {width="40%"}
+<!-- ## Column {width="40%"} -->
 
-```{r}
-#| padding: 0px
-# UI Output for ribbon plot
-uiOutput("second_column_content")
+<!-- ```{r} -->
+<!-- #| padding: 0px -->
+<!-- # UI Output for ribbon plot -->
+<!-- uiOutput("second_column_content") -->
 
-```
+<!-- ``` -->
 
 ```{r}
 #| context: server
@@ -261,7 +265,7 @@ model_in <- reactive({
   req(input$model_in)
   #loading the model
   model_in = read_rds(input$model_in$datapath)
-  cat(paste0("Read in model: " ,input$model_in$datapath, "\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Read in model: " ,input$model_in$datapath, "\n"), file = log_file, append = TRUE)
 
   # model_in = read_rds("input/model.rda")
   # ext <- tools::file_ext(input$modelFile$datapath)
@@ -277,7 +281,7 @@ model_in <- reactive({
 
 df <- reactive({
   df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
-  cat(paste0("Read in data file: ", input$file1$datapath, "\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Read in data file: ", input$file1$datapath, "\n"), file = log_file, append = TRUE)
   # df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
   continuous_columns <- c(1, ncol(df))
   df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
@@ -288,7 +292,7 @@ df <- reactive({
 knowledge <- reactive({
   req(input$file2)  # Make sure the file is uploaded
   path2 <- input$file2$datapath
-  cat(paste0("Read in knowledge file: " ,input$file2$datapath, "\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Read in knowledge file: " ,input$file2$datapath, "\n"), file = log_file, append = TRUE)
 
   extension <- tolower(tools::file_ext(path2))
   
@@ -434,10 +438,10 @@ observeEvent(input$updateButton, {
   grViz(dot, )
   })
 
-  cat(paste0("Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
-  cat(paste0("Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
-  cat(paste0("Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
-  cat(paste0("Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
 
 })
 
@@ -489,8 +493,8 @@ observeEvent(input$buildButton, {
 })
   
 observeEvent(input$goButton, {
-  cat(paste0("Selected model_exist: ", input$model_exist,"\n"), file = log_file, append = TRUE)
-  cat(paste0("Selected ate_in: ", input$ate_in,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected model_exist: ", input$model_exist,"\n"), file = log_file, append = TRUE)
+  cat(paste0(Sys.time(), " - ","Selected ate_in: ", input$ate_in,"\n"), file = log_file, append = TRUE)
 
   withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
 
@@ -629,6 +633,57 @@ observeEvent(input$goButton, {
 
 
 ### output definitions ------------------------------------------------------------------
+
+output$ui_graph_pane = renderUI({
+  grVizOutput('blankGraph')
+})
+
+
+output$second_column_content <- renderUI({
+    if (calc_complete()) {
+      tags$div(
+        style = "display: flex; flex-direction: column; height: 100%;",
+        tags$div(
+          style = "flex: 0 0 25%;",
+          uiOutput("ui_ribbon_plot")
+        ),
+        tags$div(
+          style = "flex: 0 0 25%;",
+          uiOutput("ui_figurecaption")
+        ),
+        tags$hr(
+          style = "border: none; border-top: 1px solid #ccc; margin: 5px 0;"
+        ),
+        tags$div(
+          style = "flex: 1;",
+          uiOutput("ui_interpretation")
+        )
+      )
+    } else {
+      tags$div(
+        tags$div(
+          style = "flex: 0 0 25%",
+          plotOutput('histogram_x')
+        ),
+        tags$div(
+          style = "flex: 0 0 25%",
+          plotOutput('histogram_y')
+        )
+      )
+    }
+  })
+
+output$ui_dl_btn <- renderUI({
+  req(calc_complete())
+  downloadBttn(
+              outputId = "download_report",
+              style = "jelly",
+              color = "primary"
+            )
+})
+
+
+
 output$step3 = renderUI({
   req(graph_complete())
   tagList(
@@ -884,34 +939,6 @@ output$ui_interpretation = renderUI({
   )
 })
 
-output$second_column_content <- renderUI({
-    tags$div(
-      style = "display: flex; flex-direction: column; height: 100%;",
-      tags$div(
-        style = "flex: 0 0 25%;",
-        uiOutput("ui_ribbon_plot")
-      ),
-      tags$div(
-        style = "flex: 0 0 25%;",
-        uiOutput("ui_figurecaption")
-      ),
-      tags$hr(
-        style = "border: none; border-top: 1px solid #ccc; margin: 5px 0;"
-      ),
-      tags$div(
-        style = "flex: 1;",
-        uiOutput("ui_interpretation")
-      ),
-      tags$div(
-        style = "flex: 1;",
-        downloadBttn(
-          outputId = "download_report",
-          style = "jelly",
-          color = "primary"
-        )
-      )
-    )
-  })
 
 output$download_report <- downloadHandler(
   filename = function() {
@@ -968,17 +995,15 @@ output$download_report <- downloadHandler(
 
 # Key
 
-- Graph Colors
-    - <span style="color: #FFC107; font-weight: bold;">Yellow</span>: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
-    - <span style="color: #9394A2; font-weight: bold;">Dark Gray</span>: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
-    - <span style="color: #D4C7C7; font-weight: bold;">Light Gray</span>: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
-    - <span style="color: #C00000; font-weight: bold;">Red</span>: Any nodes with this color have been flagged as introducing bias into the results of the input classifier. Nodes will change from (dark/light) gray to red if the classifier ATE falls outside the 95% confidence interval for a given adjustment set. 
-
-- Histogram Colors
-    - <span style="color: #5D9AFF; font-weight: bold;">Blue</span>: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
-    - <span style="color: #EAE1D7; font-weight: bold;">Gray</span>: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc... 
-
-- Ribbon Plot Colors
-    - <span style="color: #C00000; font-weight: bold;">Red</span>: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
-    - <span style="color: #FCB514; font-weight: bold;">Yellow</span>: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias. 
-    - <span style="color: #378855; font-weight: bold;">Green</span>: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
+-   Graph Colors
+    -   [Yellow]{style="color: #FFC107; font-weight: bold;"}: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
+    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
+    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
+    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input classifier. Nodes will change from (dark/light) gray to red if the classifier ATE falls outside the 95% confidence interval for a given adjustment set.
+-   Histogram Colors
+    -   [Blue]{style="color: #5D9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
+    -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
+-   Ribbon Plot Colors
+    -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
+    -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
+    -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.

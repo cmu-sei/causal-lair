@@ -272,7 +272,7 @@ scale_ <- function(x){
 }
 
 runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, log_file){ 
-  cat(paste0("Started superlearner with ",
+  cat(paste0(Sys.time(), " - ","Started superlearner with ",
              paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold), collapse = ", ")), "\n", 
       file = log_file, 
       append = TRUE)
@@ -463,7 +463,7 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
 processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE){
   
   # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
-  cat(paste0("Started processResults() with ",
+  cat(paste0(Sys.time(), " - ","Started processResults() with ",
              paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate, log_file), collapse = ", ")), "\n", 
       file = log_file, 
       append = TRUE)
