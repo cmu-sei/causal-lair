@@ -1,1 +1,17 @@
-*.csv text eol=lf
+# Force LF endings for all text files
+* text=auto eol=lf
+
+# Optional: Explicit rules for common file types
+*.sh     text eol=lf
+*.rs     text eol=lf
+*.toml   text eol=lf
+*.qmd    text eol=lf
+*.md     text eol=lf
+*.yml    text eol=lf
+*.json   text eol=lf
+*.csv    text eol=lf
+*.html   text eol=lf
+*.css    text eol=lf
+*.js     text eol=lf
+*.R      text eol=lf
+*.tex    text eol=lf
