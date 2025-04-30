@@ -34,7 +34,8 @@
 
     # Rust packages source
     rust-overlay = {
-      url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
+      #url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
+      url = "github:oxalica/rust-overlay";
       inputs = {
         nixpkgs.follows = "nixpkgs";
         flake-utils.follows = "flake-utils";
@@ -291,6 +292,7 @@
             lsb-release
             iproute2
             pkg-config
+            libiconv
             quarto
 	    pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
 	    pkgs.texlivePackages.framed
@@ -343,6 +345,7 @@
             openssl.dev
             pkg-config
             pkgs.stdenv.cc.cc.lib
+            libiconv
             ps
             ripgrep
             strace
@@ -500,6 +503,26 @@
             mkdir -p tmp
 
             ln -s ${myEnv}/bin/javadoc usr/bin/javadoc
+          '';
+        };
+        devShells.default = pkgs.mkShell {
+          name = "airtool-dev";
+        
+          packages = [
+            myEnv
+            pkgs.openssl.dev
+            pkgs.pkg-config
+          ];
+        
+          # Set up required env vars for openssl-sys and friends
+          shellHook = ''
+            export OPENSSL_DIR=${pkgs.openssl.dev}
+            export PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig
+            export LIBCLANG_PATH=${pkgs.libclang.lib}/lib/
+            export SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
+            export LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive
+            export JAVA_HOME=${pkgs.jdk23}
+            export PATH=$JAVA_HOME/bin:$PATH
           '';
         };
       }
