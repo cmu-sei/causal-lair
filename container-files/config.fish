@@ -95,8 +95,8 @@ end
 function fish_greeting --description="Displays the Fish logo and some other init stuff."
     set_color $fish_color_autosuggestion
     set_color normal
-    echo 'The license for this container can be found in /root/license.txt' | lolcat --force | cat
-    lol_fig "Welcome to the AIR Shell."
+    echo 'The license for this container can be found in /root/license.txt'
+    echo "Welcome to the AIR Shell." | figlet
     
     # Array of funny phrases
     set phrases "Coding with AIR: It’s a breeze!" "Let’s give your ideas some lift!" "Where bugs get blown away in a gust of genius!" "Catch your second wind of inspiration!" "Time to take off into coding greatness!" "We keep your code light as AIR!" "AIR: Where bugs don’t stand a draft!" "Blow the cobwebs off your old code!" "Let your code soar to new heights!" "Why walk when you can fly through development?" "Take a deep breath and exhale excellence!" "We make coding look plane and simple!" "No hot AIR, just cool code!" "Put your bugs on standby—this is a no-fly zone!" "AIR: Propelling your projects forward!" "Don’t just code, hover above the competition!" "Our code? It’s on cloud nine!" "When the winds of bugs blow, we stay grounded!" "Ready to take off into bug-free skies?" "AIR: Because your code deserves a tailwind!" "No updrafts, only upgrades!" "Make your code so good it takes your breath away!" "AIR: Where every bug goes down the vent!" "AIR: The gust of genius your code needs!" "With AIR, your code is never up in the air!"
@@ -105,7 +105,7 @@ function fish_greeting --description="Displays the Fish logo and some other init
     set random_index (random 1 (count $phrases))
     set phrase $phrases[$random_index]
 
-    echo $phrase | lolcat --force | cat
+    echo $phrase
 end
 
 function hash_get --description="Return a hash of the input string."
@@ -124,13 +124,6 @@ function json_validate --description="Validate provided json against provided sc
     end
 end
 
-function lol_fig --description="lolcat inside a figlet"
-    echo $argv | figlet | lolcat -f | cat
-end
-
-#function lh --description="ls -alh, so you don't have to."
-    #grc ls -alh --color $argv
-#end
 function lh --description="Uses eza, a replacement for ls, with some useful options as defaults."
     eza --group --header --group-directories-first --long --icons --git --all --binary --dereference --links $argv
 end

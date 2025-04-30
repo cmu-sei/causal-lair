@@ -34,7 +34,6 @@
 
     # Rust packages source
     rust-overlay = {
-      #url = "github:oxalica/rust-overlay?rev=260ff391290a2b23958d04db0d3e7015c8417401";
       url = "github:oxalica/rust-overlay";
       inputs = {
         nixpkgs.follows = "nixpkgs";
@@ -394,7 +393,6 @@
             gzip
             jq
             libclang
-            lolcat
             lsof
             ncurses
             nix
