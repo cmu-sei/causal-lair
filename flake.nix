@@ -38,7 +38,6 @@
       url = "github:oxalica/rust-overlay";
       inputs = {
         nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
       };
     };
 
@@ -59,11 +58,9 @@
         flake-utils.follows = "flake-utils";
       };
     };
-
-    identify.url = "path:identify";
   };
 
-  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, identify, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -72,6 +69,66 @@
             rust-overlay.overlays.default
             myNeovimOverlay.overlays.default
           ];
+        };
+
+        identify = let
+          identifySrc = ./identify;
+          cargoToml = builtins.fromTOML (builtins.readFile "${identifySrc}/Cargo.toml");
+          binaryName = cargoToml.package.name;
+        in
+        pkgs.rustPlatform.buildRustPackage {
+          pname = binaryName;
+          version = cargoToml.package.version;
+          src = identifySrc;
+          cargoLock.lockFile = "${identifySrc}/Cargo.lock";
+          doCheck = false;
+        
+          installPhase = ''
+            mkdir -p $out/bin
+            cp target/${pkgs.stdenv.hostPlatform.config}/release/${binaryName} $out/bin/
+          '';
+        };
+
+        score = let
+          scoreSrc = ./score;
+          cargoToml = builtins.fromTOML (builtins.readFile "${scoreSrc}/Cargo.toml");
+        in
+        pkgs.rustPlatform.buildRustPackage {
+          pname = cargoToml.package.name;
+          version = cargoToml.package.version;
+          src = scoreSrc;
+
+          cargoLock.lockFile = "${scoreSrc}/Cargo.lock";
+          doCheck = false;
+
+          nativeBuildInputs = [
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.openblasCompat
+            pkgs.liblapack
+            pkgs.gfortran13
+            pkgs.gfortran13.cc.lib
+          ];
+        
+          buildInputs = [
+            pkgs.pkg-config
+            pkgs.openssl
+            pkgs.openblasCompat
+            pkgs.liblapack
+            pkgs.gfortran13
+            pkgs.gfortran13.cc.lib
+          ];
+        
+          env = {
+            OPENBLAS_DIR = "${pkgs.openblasCompat}";
+            OPENBLAS_INCLUDE_DIR = "${pkgs.openblasCompat}/include";
+            OPENBLAS_LIB_DIR = "${pkgs.openblasCompat}/lib";
+            OPENSSL_DIR = "${pkgs.openssl.out}";
+            OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
+            OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
+            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
+            LD_LIBRARY_PATH = "${pkgs.gfortran13.cc.lib}/lib:$LD_LIBRARY_PATH";
+          };
         };
 
         # We create an account for the container user. These are necessary user files.
@@ -264,7 +321,7 @@
           name = "my-env";
           paths = with pkgs; [
 
-            gfortran
+            gfortran13
             gnupg
             ffmpeg                  # libavfilter-dev
             curlFull                # libcurl4-openssl-dev
@@ -279,7 +336,7 @@
             imagemagick_light       # libmagick++-dev
             libmysqlclient          # libmariadb-dev
                                     # libmariadb-dev-compat
-            openblas                # libopenblas-dev
+            openblasCompat                # libopenblas-dev
             libpng                  # libpng-dev
             poppler                 # libpoppler-cpp-dev
             librsvg                 # librsvg2-dev
@@ -342,7 +399,6 @@
             ncurses
             nix
             openssl
-            openssl.dev
             pkg-config
             pkgs.stdenv.cc.cc.lib
             libiconv
@@ -386,7 +442,8 @@
             rWithPkgs
             #tetrad.packages.x86_64-linux.default
             tetrad.packages.${system}.default
-            identify.packages.${system}.default
+            identify
+            score
           ];
           pathsToLink = [
             "/bin"
@@ -463,7 +520,7 @@
               "CC=gcc"
               "CXX=g++"
               "LD_LIBRARY_PATH=${pkgs.stdenv.cc.cc.lib}/lib"
-              "PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig"
+              "PKG_CONFIG_PATH=${pkgs.openssl}/lib/pkgconfig"
               "USER=root"
               "COREUTILS=${pkgs.uutils-coreutils-noprefix}"
               "CMAKE=/bin/cmake"
@@ -510,19 +567,21 @@
         
           packages = [
             myEnv
-            pkgs.openssl.dev
+            pkgs.openssl
             pkgs.pkg-config
           ];
         
           # Set up required env vars for openssl-sys and friends
           shellHook = ''
-            export OPENSSL_DIR=${pkgs.openssl.dev}
-            export PKG_CONFIG_PATH=${pkgs.openssl.dev}/lib/pkgconfig
-            export LIBCLANG_PATH=${pkgs.libclang.lib}/lib/
-            export SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt
-            export LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive
-            export JAVA_HOME=${pkgs.jdk23}
-            export PATH=$JAVA_HOME/bin:$PATH
+            export OPENSSL_INCLUDE_DIR="${pkgs.openssl.dev}/include"
+            export OPENSSL_LIB_DIR="${pkgs.openssl.out}/lib"
+            export PKG_CONFIG_PATH="${pkgs.openssl.dev}/lib/pkgconfig"
+            export LIBCLANG_PATH="${pkgs.libclang.lib}/lib/"
+            export SSL_CERT_FILE="/etc/ssl/certs/ca-bundle.crt"
+            export LOCALE_ARCHIVE="${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
+            export JAVA_HOME="${pkgs.jdk23}"
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.liblapack}/lib:${pkgs.openblasCompat}/lib:$LD_LIBRARY_PATH"
+            export PATH="$JAVA_HOME/bin:$PATH"
           '';
         };
       }

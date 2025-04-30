@@ -44,3 +44,8 @@ path = "src/lib.rs"
 [[bin]]
 name = "score_driver"
 path = "src/main.rs"
+
+[dependencies.openblas-src]
+version = "0.10"
+optional = false
+features = ["system"]
