@@ -21,11 +21,6 @@ This Software includes and/or makes use of Third-Party Software each subject to
 its own license.
 
 DM24-1686
-
----
-editor: 
-  markdown: 
-    wrap: 72
 ---
 
 **Title: AI Robustness (AIR) Tool**
@@ -194,8 +189,7 @@ container. I.e., every run starts from a new state.
 
 **Step 1: Building your Causal Graph**
 
-![](./readme_md_files/image1.png){width="6.5in"
-height="2.807638888888889in"}
+![](./readme_md_files/image1.png)
 
 The tool will first prompt the user for their data file. This file
 should conform to the characteristics outlined in the "Model and Data
@@ -242,8 +236,7 @@ re-build your graph until satisfied.
 **Step 2: Identifying potential sources of bias**
 
 ![Chart Description automatically
-generated](./readme_md_files/image2.png){width="6.5in"
-height="2.795138888888889in"}
+generated](./readme_md_files/image2.png)
 
 The tool will now prompt users for additional information about the
 problem the classifier is attempting to solve. Most important will be
@@ -281,8 +274,7 @@ finished for the changed inputs to take effect.
 Classifier**
 
 ![Chart Description automatically generated with low
-confidence](./readme_md_files/image3.png){width="6.5in"
-height="2.7930555555555556in"}
+confidence](./readme_md_files/image3.png)
 
 The tool will now prompt the user for information about their classifier
 to be tested. This section is context-dependent, so a user's selection
@@ -319,8 +311,7 @@ tool screen.
 **Results**
 
 ![Diagram Description automatically
-generated](./readme_md_files/image4.png){width="6.5in"
-height="2.795138888888889in"}
+generated](./readme_md_files/image4.png)
 
 This page requires no input from the user but will display the entire
 health report. It contains the following contents:
