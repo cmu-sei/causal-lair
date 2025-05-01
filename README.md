@@ -149,8 +149,7 @@ the Docker host as well. A sample run command for using the container
 would be:
 
 ```bash
-docker run -it -p 4173:4173 -u root --rm --name airtool
-airtool-image:latest
+docker run -it -p 4173:4173 -u root --rm --name airtool airtool-image:latest
 ```
 
 Flag definitions:
