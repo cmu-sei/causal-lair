@@ -25,25 +25,29 @@ server: shiny
     font-weight: bold;
   }
 </style>
-```
 
-```{=html}
 <style> .main-container { max-width: unset; } </style>
 <div id="style-test" style="background-color: white; color: black; position: absolute; left: -9999px;"></div>
+
+<!-- Hidden element for detecting overridden styles -->
+<div id="style-test" style="background-color: white; color: black; display: none;"></div>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const testElem = document.getElementById("style-test");
+  if (!testElem) return;
+
+  const computedBg = window.getComputedStyle(testElem).backgroundColor;
+  const computedColor = window.getComputedStyle(testElem).color;
+
+  if (computedBg !== "rgb(255, 255, 255)" || computedColor !== "rgb(0, 0, 0)") {
+    alert("It appears a dark mode extension might be overriding the styles. Please disable it for the best experience.");
+  }
+});
+</script>
 ```
 
-```{javascript}
-const testElem = document.getElementById("style-test");
-const computedBg = window.getComputedStyle(testElem).backgroundColor;
-const computedColor = window.getComputedStyle(testElem).color;
-
-if (computedBg !== "rgb(255, 255, 255)" || computedColor !== "rgb(0, 0, 0)") {
-  alert("It appears a dark mode extension might be overriding the styles. Please disable it for the best experience.");
-}
-
-```
-
-```{r}
+```{r initial-setup}
 #| context: setup
 #| echo: false
 #| include: false
@@ -128,6 +132,7 @@ if (Sys.info()["sysname"] == "Linux") {
   ## if running on local machine, uncomment out the next line
   # setup_tetrad_environment()
   
+  Sys.unsetenv("_JAVA_OPTIONS")
   .jinit()
   # .jinit(parameters = "-verbose:class")
   .jaddClassPath(TETRAD_PATH)
@@ -160,18 +165,21 @@ if (length(old_files) > 0) {
 
 # Docs
 
-```{r include-info, echo=FALSE, results='asis'}
+```{r info-tab, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 # Read the file and output its content as-is
 # cat(paste(readLines("info.qmd"), collapse = "\n"))
 knitr::opts_knit$set(root.dir = AIRHome)
-cat(knitr::knit_child("info.qmd", quiet = TRUE))
+knitr::opts_chunk$set(progress = FALSE)
+options(knitr.progress = FALSE)
+
+cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 ```
 
 # Analysis of Bias
 
 ##  {.sidebar}
 
-```{r}
+```{r sidebar}
 h4("Step 1: Upload your data")
 fileInput("file1", "", accept = ".csv")
 br()
@@ -199,46 +207,20 @@ uiOutput('ui_dl_btn')
 
 ## Column {width = "40%"}
 
-```{r}
+```{r graph-pane}
 # grVizOutput('blankGraph')
 uiOutput('ui_graph_pane')
 ```
 
 ## Column {width = "60%"}
 
-```{r}
+```{r right-of-graph}
 # plotOutput('histogram_x', height = "50%")
 uiOutput('second_column_content')
 # uiOutput('ui_top_right_pane')
 ```
 
-<!-- #### Row -->
-
-<!-- ```{r} -->
-<!-- # plotOutput('histogram_y', height = "50%") -->
-<!-- # uiOutput('ui_bottom_right_pane') -->
-<!-- ``` -->
-
-<!-- # Results -->
-
-<!-- ## Column {width="60%"} -->
-
-<!-- ```{r} -->
-<!-- #| padding: 0px -->
-<!-- ##| title: "Causal Discovery" -->
-<!-- uiOutput('ui_graphViz') -->
-<!-- ``` -->
-
-<!-- ## Column {width="40%"} -->
-
-<!-- ```{r} -->
-<!-- #| padding: 0px -->
-<!-- # UI Output for ribbon plot -->
-<!-- uiOutput("second_column_content") -->
-
-<!-- ``` -->
-
-```{r}
+```{r backend-compute}
 #| context: server
 
 

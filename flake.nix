@@ -206,6 +206,21 @@
           ];
         };
 
+        quartoPatched = pkgs.quarto.overrideAttrs (old: {
+          postFixup = ''
+            echo "[quarto patch] Removing upstream QUARTO_R logic..."
+            sed -i '/^QUARTO_R=/d' $out/bin/quarto
+            sed -i '/^export QUARTO_R$/d' $out/bin/quarto
+        
+            echo "[quarto patch] Forcing our QUARTO_R..."
+            echo 'QUARTO_R="${rWithPkgs}/bin/R"' >> $out/bin/quarto
+            echo 'export QUARTO_R' >> $out/bin/quarto
+        
+            echo "[quarto patch] Done. Final QUARTO_R:"
+            grep QUARTO_R $out/bin/quarto || true
+          '';
+        });
+
         rWithPkgs = pkgs.rWrapper.override {
           packages = [
             pkgs.rPackages.udunits2      # libudunits2-dev
@@ -349,10 +364,11 @@
             iproute2
             pkg-config
             libiconv
-            quarto
-	    pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
-	    pkgs.texlivePackages.framed
-	    pkgs.texlivePackages.collection-latexextra
+            quartoPatched
+
+	        pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
+	        pkgs.texlivePackages.framed
+	        pkgs.texlivePackages.collection-latexextra
 
 
             # software-properties-common <- apt-specific, has no corollary in nix?
@@ -527,7 +543,7 @@
               "SHELL=/bin/fish"
               "JAVA_HOME=${pkgs.jdk23}"
               "PATH=${myEnv}/bin:/bin:/usr/bin:/root/.cargo/bin:$JAVA_HOME/bin"
-              "QUARTO_R=${rWithPkgs}/bin"
+              "QUARTO_R=${rWithPkgs}/bin/R"
               "LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
 
               # Fish plugins environment variables

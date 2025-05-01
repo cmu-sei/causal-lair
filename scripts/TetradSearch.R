@@ -44,7 +44,7 @@ TetradSearch <- setRefClass(
     # @param data A data frame containing the dataset to be analyzed.
     # @return A TetradSearch object.
     initialize = function(data) {
-      cat("Initializing TetradSearch object...\n")
+      #cat("Initializing TetradSearch object...\n")
 
       if (!is.data.frame(data)) {
         stop("Data must be a data.frame")
@@ -52,8 +52,8 @@ TetradSearch <- setRefClass(
 
       .self$data <- data
       .self$sample_size <- nrow(data)
-      cat("Data frame dimensions:", dim(data), "\n")
-      cat("Sample size set to:", .self$sample_size, "\n")
+      #cat("Data frame dimensions:", dim(data), "\n")
+      #cat("Sample size set to:", .self$sample_size, "\n")
 
       i <- c(1, ncol(data))
       data[, i] <<- apply(data[, i], 2, as.numeric)
@@ -63,11 +63,11 @@ TetradSearch <- setRefClass(
                          .self$vars,
                          .jarray(as.matrix(cov(data)), dispatch = TRUE),
                          as.integer(.self$sample_size))
-      cat("Covariance matrix created.\n")
+      #cat("Covariance matrix created.\n")
 
       .self$knowledge <- .jnew("edu/cmu/tetrad/data/Knowledge")
-      cat("Knowledge instance created.\n")
-      cat("TetradSearch object initialized successfully.\n")
+      #cat("Knowledge instance created.\n")
+      #cat("TetradSearch object initialized successfully.\n")
     },
 
     # Make sure the score object is initialized
@@ -101,12 +101,12 @@ TetradSearch <- setRefClass(
     # @param tier The tier to which the variable should be added.
     # @param var_name The name of the variable to add.
     add_to_tier = function(tier, var_name) {
-      cat("Adding variable", var_name, "to tier", tier, "...\n")
+      #cat("Adding variable", var_name, "to tier", tier, "...\n")
       tryCatch({
         tier <- as.integer(tier)
         var_name <- as.character(var_name)
         .jcall(.self$knowledge, "V", "addToTier", tier, var_name)
-        cat("Variable", var_name, "added to tier", tier, ".\n")
+        #cat("Variable", var_name, "added to tier", tier, ".\n")
       }, error = function(e) {
         cat("Error adding variable to tier:", e$message, "\n")
       })
@@ -121,7 +121,7 @@ TetradSearch <- setRefClass(
       .self$score <- .jcast(score1, "edu.cmu.tetrad.search.score.Score")
       .jcall(.self$score, "V", "setPenaltyDiscount", penalty_discount)
 
-      cat("SemBicScore object created with penalty discount set.\n")
+      #cat("SemBicScore object created with penalty discount set.\n")
     },
 
     # Set the test to Fisher Z
@@ -134,7 +134,7 @@ TetradSearch <- setRefClass(
       .self$test <- .jcast(test1, "edu.cmu.tetrad.search.IndependenceTest")
       # .jcall(.self$test, "V", "setAlpha", alpha)
 
-      cat("Fisher Z object created with alpha set.\n")
+      #cat("Fisher Z object created with alpha set.\n")
     },
 
     # Run the PC algorithm
@@ -181,14 +181,14 @@ TetradSearch <- setRefClass(
     run_boss = function() {
 
       # The API for BOSS is a bit different, so we need to handle it separately
-      cat("Running BOSS algorithm...\n")
+      #cat("Running BOSS algorithm...\n")
       tryCatch({
         .self$.check_score()
         suborder_search <- .jnew("edu.cmu.tetrad.search.Boss", .self$score)
         .self$search <- .jnew("edu.cmu.tetrad.search.PermutationSearch",
                               .jcast(suborder_search, "edu.cmu.tetrad.search.SuborderSearch"))
         .self$.run_search()
-        cat("BOSS algorithm completed. Graph generated.\n")
+        #cat("BOSS algorithm completed. Graph generated.\n")
       }, error = function(e) {
         stop("Error during BOSS algorithm execution:", e$message, "\n")
       })
@@ -257,11 +257,11 @@ TetradSearch <- setRefClass(
     # @param graph A Tetrad graph object.
     # @return The graph object.
     print_graph = function(graph) {
-      cat("Attempting to print the graph...\n")
+      #cat("Attempting to print the graph...\n")
       if (is.null(graph)) {
         cat("No graph generated yet. Please run the BOSS algorithm first.\n")
       } else {
-        cat("Graph structure:\n", graph$toString(), "\n")
+        #cat("Graph structure:\n", graph$toString(), "\n")
       }
       invisible(.self$graph)
     }

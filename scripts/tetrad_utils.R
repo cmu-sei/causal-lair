@@ -186,19 +186,19 @@ if (TETRAD_PATH == "") {
 #' @param data The data frame containing the variables.
 #' @return A Java List of Nodes.
 create_variables <- function(data) {
-  cat("Creating variable list from data...\n")
+  #cat("Creating variable list from data...\n")
   
   vars <- .jnew("java/util/ArrayList")
   
   for (name in colnames(data)) {
-    cat("Adding variable:", name, "to the list.\n")
+    #cat("Adding variable:", name, "to the list.\n")
     variable <- .jnew("edu/cmu/tetrad/data/ContinuousVariable", name)
     node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
     .jcall(vars, "Z", "add", .jcast(node, "java/lang/Object"))
   }
   
   vars <- .jcast(vars, "java/util/List")
-  cat("Variable list creation complete. Number of variables added:", length(vars), "\n")
+  #cat("Variable list creation complete. Number of variables added:", length(vars), "\n")
   
   return(vars)
 }
