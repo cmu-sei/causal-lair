@@ -15,14 +15,6 @@ jobs:
       packages: write
 
     steps:
-      - name: Free up disk space
-        run: |
-          echo "Initial disk usage:"
-          df -h
-          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
-          echo "Post-cleanup disk usage:"
-          df -h
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
