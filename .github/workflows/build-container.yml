@@ -15,13 +15,40 @@ jobs:
       packages: write
 
     steps:
+      - name: Free up disk space
+        run: |
+          echo "Initial disk usage:"
+          df -h
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android
+          echo "Post-cleanup disk usage:"
+          df -h
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      - name: Set up caching for Cargo
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Install Nix
         uses: cachix/install-nix-action@v22
+        with:
+          extra_nix_config: |
+            max-jobs = auto
+            cores = 0
+
+      - name: Authenticate with Cachix (optional but recommended)
+        uses: cachix/cachix-action@v12
+        with:
+          name: your-cachix-cache-name  # replace this with your Cachix cache name
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Build Nix container
         run: nix build .#default
