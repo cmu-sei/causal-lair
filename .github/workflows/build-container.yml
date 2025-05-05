@@ -1,0 +1,36 @@
+name: "Build and Push Nix Container"
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Container version tag (e.g., v1.0.0)"
+        required: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v22
+
+      - name: Build Nix container
+        run: nix build .#default
+
+      - name: Load Docker image
+        run: |
+          docker load < result
+          docker tag result ghcr.io/${{ github.repository_owner }}/airtool-dev:${{ github.event.inputs.version }}
+
+      - name: Authenticate to GHCR
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Push to GitHub Container Registry
+        run: docker push ghcr.io/${{ github.repository_owner }}/airtool-dev:${{ github.event.inputs.version }}
