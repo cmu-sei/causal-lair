@@ -57,6 +57,12 @@
         flake-utils.follows = "flake-utils";
       };
     };
+
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.url = "github:NixOS/nixpkgs/eb9ceca17df2ea50a250b6b27f7bf6ab0186f198";
+    };
+
   };
 
   outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, ... }:
