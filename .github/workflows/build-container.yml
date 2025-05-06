@@ -42,7 +42,7 @@ jobs:
           echo "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}" >> ~/.config/nix/nix.conf
 
       - name: Build and push to Cachix
-        uses: cachix/cachix-action@v12
+        uses: cachix/cachix-action@v14
         with:
           name: airtool-dev
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -52,6 +52,9 @@ jobs:
         run: |
           docker image rm -f airtool-dev || true
           docker image rm -f ghcr.io/${{ github.repository_owner }}/airtool-dev:latest || true
+
+      - name: Ensure result exists
+        run: test -e result
 
       - name: Load Docker image
         run: |
