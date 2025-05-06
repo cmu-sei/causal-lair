@@ -36,19 +36,17 @@ jobs:
             max-jobs = auto
             cores = 0
 
-      - name: Authenticate with Cachix (optional but recommended)
-        uses: cachix/cachix-action@v12
-        with:
-          name: airtool-dev
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
       - name: Configure GitHub token for Nix
         run: |
           mkdir -p ~/.config/nix
           echo "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}" >> ~/.config/nix/nix.conf
 
-      - name: Build Nix container
-        run: nix build .#default
+      - name: Build and push to Cachix
+        uses: cachix/cachix-action@v12
+        with:
+          name: airtool-dev
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          buildCommand: nix build .#default
 
       - name: Clean up old airtool-dev Docker images
         run: |
@@ -65,6 +63,3 @@ jobs:
 
       - name: Push to GitHub Container Registry
         run: docker push ghcr.io/${{ github.repository_owner }}/airtool-dev:${{ github.event.inputs.version }}
-
-      - name: Push result to Cachix
-        run: cachix push airtool-dev result

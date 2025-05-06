@@ -25,6 +25,11 @@
 {
   description = "creates a dev container for AIR, with R and other tools";
 
+  nixConfig = {
+    substituters = [ "https://airtool-dev.cachix.org" ];
+    trusted-public-keys = [ "airtool-dev.cachix.org-1:dfX1T1ibTyc1dIOSWtxQxbpPJUya00RVFu9gLtiWvn8=" ];
+  };
+
   inputs = {
     flake-utils.url = "github:numtide/flake-utils"; # Utility functions for Nix flakes
 
