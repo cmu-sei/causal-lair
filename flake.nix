@@ -26,8 +26,14 @@
   description = "creates a dev container for AIR, with R and other tools";
 
   nixConfig = {
-    substituters = [ "https://airtool-dev.cachix.org" ];
-    trusted-public-keys = [ "airtool-dev.cachix.org-1:dfX1T1ibTyc1dIOSWtxQxbpPJUya00RVFu9gLtiWvn8=" ];
+    substituters = [
+        "https://cache.nixos.org"
+        "https://airtool-dev.cachix.org"
+    ];
+    trusted-public-keys = [ 
+        "airtool-dev.cachix.org-1:dfX1T1ibTyc1dIOSWtxQxbpPJUya00RVFu9gLtiWvn8="
+        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+    ];
   };
 
   inputs = {
