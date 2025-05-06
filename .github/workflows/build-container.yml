@@ -42,13 +42,13 @@ jobs:
           name: airtool-dev
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Export GitHub token to Nix for flake fetch
-        run: echo "GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}" >> $GITHUB_ENV
+      - name: Configure GitHub token for Nix
+        run: |
+          mkdir -p ~/.config/nix
+          echo "access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}" >> ~/.config/nix/nix.conf
 
       - name: Build Nix container
         run: nix build .#default
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Load Docker image
         run: |
