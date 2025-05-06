@@ -50,6 +50,11 @@ jobs:
       - name: Build Nix container
         run: nix build .#default
 
+      - name: Clean up old airtool-dev Docker images
+        run: |
+          docker image rm -f airtool-dev || true
+          docker image rm -f ghcr.io/${{ github.repository_owner }}/airtool-dev:latest || true
+
       - name: Load Docker image
         run: |
           docker load < result
