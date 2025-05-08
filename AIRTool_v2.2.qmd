@@ -598,7 +598,13 @@ observeEvent(input$goButton, {
     
     
     calc_complete(TRUE)
-    sendSweetAlert(
+ 
+     output$blankGraph <- renderGrViz({
+        req(calc_complete())
+        dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
+        grViz(dot)
+        })
+   sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "Causal Estimates Successfully Calculated",
       text = "Please switch to the 'Results' tab to view your results.",
@@ -770,14 +776,6 @@ output$ui_file2 = renderUI({
   req(input$file1)
   fileInput("file2", "", accept = ".csv")
 })
-
-output$blankGraph <- renderGrViz({
-  req(graph_complete())
-  
-  dot <- get_updated_graph(AIRHome, graph_update(), input$xvar, input$yvar, Zvars)
-  grViz(dot)
-})
-
 output$histogram_x <- renderPlot({
   req(input$xvar, input$tv_dir, input$tv_threshold)
     
