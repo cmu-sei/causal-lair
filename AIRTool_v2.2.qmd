@@ -406,16 +406,27 @@ observeEvent(input$updateButton, {
   # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
   # source_python(paste0(AIRHome, "/scripts/identify.py"))
   if (Sys.info()["sysname"] == "Linux") {
-    adj_list <- AIR_getAdjSets(ts, 
-                               input$xvar, 
-                               input$yvar, 
-                               MC_passing_cpdag_already_found, 
-                               best_cpdag_seen_so_far)
-      
+    # adj_list <- AIR_getAdjSets(ts, 
+    #                            input$xvar, 
+    #                            input$yvar, 
+    #                            MC_passing_cpdag_already_found, 
+    #                            best_cpdag_seen_so_far)
+    # Z1 <- adj_list[1]
+    # Z2 <- adj_list[2]
+    param1 = df_vars$val[1]
+    param2 = df_vars$val[2]
+    param3 = paste0(AIRHome, "/graphtxt.txt")
 
+    rust_bin = "identify"
+    json_output <- system2(rust_bin,
+                           args = c(paste0("--param1=", param1),
+                                    paste0("--param2=", param2),
+                                    paste0("--param3=", param3)),
+                           stdout = TRUE)
+    parsed <- fromJSON(json_output[1])
     # Now `parsed` should be a list with two elements: $vector1 and $vector2
-    Z1 <- adj_list[1]
-    Z2 <- adj_list[2]
+    Z1 <- parsed$vector1
+    Z2 <- parsed$vector2
   } else {
     source("scripts/identify.R")
   }
