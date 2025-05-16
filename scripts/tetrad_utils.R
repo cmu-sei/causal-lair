@@ -31,6 +31,7 @@
 #LINUX_JDK_URL <- "https://corretto.aws/downloads/latest/amazon-corretto-21-x64-linux-jdk.tar.gz"
 #TETRAD_URL <- "https://s01.oss.sonatype.org/content/repositories/releases/io/github/cmu-phil/tetrad-gui/7.6.5/tetrad-gui-7.6.5-launch.jar"
 #TETRAD_PATH <- "inst/tetrad-gui-7.6.5-launch.jar"
+# TETRAD_PATH <- "/srv/local/ntesta_mgr/py-tetrad/pytetrad/resources/tetrad-current.jar"
 TETRAD_PATH <- Sys.getenv("TETRAD_PATH")
 
 if (TETRAD_PATH == "") {

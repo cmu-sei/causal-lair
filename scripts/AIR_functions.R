@@ -240,31 +240,181 @@ change_node_color <- function(dot_code, node, color) {
   return(dot_code)
 }
 
-# AIR Tool Functions
 AIR_getGraph <- function(data, knowledge){
-  # Create a BOSS object with the data
-  ts <- TetradSearch$new(data)
+  headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
+  cat(headers_string, "\n")
   
-  # Optionally, add knowledge to specific tiers
-  for (i in 1:nrow(knowledge)) {
-    ts$add_to_tier(knowledge[i,]$level, knowledge[i,]$variable)
+  
+  # initialize whether a cpdag meeting the MC threshold has already been found (used in for loop)
+  MC_passing_cpdag_already_found = FALSE 
+  
+  for (i in seq(0,15)) {
+    pd <- 0.5 + (i * 0.1)
+    # select printing destination
+    sink("/dev/null")  # suppress any printing, initially, at each iteration
+    
+    # Create a BOSS object with the data
+    ts <- TetradSearch$new(data)
+    
+    # Add knowledge to specific tiers
+    for (j in 1:nrow(knowledge)) {
+      ts$add_to_tier(knowledge[j,]$level, knowledge[j,]$variable)
+    }
+
+    # Run the BOSS algorithm
+    ts$use_sem_bic(penalty_discount = pd)
+    ts$run_boss()
+    g2 <- ts$get_java()
+    sink()
+    sink(sprintf("graphtext%.1f.txt", pd)) # print graph to an external file
+    sink()
+    
+    bic <- g2$getAttribute("BIC")
+    num_edges <- g2$getNumEdges()
+    
+    sink("/dev/null")
+    ts$use_fisher_z(use_for_mc = TRUE)
+    
+    ret <- ts$markov_check(g2)
+    sink()
+    
+    cpdag_graph_when_PD_is_1 <- g2
+    if (ret$ad_ind > 0.1) {
+      print_param_and_results_string <- 
+        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f", 
+                pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges, 
+                ret$num_tests_ind, ret$num_tests_dep) 
+      cat(print_param_and_results_string, "\n")
+      if (MC_passing_cpdag_already_found == FALSE) {
+        best_cpdag_seen_so_far <- g2
+        best_cpdag_seen_so_far_num_edges <- num_edges
+        best_cpdag_seen_so_far_params <- print_param_and_results_string
+        MC_passing_cpdag_already_found <- TRUE
+      }
+      # this needs to be separate
+      if (num_edges < best_cpdag_seen_so_far_num_edges) {
+        best_cpdag_seen_so_far <- g2
+        best_cpdag_seen_so_far_num_edges <- num_edges
+        best_cpdag_seen_so_far_params <- print_param_and_results_string
+      }
+    }
   }
   
+  cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
+  cat(headers_string, "\n")
+  cat(best_cpdag_seen_so_far_params, "\n")
   
-  # Run the BOSS algorithm
-  # graph <- ts$run_boss(penalty_discount = 2)
-  ts$use_sem_bic(penalty_discount = 1)
-  ts$use_fisher_z(alpha = 0.01)
-  graph <- ts$run_boss()
+  if (MC_passing_cpdag_already_found == TRUE) {
+    graphtxt <- .jcall(best_cpdag_seen_so_far, "Ljava/lang/String;", "toString")
+  } else {
+    graphtxt <- .jcall(cpdag_graph_when_PD_is_1, "Ljava/lang/String;", "toString")
+  }
   
-  graphtxt <- object_string <- .jcall(ts$print_graph(graph), "Ljava/lang/String;", "toString")
+  readr::write_file(x = graphtxt, file = "graphtxt.txt")
+
+  return(list(graphtxt, ts, 
+              MC_passing_cpdag_already_found,
+              best_cpdag_seen_so_far))
+}
+
+AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpdag_seen_so_far){
+  TREATMENT_NAME = tv
+  RESPONSE_NAME = ov
+  MAX_NUM_SETS = 3
+  MAX_DISTANCE_FROM_POINT = 4
+  MAX_PATH_LENGTH = 4
+  NEAR_TREATMENT = 1
+  NEAR_RESPONSE = 2
   
   
-  # graphtxt <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph)
+  cat("Identification parameters: \n")
+  cat("    maximum number of adjustment sets = ", MAX_NUM_SETS, "\n")  
+  cat("    maximum distance from target endpoint (TREATMENT or RESPONSE) = ", MAX_DISTANCE_FROM_POINT, "\n")  
+  cat("    maximum path length = ", MAX_PATH_LENGTH, "\n")  
   
-  write_file(x = graphtxt, file = "graphtxt.txt")
+  if (MC_passing_cpdag_already_found == TRUE) {
+    cat("Searching for adjustment set(s) on the *** Treatment *** side:\n")
+    # Z1
+    adj_sets_treatment = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
+                                                MAX_NUM_SETS,
+                                                MAX_DISTANCE_FROM_POINT,
+                                                NEAR_TREATMENT,
+                                                MAX_PATH_LENGTH)
+    
+    ts$print_adjustment_sets(adj_sets_treatment)
+    
+    cat("Searching for adjustment sets on the *** Response *** side:\n")
+    # Z2
+    adj_sets_response  = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
+                                                MAX_NUM_SETS,
+                                                MAX_DISTANCE_FROM_POINT,
+                                                NEAR_RESPONSE,
+                                                MAX_PATH_LENGTH)
+    
+    ts$print_adjustment_sets(adj_sets_response)
+  } 
   
-  return(graph)
+  ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
+  flag_no_adjustment_set_found = FALSE
+  flag_only_one_adjustment_set_found = FALSE
+  
+  # Determine the union and differences of the two adjustment sets
+  union_of_two_lists = union(adj_sets_treatment, adj_sets_response)
+  near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
+  near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
+  
+  cat("Total number of adjustment sets encountered (ignoring duplicates) = ", length(union_of_two_lists), "\n")
+  cat("Size of Treatment - Response adjustment sets = ", length(near_treatment_not_near_response), "\n")
+  cat("Size of Response - Treatment adjustment sets = ", length(near_response_not_near_treatment), "\n")
+  
+  ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
+  # if both empty, we need to set the corresponding flag:
+  if (length(union_of_two_lists) == 0) {
+    # Then no adjustment sets and we must be working with a cpdag (at least one undirected
+    #   edge) rather than a DAG. (For a DAG, there's always an adjustment set--namely the
+    #   set of parents of the treatment variable, which can be empty, but that's still
+    #   a valid adjustment set.) There are multiple solutions here, but get the end-user
+    #   involved.
+    cat("*** No adjustment set found. Either: ")
+    cat("Revise knowledge (see AIR job aid) so search result has no undirected edges. ***\n")
+    flag_no_adjustment_set_found = TRUE    
+  } else if (length(union_of_two_lists)==1) {
+    # Only one adjustment set is found altogether, and so we set the corresponding flag:
+    flag_only_one_adjustment_set_found = TRUE
+    return_first_adj_set  = union_of_two_lists[[1]]
+    return_second_adj_set = union_of_two_lists[[1]]  # same adjustment set
+  } else {
+    # We have at least two distinct adjustment sets; we prefer ones only from each side if practical, so, test alternatives first.
+    cat("At least two adjustment sets found. \n")
+    
+    # if no adjustment set found near response that was not already near treatment:
+    if (length(near_response_not_near_treatment) == 0) {
+      cat("In this case, there is no adjustment set near response that is not also near treatment.\n")
+      return_first_adj_set  = adj_sets_treatment[[1]]
+      return_second_adj_set = adj_sets_treatment[[2]]
+    } else if (length(near_treatment_not_near_response) == 0) {
+      cat("In this case, there is no adjustment set near treatment that is not also near response.\n")
+      return_first_adj_set  = adj_sets_response[[1]]
+      return_second_adj_set = adj_sets_response[[2]]
+    } else {
+      # At least one adjustment set is near treatment but not response, and vice versa.
+      #   This is the ideal case to obtain greater diversity of adjustment sets, which 
+      #   is also why we might want to set max_num_sets higher.
+      #   Return two distinct adjustment sets, one from each side.
+      cat("In this case, we have found at least one adjustment set near treatment but not near response; and vice versa.\n")
+      return_first_adj_set  = near_treatment_not_near_response[[1]]
+      return_second_adj_set = near_response_not_near_treatment[[1]]
+    }
+  }
+  
+  cat("Summary of results: \n")
+  cat("First adjustment set to return: ", return_first_adj_set, "\n")
+  cat("Second adjustment set to return: ", return_second_adj_set, "\n")
+  cat("Flag status for no adjustment set found: ", flag_no_adjustment_set_found, "\n")
+  cat("Flag status for only one adjustment set found: ", flag_only_one_adjustment_set_found, "\n")
+  
+  ### return the two adjustment sets plus the two flags instead.
+  return(list(return_first_adj_set, return_second_adj_set))
 }
 
 scale_ <- function(x){

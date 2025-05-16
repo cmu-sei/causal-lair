@@ -261,10 +261,10 @@ model_in <- reactive({
   return(model_in)
 })
 
+# df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
 df <- reactive({
   df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
   cat(paste0(Sys.time(), " - ","Read in data file: ", input$file1$datapath, "\n"), file = log_file, append = TRUE)
-  # df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
   continuous_columns <- c(1, ncol(df))
   df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
   return(df)
@@ -340,6 +340,62 @@ observeEvent(input$file2, {
   #print(result)
 })
 
+
+observeEvent(input$buildButton, {
+  ### AIR Step 1 ----------------
+    if (Sys.info()["sysname"] == "Linux") {
+      print("let's see if this works...")
+      graph <- AIR_getGraph(df(), knowledge()) # prod
+      # list(graphtxt, ts, 
+      #         MC_passing_cpdag_already_found,
+      #         best_cpdag_seen_so_far)
+      graphtxt <- graph[1]
+      ts <- graph[2]
+      MC_passing_cpdag_already_found <- graph[3]
+      best_cpdag_seen_so_far <- graph[4]
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphtxt) # prod
+    } else {
+      graph <- read_file("graphtxt.txt") # test
+      dot <- read_file("dotfile.txt") # test
+    }
+  
+    # graph <- AIR_getGraph(df, knowledge)
+    
+    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
+    # writeLines(graph_data, "graphtxt.txt")
+  
+    # Visualize the resulting graph
+    # visualize_graph(graph)
+    write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
+  
+    output$blankGraph <- renderGrViz({
+      req(graph_complete())
+      cat("Graph Built\n", file = log_file, append = TRUE)
+  
+      dot <- readLines("dotfile.txt")  
+      # for (node in names(df())) {
+      #   dot <- change_node_color(dot, node, "'#ffffff'")
+      # }
+  
+      grViz(dot)
+    })
+    
+    if (graph_complete()) {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Your Causal Graph is Ready",
+        text = NULL,
+        type = "success",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE,
+        )
+    }
+    graph_complete(TRUE)
+    
+})
+
 observeEvent(input$updateButton, {
   ### AIR Step 2 ---------------
   # assign global variables
@@ -350,25 +406,16 @@ observeEvent(input$updateButton, {
   # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
   # source_python(paste0(AIRHome, "/scripts/identify.py"))
   if (Sys.info()["sysname"] == "Linux") {
-    param1 = df_vars$val[1]
-    param2 = df_vars$val[2]
-    param3 = paste0(AIRHome, "/graphtxt.txt")
+    adj_list <- AIR_getAdjSets(ts, 
+                               input$xvar, 
+                               input$yvar, 
+                               MC_passing_cpdag_already_found, 
+                               best_cpdag_seen_so_far)
+      
 
-    rust_bin = "identify"
-    # system2() returns the output as a character vector (one element per line).
-    json_output <- system2(rust_bin,
-                           args = c(paste0("--param1=", param1),
-                                    paste0("--param2=", param2),
-				    paste0("--param3=", param3)),
-                           stdout = TRUE)
-    
-    # json_output is a character vector. If the Rust program only prints a single line
-    # of JSON, json_output[1] will hold the entire JSON string.
-    parsed <- fromJSON(json_output[1])
-    
     # Now `parsed` should be a list with two elements: $vector1 and $vector2
-    Z1 <- parsed$vector1
-    Z2 <- parsed$vector2
+    Z1 <- adj_list[1]
+    Z2 <- adj_list[2]
   } else {
     source("scripts/identify.R")
   }
@@ -425,53 +472,6 @@ observeEvent(input$updateButton, {
   cat(paste0(Sys.time(), " - ","Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
   cat(paste0(Sys.time(), " - ","Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
 
-})
-
-observeEvent(input$buildButton, {
-  ### AIR Step 1 ----------------
-    if (Sys.info()["sysname"] == "Linux") {
-      graph <- AIR_getGraph(df(), knowledge()) # prod
-      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph) # prod
-    } else {
-      graph <- read_file("graphtxt.txt") # test
-      dot <- read_file("dotfile.txt") # test
-    }
-  
-    # graph <- AIR_getGraph(df, knowledge)
-    
-    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
-    # writeLines(graph_data, "graphtxt.txt")
-  
-    # Visualize the resulting graph
-    # visualize_graph(graph)
-    write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
-  
-    output$blankGraph <- renderGrViz({
-      req(graph_complete())
-      cat("Graph Built\n", file = log_file, append = TRUE)
-  
-      dot <- readLines("dotfile.txt")  
-      # for (node in names(df())) {
-      #   dot <- change_node_color(dot, node, "'#ffffff'")
-      # }
-  
-      grViz(dot)
-    })
-    
-    if (graph_complete()) {
-      sendSweetAlert(
-        session = shiny::getDefaultReactiveDomain(),
-        title = "Your Causal Graph is Ready",
-        text = NULL,
-        type = "success",
-        btn_labels = "Continue",
-        btn_colors = "#3085d6",
-        closeOnClickOutside = TRUE,
-        showCloseButton = FALSE,
-        )
-    }
-    graph_complete(TRUE)
-    
 })
   
 observeEvent(input$goButton, {
