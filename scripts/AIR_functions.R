@@ -1215,7 +1215,9 @@ get_histogram_x <- function(df, xvar, tv_dir, tv_threshold) {
     theme_minimal() + 
     theme(text = element_text(color = "#666666", face = "bold"),
           panel.background = element_rect(fill = "transparent", color = NA),
-          plot.background  = element_rect(fill = "transparent", color = NA)) 
+          plot.background  = element_rect(fill = "transparent", color = NA),
+          legend.position = "bottom",
+          legend.direction = "horizontal") 
 }
 
 get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
@@ -1275,7 +1277,9 @@ get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
     theme_minimal() + 
     theme(text = element_text(color = "#666666", face = "bold"),
           panel.background = element_rect(fill = "transparent", color = NA),
-          plot.background  = element_rect(fill = "transparent", color = NA)) 
+          plot.background  = element_rect(fill = "transparent", color = NA),
+          legend.position = "bottom",
+          legend.direction = "horizontal") 
 }
 
 get_updated_graph <- function(AIRHome, graph_update, xvar, yvar, Zvars) { 
