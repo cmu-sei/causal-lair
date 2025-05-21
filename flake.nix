@@ -223,21 +223,6 @@
           ];
         };
 
-        quartoPatched = pkgs.quarto.overrideAttrs (old: {
-          postFixup = ''
-            echo "[quarto patch] Removing upstream QUARTO_R logic..."
-            sed -i '/^QUARTO_R=/d' $out/bin/quarto
-            sed -i '/^export QUARTO_R$/d' $out/bin/quarto
-        
-            echo "[quarto patch] Forcing our QUARTO_R..."
-            echo 'QUARTO_R="${rWithPkgs}/bin/R"' >> $out/bin/quarto
-            echo 'export QUARTO_R' >> $out/bin/quarto
-        
-            echo "[quarto patch] Done. Final QUARTO_R:"
-            grep QUARTO_R $out/bin/quarto || true
-          '';
-        });
-
         rWithPkgs = pkgs.rWrapper.override {
           packages = [
             pkgs.rPackages.udunits2      # libudunits2-dev
@@ -348,6 +333,31 @@
           ];
         };
 
+        quartoPatched = pkgs.quarto.overrideAttrs (old: {
+          buildInputs = (old.buildInputs or []) ++ [ rWithPkgs ];
+
+          postFixup = ''
+            echo "[quarto patch] Replacing upstream QUARTO_R in-place..."
+
+            # Remove any existing QUARTO_R export (important!)
+            sed -i '/^export QUARTO_R=/d' $out/bin/quarto
+
+            # Insert our QUARTO_R export *before* the exec line so it's actually used
+            sed -i 's|^exec .*|export QUARTO_R="${rWithPkgs}/bin/R"\n&|' $out/bin/quarto
+
+            echo "[quarto patch] Final result:"
+            grep QUARTO_R $out/bin/quarto || true
+          '';
+        });
+
+        quartoEnv = pkgs.buildEnv {
+          name = "quarto-env";
+          paths = [
+            rWithPkgs
+            quartoPatched
+          ];
+        };
+
         myEnv = pkgs.buildEnv {
           name = "my-env";
           paths = with pkgs; [
@@ -381,7 +391,6 @@
             iproute2
             pkg-config
             libiconv
-            quartoPatched
 
 	        pkgs.texlive.combined.scheme-full  # Full TeX distribution added here
 	        pkgs.texlivePackages.framed
@@ -469,9 +478,10 @@
               # targets = [ "wasm32-unknown-unknown" ];
             }))
 
-            sl3
-            rWithPkgs
-            #tetrad.packages.x86_64-linux.default
+            #quartoPatched
+            #sl3
+            #rWithPkgs
+            quartoEnv
             tetrad.packages.${system}.default
             identify
             score
@@ -522,6 +532,14 @@
           cp -r ${./.}/* $out/workspace
         '';
 
+        # Dynamically resolve the full JAR path
+        jarPath = pkgs.runCommand "tetrad-jar-path" { } ''
+          jar=$(cd ${tetrad.packages.${system}.default}/share/java && echo tetrad-gui-*-launch.jar)
+          echo -n ${tetrad.packages.${system}.default}/share/java/$jar > $out
+        '';
+
+        TETRAD_PATH = builtins.readFile jarPath;
+
       in
       {
         packages.default = pkgs.dockerTools.buildImage {
@@ -569,7 +587,7 @@
               "BOB_THE_FISH=${pkgs.fishPlugins.bobthefish}"
               "_JAVA_OPTIONS='-Dawt.useSystemAAFontSettings=lcd -Dswing.defaultlaf=com.sun.java.swing.plaf.gtk.GTKLookAndFeel'"
               "DISPLAY=:1"
-              "TETRAD_PATH=${tetrad.packages.x86_64-linux.default}/share/java/tetrad-gui-7.6.7-SNAPSHOT-launch.jar"
+              "TETRAD_PATH=${TETRAD_PATH}"
             ];
             Volumes = { };
             Cmd = [ "/bin/fish" ]; # Default command
