@@ -345,15 +345,20 @@ observeEvent(input$buildButton, {
   ### AIR Step 1 ----------------
     if (Sys.info()["sysname"] == "Linux") {
       print("let's see if this works...")
+
       graph <- AIR_getGraph(df(), knowledge()) # prod
-      # list(graphtxt, ts, 
-      #         MC_passing_cpdag_already_found,
-      #         best_cpdag_seen_so_far)
-      graphtxt <- graph[1]
-      ts <- graph[2]
-      MC_passing_cpdag_already_found <- graph[3]
-      best_cpdag_seen_so_far <- graph[4]
-      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphtxt) # prod
+  	  # list(graphtxt, ts,
+  	  #     	MC_passing_cpdag_already_found,
+  	  #     	best_cpdag_seen_so_far)
+  	  graphtxt <- gsub("(?s)Graph Attributes:.*", "", graph[[1]], perl = TRUE)
+  	  ts <- graph[[2]]
+  	  MC_passing_cpdag_already_found <- graph[[3]]
+  	  best_cpdag_seen_so_far <- graph[[4]]
+  	  # dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphtxt) # prod
+  	  dot <- graphtxt
+  	  write(gsub("(?m)^\\s*\\n", "", graphtxt, perl = TRUE), "graphtxt.txt")
+  	  write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
+      
     } else {
       graph <- read_file("graphtxt.txt") # test
       dot <- read_file("dotfile.txt") # test

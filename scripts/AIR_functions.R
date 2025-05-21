@@ -243,78 +243,89 @@ change_node_color <- function(dot_code, node, color) {
 AIR_getGraph <- function(data, knowledge){
   headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
   cat(headers_string, "\n")
-  
-  
+ 
+ 
   # initialize whether a cpdag meeting the MC threshold has already been found (used in for loop)
-  MC_passing_cpdag_already_found = FALSE 
-  
+  MC_passing_cpdag_already_found = FALSE
+ 
   for (i in seq(0,15)) {
-    pd <- 0.5 + (i * 0.1)
-    # select printing destination
-    sink("/dev/null")  # suppress any printing, initially, at each iteration
+	pd <- 0.5 + (i * 0.1)
+	# select printing destination
+	sink("/dev/null")  # suppress any printing, initially, at each iteration
     
-    # Create a BOSS object with the data
-    ts <- TetradSearch$new(data)
+	# Create a BOSS object with the data
+	ts <- TetradSearch$new(data)
     
-    # Add knowledge to specific tiers
-    for (j in 1:nrow(knowledge)) {
-      ts$add_to_tier(knowledge[j,]$level, knowledge[j,]$variable)
-    }
+	# Add knowledge to specific tiers
+	for (j in 1:nrow(knowledge)) {
+  	ts$add_to_tier(knowledge[j,]$level, knowledge[j,]$variable)
+	}
 
-    # Run the BOSS algorithm
-    ts$use_sem_bic(penalty_discount = pd)
-    ts$run_boss()
-    g2 <- ts$get_java()
-    sink()
-    sink(sprintf("graphtext%.1f.txt", pd)) # print graph to an external file
-    sink()
+	# Run the BOSS algorithm
+	ts$use_sem_bic(penalty_discount = pd)
+	ts$run_boss()
+	g2 <- ts$get_java()
+	sink()
+	sink(sprintf("graphtext%.1f.txt", pd)) # print graph to an external file
+	sink()
     
-    bic <- g2$getAttribute("BIC")
-    num_edges <- g2$getNumEdges()
+	bic <- g2$getAttribute("BIC")
+	num_edges <- g2$getNumEdges()
     
-    sink("/dev/null")
-    ts$use_fisher_z(use_for_mc = TRUE)
+	sink("/dev/null")
+	ts$use_fisher_z(use_for_mc = TRUE)
     
-    ret <- ts$markov_check(g2)
-    sink()
-    
-    cpdag_graph_when_PD_is_1 <- g2
-    if (ret$ad_ind > 0.1) {
-      print_param_and_results_string <- 
-        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f", 
-                pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges, 
-                ret$num_tests_ind, ret$num_tests_dep) 
-      cat(print_param_and_results_string, "\n")
-      if (MC_passing_cpdag_already_found == FALSE) {
-        best_cpdag_seen_so_far <- g2
-        best_cpdag_seen_so_far_num_edges <- num_edges
-        best_cpdag_seen_so_far_params <- print_param_and_results_string
-        MC_passing_cpdag_already_found <- TRUE
-      }
-      # this needs to be separate
-      if (num_edges < best_cpdag_seen_so_far_num_edges) {
-        best_cpdag_seen_so_far <- g2
-        best_cpdag_seen_so_far_num_edges <- num_edges
-        best_cpdag_seen_so_far_params <- print_param_and_results_string
-      }
-    }
+	ret <- ts$markov_check(g2)
+	sink()
+
+	cpdag_graph_when_PD_is_1 <- g2
+
+	if (ret$ad_ind > 0.1) {
+  	print_param_and_results_string <-
+    	sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
+            	pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
+            	ret$num_tests_ind, ret$num_tests_dep)
+  	cat(print_param_and_results_string, "\n")
+  	if (MC_passing_cpdag_already_found == FALSE) {
+    	best_cpdag_seen_so_far <- g2
+    	best_cpdag_seen_so_far_num_edges <- num_edges
+    	best_cpdag_seen_so_far_params <- print_param_and_results_string
+    	MC_passing_cpdag_already_found <- TRUE
+  	}
+  	# this needs to be separate
+  	if (num_edges < best_cpdag_seen_so_far_num_edges) {
+    	best_cpdag_seen_so_far <- g2
+    	best_cpdag_seen_so_far_num_edges <- num_edges
+    	best_cpdag_seen_so_far_params <- print_param_and_results_string
+    	}
+  	}
+	if (pd == 1.0) {
+      print_param_and_results_string <-
+        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
+                pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
+                ret$num_tests_ind, ret$num_tests_dep)
+
+  	best_cpdag_seen_so_far <- g2
+  	best_cpdag_seen_so_far_num_edges <- num_edges
+  	best_cpdag_seen_so_far_params <- print_param_and_results_string
+  	}
   }
-  
+ 
   cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
   cat(headers_string, "\n")
   cat(best_cpdag_seen_so_far_params, "\n")
-  
+ 
   if (MC_passing_cpdag_already_found == TRUE) {
-    graphtxt <- .jcall(best_cpdag_seen_so_far, "Ljava/lang/String;", "toString")
+	graphtxt <- .jcall(best_cpdag_seen_so_far, "Ljava/lang/String;", "toString")
   } else {
-    graphtxt <- .jcall(cpdag_graph_when_PD_is_1, "Ljava/lang/String;", "toString")
+	graphtxt <- .jcall(cpdag_graph_when_PD_is_1, "Ljava/lang/String;", "toString")
   }
-  
+ 
   readr::write_file(x = graphtxt, file = "graphtxt.txt")
 
-  return(list(graphtxt, ts, 
-              MC_passing_cpdag_already_found,
-              best_cpdag_seen_so_far))
+  return(list(graphtxt, ts,
+          	MC_passing_cpdag_already_found,
+          	best_cpdag_seen_so_far))
 }
 
 AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpdag_seen_so_far){
