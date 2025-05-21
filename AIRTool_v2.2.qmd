@@ -475,7 +475,7 @@ observeEvent(input$updateButton, {
     dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
     dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
   }
-  grViz(dot, )
+  grViz(dot)
   })
 
   cat(paste0(Sys.time(), " - ","Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
@@ -608,17 +608,18 @@ observeEvent(input$goButton, {
       }
     
     
-    calc_complete(TRUE)
+   calc_complete(TRUE)
  
-     output$blankGraph <- renderGrViz({
-        req(calc_complete())
-        dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
-        grViz(dot)
-        })
+   output$blankGraph <- renderGrViz({
+      # req(calc_complete())
+      dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
+      grViz(dot)
+      })
+
    sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "Causal Estimates Successfully Calculated",
-      text = "Please switch to the 'Results' tab to view your results.",
+      text = "",
       type = "success",
       btn_labels = "Continue",
       btn_colors = "#3085d6",
@@ -898,12 +899,12 @@ output$ui_updateButton = renderUI({
     )
 })
 
-output$graphViz = renderGrViz({
-  req(calc_complete())
-  
-  dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
-  grViz(dot)
-})
+# output$graphViz = renderGrViz({
+#   req(calc_complete())
+#   
+#   dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
+#   grViz(dot)
+# })
   
 
 # output$ribbon_plot = renderImage({
