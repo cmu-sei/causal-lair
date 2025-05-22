@@ -340,6 +340,8 @@ observeEvent(input$file2, {
   #print(result)
 })
 
+# create a shared reactiveValues object to pass variables around
+rv <- reactiveValues()
 
 observeEvent(input$buildButton, {
   ### AIR Step 1 ----------------
@@ -347,17 +349,11 @@ observeEvent(input$buildButton, {
       print("let's see if this works...")
 
       graphlist <- AIR_getGraph(df(), knowledge()) # prod
-  	  # list(graphtxt, ts,
-  	  #     	MC_passing_cpdag_already_found,
-  	  #     	best_cpdag_seen_so_far)
   	  graphtxt <- .jcall(graphlist[[1]], "Ljava/lang/String;", "toString")
   	  graphtxt <- gsub("(?s)Graph Attributes:.*", "", graphtxt, perl = TRUE)
-  	  ts <- graphlist[[2]]
-  	  MC_passing_cpdag_already_found <- graphlist[[3]]
-  	  best_cpdag_seen_so_far <- graphlist[[4]]
-  	  ### this is the problem -----
-  	  # this file isn't being formatted properly. I need to actually run graphToDot to fix
-  	  # dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphtxt) # prod
+  	  rv$ts <- graphlist[[2]]
+  	  rv$MC_passing_cpdag_already_found <- graphlist[[3]]
+  	  rv$best_cpdag_seen_so_far <- graphlist[[4]]
   	  dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphlist[[1]])
   	  write(gsub("(?m)^\\s*\\n", "", graphtxt, perl = TRUE), "graphtxt.txt")
   	  write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
@@ -414,27 +410,28 @@ observeEvent(input$updateButton, {
   # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
   # source_python(paste0(AIRHome, "/scripts/identify.py"))
   if (Sys.info()["sysname"] == "Linux") {
-    # adj_list <- AIR_getAdjSets(ts, 
-    #                            input$xvar, 
-    #                            input$yvar, 
-    #                            MC_passing_cpdag_already_found, 
-    #                            best_cpdag_seen_so_far)
-    # Z1 <- adj_list[1]
-    # Z2 <- adj_list[2]
-    param1 = df_vars$val[1]
-    param2 = df_vars$val[2]
-    param3 = paste0(AIRHome, "/graphtxt.txt")
-
-    rust_bin = "identify"
-    json_output <- system2(rust_bin,
-                           args = c(paste0("--param1=", param1),
-                                    paste0("--param2=", param2),
-                                    paste0("--param3=", param3)),
-                           stdout = TRUE)
-    parsed <- fromJSON(json_output[1])
-    # Now `parsed` should be a list with two elements: $vector1 and $vector2
-    Z1 <- parsed$vector1
-    Z2 <- parsed$vector2
+    adj_list <- AIR_getAdjSets(rv$ts,
+                               input$xvar,
+                               input$yvar,
+                               rv$MC_passing_cpdag_already_found,
+                               rv$best_cpdag_seen_so_far)
+    Z1 <- adj_list[[1]]
+    Z2 <- adj_list[[2]]
+    # deprecated rust section
+    # param1 = df_vars$val[1]
+    # param2 = df_vars$val[2]
+    # param3 = paste0(AIRHome, "/graphtxt.txt")
+    # 
+    # rust_bin = "identify"
+    # json_output <- system2(rust_bin,
+    #                        args = c(paste0("--param1=", param1),
+    #                                 paste0("--param2=", param2),
+    #                                 paste0("--param3=", param3)),
+    #                        stdout = TRUE)
+    # parsed <- fromJSON(json_output[1])
+    # # Now `parsed` should be a list with two elements: $vector1 and $vector2
+    # Z1 <- parsed$vector1
+    # Z2 <- parsed$vector2
   } else {
     source("scripts/identify.R")
   }
