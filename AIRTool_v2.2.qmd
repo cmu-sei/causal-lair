@@ -346,16 +346,19 @@ observeEvent(input$buildButton, {
     if (Sys.info()["sysname"] == "Linux") {
       print("let's see if this works...")
 
-      graph <- AIR_getGraph(df(), knowledge()) # prod
+      graphlist <- AIR_getGraph(df(), knowledge()) # prod
   	  # list(graphtxt, ts,
   	  #     	MC_passing_cpdag_already_found,
   	  #     	best_cpdag_seen_so_far)
-  	  graphtxt <- gsub("(?s)Graph Attributes:.*", "", graph[[1]], perl = TRUE)
-  	  ts <- graph[[2]]
-  	  MC_passing_cpdag_already_found <- graph[[3]]
-  	  best_cpdag_seen_so_far <- graph[[4]]
+  	  graphtxt <- .jcall(graphlist[[1]], "Ljava/lang/String;", "toString")
+  	  graphtxt <- gsub("(?s)Graph Attributes:.*", "", graphtxt, perl = TRUE)
+  	  ts <- graphlist[[2]]
+  	  MC_passing_cpdag_already_found <- graphlist[[3]]
+  	  best_cpdag_seen_so_far <- graphlist[[4]]
+  	  ### this is the problem -----
+  	  # this file isn't being formatted properly. I need to actually run graphToDot to fix
   	  # dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphtxt) # prod
-  	  dot <- graphtxt
+  	  dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphlist[[1]])
   	  write(gsub("(?m)^\\s*\\n", "", graphtxt, perl = TRUE), "graphtxt.txt")
   	  write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
       

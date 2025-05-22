@@ -316,14 +316,14 @@ AIR_getGraph <- function(data, knowledge){
   cat(best_cpdag_seen_so_far_params, "\n")
  
   if (MC_passing_cpdag_already_found == TRUE) {
-	graphtxt <- .jcall(best_cpdag_seen_so_far, "Ljava/lang/String;", "toString")
+	  graph <- best_cpdag_seen_so_far
   } else {
-	graphtxt <- .jcall(cpdag_graph_when_PD_is_1, "Ljava/lang/String;", "toString")
+	  graph <- cpdag_graph_when_PD_is_1
   }
  
-  readr::write_file(x = graphtxt, file = "graphtxt.txt")
+  readr::write_file(x = .jcall(graph, "Ljava/lang/String;", "toString"), file = "graphtxt.txt")
 
-  return(list(graphtxt, ts,
+  return(list(graph, ts,
           	MC_passing_cpdag_already_found,
           	best_cpdag_seen_so_far))
 }
