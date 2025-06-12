@@ -85,10 +85,1335 @@ setwd(AIRHome)
 set.seed(123)
 
 
-# Nick, I significantly reduced the complexity of tetrad_utils. Most of what it
-# was doing is no longer needed.
+# --- BEGIN INLINE: scripts/AIR_functions.R ---
+getLocalTags <- function() {
+  if (!isLocal()) {
+    return(NULL)
+  }
+  
+  htmltools::tagList(
+    htmltools::tags$script(paste0(
+      "$(function() {",
+      "  $(document).on('shiny:disconnected', function(event) {",
+      "    $('#ss-connect-dialog').show();",
+      "    $('#ss-overlay').show();",
+      "  })",
+      "});"
+    )),
+    htmltools::tags$div(
+      id="ss-connect-dialog", style="display: none;",
+      htmltools::tags$a(id="ss-reload-link", href="#", onclick="window.location.reload(true);")
+    ),
+    htmltools::tags$div(id="ss-overlay", style="display: none;")
+  )
+}
 
-source("scripts/AIR_functions.R")
+isLocal <- function() {
+  Sys.getenv("SHINY_PORT", "") == ""
+}
+
+disconnectMessage <- function(
+    text = "An error occurred. Please refresh the page and try again.",
+    refresh = "Refresh",
+    width = 450,
+    top = 50,
+    size = 22,
+    background = "white",
+    colour = "#444444",
+    overlayColour = "black",
+    overlayOpacity = 0.6,
+    refreshColour = "#337ab7",
+    css = ""
+) {
+  
+  checkmate::assert_string(text, min.chars = 1)
+  checkmate::assert_string(refresh)
+  checkmate::assert_numeric(size, lower = 0)
+  checkmate::assert_string(background)
+  checkmate::assert_string(colour)
+  checkmate::assert_string(overlayColour)
+  checkmate::assert_number(overlayOpacity, lower = 0, upper = 1)
+  checkmate::assert_string(refreshColour)
+  checkmate::assert_string(css)
+  
+  if (width == "full") {
+    width <- "100%"
+  } else if (is.numeric(width) && width >= 0) {
+    width <- paste0(width, "px")
+  } else {
+    stop("disconnectMessage: 'width' must be either an integer, or the string \"full\".", call. = FALSE)
+  }
+  
+  if (top == "center") {
+    top <- "50%"
+    ytransform <- "-50%"
+  } else if (is.numeric(top) && top >= 0) {
+    top <- paste0(top, "px")
+    ytransform <- "0"
+  } else {
+    stop("disconnectMessage: 'top' must be either an integer, or the string \"center\".", call. = FALSE)
+  }
+  
+  htmltools::tagList(
+    getLocalTags(),
+    htmltools::tags$head(
+      htmltools::tags$style(
+        glue::glue(
+          .open = "{{", .close = "}}",
+          
+          "#shiny-disconnected-overlay { display: none !important; }",
+          
+          "#ss-overlay {
+             background-color: {{overlayColour}} !important;
+             opacity: {{overlayOpacity}} !important;
+             position: fixed !important;
+             top: 0 !important;
+             left: 0 !important;
+             bottom: 0 !important;
+             right: 0 !important;
+             z-index: 99998 !important;
+             overflow: hidden !important;
+             cursor: not-allowed !important;
+          }",
+          
+          "#ss-connect-dialog {
+             background: {{background}} !important;
+             color: {{colour}} !important;
+             width: {{width}} !important;
+             transform: translateX(-50%) translateY({{ytransform}}) !important;
+             font-size: {{size}}px !important;
+             top: {{top}} !important;
+             position: fixed !important;
+             bottom: auto !important;
+             left: 50% !important;
+             padding: 0.8em 1.5em !important;
+             text-align: center !important;
+             height: auto !important;
+             opacity: 1 !important;
+             z-index: 99999 !important;
+             border-radius: 3px !important;
+             box-shadow: rgba(0, 0, 0, 0.3) 3px 3px 10px !important;
+          }",
+          
+          "#ss-connect-dialog::before { content: '{{text}}' }",
+          
+          "#ss-connect-dialog label { display: none !important; }",
+          
+          "#ss-connect-dialog a {
+             display: {{ if (refresh == '') 'none' else 'block' }} !important;
+             color: {{refreshColour}} !important;
+             font-size: 0 !important;
+             margin-top: {{size}}px !important;
+             font-weight: normal !important;
+          }",
+          
+          "#ss-connect-dialog a::before {
+            content: '{{refresh}}';
+            font-size: {{size}}px;
+          }",
+          
+          "#ss-connect-dialog { {{ htmltools::HTML(css) }} }"
+        )
+      )
+    )
+  )
+}
+
+#' Show a nice message when a shiny app disconnects or errors
+#'
+#' This function is a version of disconnectMessage() with a pre-set combination
+#' of parameters that results in a large centered message.
+#' @export
+disconnectMessage2 <- function() {
+  disconnectMessage(
+    text = "Your session has timed out.",
+    refresh = "",
+    size = 70,
+    colour = "white",
+    background = "rgba(64, 64, 64, 0.9)",
+    width = "full",
+    top = "center",
+    overlayColour = "#999",
+    overlayOpacity = 0.7,
+    css = "padding: 15px !important; box-shadow: none !important;"
+  )
+}
+
+fix_knowledge <- function(df){
+  # Store original column names
+  original_colnames <- colnames(df)
+  
+  # Detect numeric vs non-numeric columns
+  numeric_cols <- sapply(df, function(col) all(!is.na(suppressWarnings(as.numeric(as.character(col))))))
+  # check if column header is missing and data conform to expectations. If so, process and return
+  if (any(!is.na(suppressWarnings(as.numeric(original_colnames))))) {
+    
+    # Confirm exactly one numeric and one character-type column exist
+    if (sum(numeric_cols) == 1 && sum(!numeric_cols) == 1) {
+      new_colnames <- c("level", "variable")
+      new_colnames_ordered <- rep(NA, length(df))
+      new_colnames_ordered[numeric_cols] <- "level"
+      new_colnames_ordered[!numeric_cols] <- "variable"
+      
+      # Move original column names to first row
+      df <- rbind(setNames(as.list(original_colnames), names(df)), df)
+      
+      # Now assign the new column names
+      colnames(df) <- new_colnames_ordered
+    } else {
+      return("Unable to read knowledge file data. Please make sure file contains a header with the following column names: level, variable. 'variable' should contain the name of each variable used, and 'level' should be a numeric value to represent an estimated causal hierarchy (see readme file for a detailed description).")
+    }  
+  } else if (sum(numeric_cols) == 1 && sum(!numeric_cols) == 1) {
+      colnames(df)[numeric_cols] <- "level"
+      colnames(df)[!numeric_cols] <- "variable"
+    } else {
+      return("Unable to read knowledge file data. Please make sure file contains a header with the following column names: level, variable. 'variable' should contain the name of each variable used, and 'level' should be a numeric value to represent an estimated causal hierarchy (see readme file for a detailed description).")
+    }
+  
+  return(df)
+}
+
+# change color of nodes in graph
+# change_node_color <- function(dot_code, node, color) {
+#   for (i in 1:length(node)) {
+#     # Create the node definition with the color
+#     node_definition <- paste0("\"", node[i], "\" [style=filled, fillcolor=", color, "];")
+#     
+#     # Append the new node definition to the beginning of the DOT code
+#     dot_code <- sub("digraph g \\{", paste0("digraph g {\r\n  ", node_definition), dot_code)
+#   }
+#   
+#   return(dot_code)
+# }
+# 
+# change_node_color <- function(dot_code, node, color) {
+#   # Create all node definitions as a single string with a single newline separator
+#   node_definitions <- paste0("\"", node, "\" [style=filled, fillcolor=", color, "];", collapse = "\n  ")
+#   
+#   # Replace once, inserting all node definitions
+#   dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definitions), dot_code)
+#   
+#   return(dot_code)
+# }
+
+change_node_color <- function(dot_code, node, color) {
+  # Remove any accidental extra quotes from the color string
+  color <- trimws(gsub("['\"]", "", color))
+  node_definition <- paste0("\"", node, "\" [style=filled, fillcolor=\"", color, "\"];")
+  dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definition), dot_code)
+  dot_code <- gsub("\'", "\"", dot_code)
+  return(dot_code)
+}
+
+AIR_getGraph <- function(data, knowledge){
+  headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
+  cat(headers_string, "\n")
+ 
+ 
+  # initialize whether a cpdag meeting the MC threshold has already been found (used in for loop)
+  MC_passing_cpdag_already_found = FALSE
+ 
+  for (i in seq(0,15)) {
+	pd <- 0.5 + (i * 0.1)
+	# select printing destination
+	sink("/dev/null")  # suppress any printing, initially, at each iteration
+    
+	# Create a BOSS object with the data
+	ts <- TetradSearch$new(data)
+    
+	# Add knowledge to specific tiers
+	for (j in 1:nrow(knowledge)) {
+  	ts$add_to_tier(knowledge[j,]$level, knowledge[j,]$variable)
+	}
+
+	# Run the BOSS algorithm
+	ts$use_sem_bic(penalty_discount = pd)
+	ts$run_boss()
+	g2 <- ts$get_java()
+	sink()
+	sink(sprintf("graphtext%.1f.txt", pd)) # print graph to an external file
+	sink()
+    
+	bic <- g2$getAttribute("BIC")
+	num_edges <- g2$getNumEdges()
+    
+	sink("/dev/null")
+	ts$use_fisher_z(use_for_mc = TRUE)
+    
+	ret <- ts$markov_check(g2)
+	sink()
+
+	cpdag_graph_when_PD_is_1 <- g2
+
+	if (ret$ad_ind > 0.1) {
+  	print_param_and_results_string <-
+    	sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
+            	pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
+            	ret$num_tests_ind, ret$num_tests_dep)
+  	cat(print_param_and_results_string, "\n")
+  	if (MC_passing_cpdag_already_found == FALSE) {
+    	best_cpdag_seen_so_far <- g2
+    	best_cpdag_seen_so_far_num_edges <- num_edges
+    	best_cpdag_seen_so_far_params <- print_param_and_results_string
+    	MC_passing_cpdag_already_found <- TRUE
+  	}
+  	# this needs to be separate
+  	if (num_edges < best_cpdag_seen_so_far_num_edges) {
+    	best_cpdag_seen_so_far <- g2
+    	best_cpdag_seen_so_far_num_edges <- num_edges
+    	best_cpdag_seen_so_far_params <- print_param_and_results_string
+    	}
+  	}
+	if (pd == 1.0) {
+      print_param_and_results_string <-
+        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
+                pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
+                ret$num_tests_ind, ret$num_tests_dep)
+
+  	best_cpdag_seen_so_far <- g2
+  	best_cpdag_seen_so_far_num_edges <- num_edges
+  	best_cpdag_seen_so_far_params <- print_param_and_results_string
+  	}
+  }
+ 
+  cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
+  cat(headers_string, "\n")
+  cat(best_cpdag_seen_so_far_params, "\n")
+ 
+  if (MC_passing_cpdag_already_found == TRUE) {
+	  graph <- best_cpdag_seen_so_far
+  } else {
+	  graph <- cpdag_graph_when_PD_is_1
+  }
+ 
+  readr::write_file(x = .jcall(graph, "Ljava/lang/String;", "toString"), file = "graphtxt.txt")
+
+  return(list(graph, ts,
+          	MC_passing_cpdag_already_found,
+          	best_cpdag_seen_so_far))
+}
+
+AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpdag_seen_so_far){
+  TREATMENT_NAME = tv
+  RESPONSE_NAME = ov
+  MAX_NUM_SETS = 3
+  MAX_DISTANCE_FROM_POINT = 4
+  MAX_PATH_LENGTH = 4
+  NEAR_TREATMENT = 1
+  NEAR_RESPONSE = 2
+  
+  
+  cat("Identification parameters: \n")
+  cat("    maximum number of adjustment sets = ", MAX_NUM_SETS, "\n")  
+  cat("    maximum distance from target endpoint (TREATMENT or RESPONSE) = ", MAX_DISTANCE_FROM_POINT, "\n")  
+  cat("    maximum path length = ", MAX_PATH_LENGTH, "\n")  
+  
+  if (MC_passing_cpdag_already_found == TRUE) {
+    cat("Searching for adjustment set(s) on the *** Treatment *** side:\n")
+    # Z1
+    adj_sets_treatment = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
+                                                MAX_NUM_SETS,
+                                                MAX_DISTANCE_FROM_POINT,
+                                                NEAR_TREATMENT,
+                                                MAX_PATH_LENGTH)
+    
+    ts$print_adjustment_sets(adj_sets_treatment)
+    
+    cat("Searching for adjustment sets on the *** Response *** side:\n")
+    # Z2
+    adj_sets_response  = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
+                                                MAX_NUM_SETS,
+                                                MAX_DISTANCE_FROM_POINT,
+                                                NEAR_RESPONSE,
+                                                MAX_PATH_LENGTH)
+    
+    ts$print_adjustment_sets(adj_sets_response)
+  } 
+  
+  ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
+  flag_no_adjustment_set_found = FALSE
+  flag_only_one_adjustment_set_found = FALSE
+  
+  # Determine the union and differences of the two adjustment sets
+  union_of_two_lists = union(adj_sets_treatment, adj_sets_response)
+  near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
+  near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
+  
+  cat("Total number of adjustment sets encountered (ignoring duplicates) = ", length(union_of_two_lists), "\n")
+  cat("Size of Treatment - Response adjustment sets = ", length(near_treatment_not_near_response), "\n")
+  cat("Size of Response - Treatment adjustment sets = ", length(near_response_not_near_treatment), "\n")
+  
+  ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
+  # if both empty, we need to set the corresponding flag:
+  if (length(union_of_two_lists) == 0) {
+    # Then no adjustment sets and we must be working with a cpdag (at least one undirected
+    #   edge) rather than a DAG. (For a DAG, there's always an adjustment set--namely the
+    #   set of parents of the treatment variable, which can be empty, but that's still
+    #   a valid adjustment set.) There are multiple solutions here, but get the end-user
+    #   involved.
+    cat("*** No adjustment set found. Either: ")
+    cat("Revise knowledge (see AIR job aid) so search result has no undirected edges. ***\n")
+    flag_no_adjustment_set_found = TRUE    
+  } else if (length(union_of_two_lists)==1) {
+    # Only one adjustment set is found altogether, and so we set the corresponding flag:
+    flag_only_one_adjustment_set_found = TRUE
+    return_first_adj_set  = union_of_two_lists[[1]]
+    return_second_adj_set = union_of_two_lists[[1]]  # same adjustment set
+  } else {
+    # We have at least two distinct adjustment sets; we prefer ones only from each side if practical, so, test alternatives first.
+    cat("At least two adjustment sets found. \n")
+    
+    # if no adjustment set found near response that was not already near treatment:
+    if (length(near_response_not_near_treatment) == 0) {
+      cat("In this case, there is no adjustment set near response that is not also near treatment.\n")
+      return_first_adj_set  = adj_sets_treatment[[1]]
+      return_second_adj_set = adj_sets_treatment[[2]]
+    } else if (length(near_treatment_not_near_response) == 0) {
+      cat("In this case, there is no adjustment set near treatment that is not also near response.\n")
+      return_first_adj_set  = adj_sets_response[[1]]
+      return_second_adj_set = adj_sets_response[[2]]
+    } else {
+      # At least one adjustment set is near treatment but not response, and vice versa.
+      #   This is the ideal case to obtain greater diversity of adjustment sets, which 
+      #   is also why we might want to set max_num_sets higher.
+      #   Return two distinct adjustment sets, one from each side.
+      cat("In this case, we have found at least one adjustment set near treatment but not near response; and vice versa.\n")
+      return_first_adj_set  = near_treatment_not_near_response[[1]]
+      return_second_adj_set = near_response_not_near_treatment[[1]]
+    }
+  }
+  
+  cat("Summary of results: \n")
+  cat("First adjustment set to return: ", return_first_adj_set, "\n")
+  cat("Second adjustment set to return: ", return_second_adj_set, "\n")
+  cat("Flag status for no adjustment set found: ", flag_no_adjustment_set_found, "\n")
+  cat("Flag status for only one adjustment set found: ", flag_only_one_adjustment_set_found, "\n")
+  
+  ### return the two adjustment sets plus the two flags instead.
+  return(list(return_first_adj_set, return_second_adj_set))
+}
+
+scale_ <- function(x){
+  (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
+}
+
+runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, log_file){ 
+  cat(paste0(Sys.time(), " - ","Started superlearner with ",
+             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold), collapse = ", ")), "\n", 
+      file = log_file, 
+      append = TRUE)
+  Z_level <- settings$Z_level
+  doc_title <- settings$doc_title
+  
+  cat("Reading in data\n", file = log_file, append = TRUE)
+  confounders <- as.character(strsplit(x = settings$confounders, split = " ")[[1]])
+  treatment <- as.character(settings$varName)
+  outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
+  # mediators = df |> select(-c(treatment, outcome, confounders)) |> colnames() # unnecessary unless doing mediation analysis
+  df <- read_csv(paste0(AIRHome,"/data/datafile.csv")) # can probably remove this as it's likely redundant
+  if (tv_dir == ">") {
+    df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
+  } else if (tv_dir == ">=") {
+    df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
+  } else if (tv_dir == "<") {
+    df[[treatment]] <- ifelse(df[[treatment]] < tv_threshold, 1, 0)
+  } else if (tv_dir == "<=") {
+    df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)
+  } else if (tv_dir == "=") {
+    df[[treatment]] <- ifelse(df[[treatment]] == tv_threshold, 1, 0)
+  } 
+  if (ov_dir == ">") {
+    df[[outcome]] <- ifelse(df[[outcome]] > ov_threshold, 1, 0)
+  } else if (ov_dir == ">=") {
+    df[[outcome]] <- ifelse(df[[outcome]] >= ov_threshold, 1, 0)
+  } else if (ov_dir == "<") {
+    df[[outcome]] <- ifelse(df[[outcome]] < ov_threshold, 1, 0)
+  } else if (ov_dir == "<=") {
+    df[[outcome]] <- ifelse(df[[outcome]] <= ov_threshold, 1, 0)
+  } else if (ov_dir == "=") {
+    df[[outcome]] <- ifelse(df[[outcome]] == ov_threshold, 1, 0)
+  } 
+
+  #### TMLE -------------------------------------
+  ##### Define Superlearner -------------------
+  # sl3_list_learners("binomial") 
+  
+  cat("Building learner list\n", file = log_file, append = TRUE)
+  lrnr_mean <- sl3::make_learner(sl3::Lrnr_mean)
+  lrnr_glm <- sl3::make_learner(sl3::Lrnr_glm)
+  lrnr_hal <- sl3::make_learner(sl3::Lrnr_hal9001)
+  lrnr_nnet <- sl3::make_learner(sl3::Lrnr_nnet)
+  lrnr_rforest <- sl3::make_learner(sl3::Lrnr_randomForest)
+  lrnr_ranger <- sl3::make_learner(sl3::Lrnr_ranger)
+  lrnr_glmnet <- sl3::make_learner(sl3::Lrnr_glmnet)
+  lrnr_xgboost <- sl3::make_learner(sl3::Lrnr_xgboost, max_depth = 4, eta = 0.01, nrounds = 100)  
+  lrnr_earth <- sl3::make_learner(sl3::Lrnr_earth)  
+  if (length(confounders) > 1) {
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
+                                           lrnr_glm,
+                                           lrnr_hal,
+                                           lrnr_ranger, 
+                                           lrnr_rforest,
+                                           lrnr_glmnet, # this is the difference. It needs 2+ confounders
+                                           lrnr_xgboost,
+                                           lrnr_earth,
+                                           lrnr_nnet), 
+                                      recursive = TRUE))
+  } else {
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
+                                           lrnr_glm,
+                                           lrnr_hal,
+                                           lrnr_ranger, 
+                                           lrnr_rforest,
+                                           lrnr_xgboost,
+                                           lrnr_earth,
+                                           lrnr_nnet), 
+                                      recursive = TRUE))
+  }
+  # DEFINE SL_Y AND SL_A 
+  # We only need one, because they're the same
+  ##### Define Formulae --------------------------
+  Q_learner <- sl3::Lrnr_sl$new(learners = sl_, 
+                           metalearner = sl3::Lrnr_nnls$new(convex = T)) # output model
+  g_learner <- sl3::Lrnr_sl$new(learners = sl_, 
+                           metalearner = sl3::Lrnr_nnls$new(convex = T)) # treatment model
+  learner_list <- list(Y = Q_learner,
+                       A = g_learner)
+  
+  # PREPARE THE THINGS WE WANT TO FEED IN TO TMLE3
+  ate_spec <- tmle3::tmle_ATE(treatment_level = 1, control_level = 0)
+  
+
+  
+  ##### Nodes ------------------
+  nodes_ <- list(W = confounders, # covariates
+                 A = treatment,
+                 # Z = mediators, # unnecessary unless doing mediation analysis
+                 Y = outcome)
+  
+  ##### RUN TMLE3 -------------------------------
+  set.seed(123)
+  ### this is where the parallel is breaking
+  cat("Starting TMLE\n", file = log_file, append = TRUE)
+  tryCatch({
+    tmle_fit_ <- tmle3::tmle3(tmle_spec = ate_spec,
+                 data = df,
+                 node_list = nodes_,
+                 learner_list = learner_list)
+  }, error = function(e) {
+    cat(sprintf("Error in tmle3 call: %s\n", conditionMessage(e)), 
+        file = log_file, append = TRUE)
+    stop(e)
+  })
+  cat("Pulling out TMLE scores\n", file = log_file, append = TRUE)
+  tmle_task <- ate_spec$make_tmle_task(df, nodes_)
+  
+  initial_likelihood <- ate_spec$make_initial_likelihood(
+    tmle_task,
+    learner_list
+  )
+  
+  ## save propensity score for diagnosis
+  propensity_score <- initial_likelihood$get_likelihoods(tmle_task)$A
+  propensity_score <- propensity_score * df[,..treatment] + (1 - propensity_score) * (1 - df[,..treatment])
+  
+  plap_ <- tibble(exposure = df[,..treatment] |> pull(),
+                  pscore = propensity_score |> pull())
+  
+  plap_$sw <- plap_$exposure * (mean(plap_$exposure)/propensity_score) + (1 - plap_$exposure) * ((1 - mean(plap_$exposure)) / (1 - propensity_score))
+  ##### Save results ----------------------------
+  # results to results file
+  write.table(cbind(treatment, Z_level, tmle_fit_$summary[,c(8:10)], deparse.level = 0), 
+              file = paste0(AIRHome, "/Results.csv"), 
+              sep = ",", append = TRUE, quote = FALSE, col.names = FALSE, row.names = FALSE)
+  
+  
+  # save outcome predictions for diagnosis
+  # initial_likelihood_preds was formerly labeled outcome_preds
+  initial_likelihood_preds <- initial_likelihood$get_likelihoods(tmle_task,"Y")
+  # define and fit likelihood
+  factor_list <- list(
+    tmle3::define_lf(LF_emp, "W"),
+    tmle3::define_lf(LF_fit, "A", sl_),
+    tmle3::define_lf(LF_fit, "Y", sl_, type = "mean")
+  )
+  likelihood_def <- tmle3::Likelihood$new(factor_list)
+  likelihood <- likelihood_def$train(tmle_task)
+  likelihood_values <- rowMeans(likelihood$get_likelihoods(tmle_task,"Y"))
+  
+  # print("super learner coefficients for PS model")
+  g_fit <- tmle_fit_$likelihood$factor_list[["A"]]$learner
+  # g_fit$fit_object$full_fit$learner_fits$Lrnr_nnls_TRUE
+  
+  # print("super learner coefficients for outcome model")
+  Q_fit <- tmle_fit_$likelihood$factor_list[["Y"]]$learner
+  # Q_fit$fit_object$full_fit$learner_fits$Lrnr_nnls_TRUE
+  
+  ## generate counterfactuals
+  ### counterfactual where all treatments set to 1
+  intervention1 <- tmle3::define_lf(LF_static, "A", value = 1)
+  
+  cf_likelihood1 <- tmle3::make_CF_Likelihood(likelihood, intervention1)
+  
+  cf_likelihood_values1 <- cf_likelihood1$get_likelihoods(tmle_task, "A")
+  
+  # We can then use this to construct a counterfactual likelihood:
+  ### counterfactual where all treatments set to 0
+  # set values
+  intervention0 <- tmle3::define_lf(LF_static, "A", value = 0)
+  # generate counterfactual likelihood object
+  cf_likelihood0 <- tmle3::make_CF_Likelihood(likelihood, intervention0)
+  # get likelihoods from object
+  cf_likelihood_values0 <- cf_likelihood0$get_likelihoods(tmle_task, "A")
+  # We see that the likelihood values for the A node are all either 0 or 1, as would be expected from an indicator likelihood function. In addition, the likelihood values for the non-intervention nodes have not changed.
+  cat("Building Output\n", file = log_file, append = TRUE)
+  ## output individual row values
+  # df_out <- df[,c(nodes_$A, nodes_$Y, nodes_$W)]
+  df_out <- df |> select(nodes_$A, nodes_$Y, nodes_$W)
+  df_out$exposure <- plap_$exposure
+  df_out$rownum <- rownames(df_out)
+  df_out$pscore <- plap_$pscore
+  df_out$sw <- plap_$sw
+  df_out$tmle_est <- tmle_fit_$estimates[[1]]$IC
+  df_out$initial_likelihood_preds <- initial_likelihood_preds
+  df_out$likelihood_values <- likelihood_values
+  df_out$counterfactual_0 <- cf_likelihood_values0
+  df_out$counterfactual_1 <- cf_likelihood_values1
+  df_out$g_fit_pred <- g_fit$predict() 
+  df_out$Q_fit_pred <- Q_fit$predict()
+  
+  write_csv(df_out, paste0(AIRHome, "/data/", settings$doc_title,"-data.csv"))
+  cat("Finished SuperLearner\n", file = log_file, append = TRUE)
+}
+
+processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE){
+  
+  # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
+  cat(paste0(Sys.time(), " - ","Started processResults() with ",
+             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate, log_file), collapse = ", ")), "\n", 
+      file = log_file, 
+      append = TRUE)
+  
+  treatment <- as.character(settings$varName)
+  outcome <- as.character(df_vars[df_vars$var == "OV",]$val)
+  confounders <-  as.character(unique(Zvars$Z)) #strsplit(x = settings$confounders, split = " ")[[1]]
+  doc_title <- settings$doc_title
+  
+  set.seed(123)
+  cat("Assigned variables\n", file = log_file, append = TRUE)
+  df <- read_csv(paste0(AIRHome, "/data/datafile.csv"))
+  if (tv_dir == ">") {
+    df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
+  } else if (tv_dir == ">=") {
+    df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
+  } else if (tv_dir == "<") {
+    df[[treatment]] <- ifelse(df[[treatment]] < tv_threshold, 1, 0)
+  } else if (tv_dir == "<=") {
+    df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)
+  } else if (tv_dir == "=") {
+    df[[treatment]] <- ifelse(df[[treatment]] == tv_threshold, 1, 0)
+  } 
+  if (ov_dir == ">") {
+    df[[outcome]] <- ifelse(df[[outcome]] > ov_threshold, 1, 0)
+  } else if (ov_dir == ">=") {
+    df[[outcome]] <- ifelse(df[[outcome]] >= ov_threshold, 1, 0)
+  } else if (ov_dir == "<") {
+    df[[outcome]] <- ifelse(df[[outcome]] < ov_threshold, 1, 0)
+  } else if (ov_dir == "<=") {
+    df[[outcome]] <- ifelse(df[[outcome]] <= ov_threshold, 1, 0)
+  } else if (ov_dir == "=") {
+    df[[outcome]] <- ifelse(df[[outcome]] == ov_threshold, 1, 0)
+  } 
+  
+  #### read in data ------------------
+  # I think these are not necessary...I added the code above to transform the treatment variable and am commenting out all the rest,  just like in the superlearner function
+  # df[treatment] <- ifelse(df[treatment] >= 0, 1, 0)
+  # df[confounders] <- ifelse(df[confounders] >= 0, 1, 0)
+  # df[outcome] <- ifelse(df[outcome] >= 0, 1, 0) # removed the >= for >, because it makes more sense... hopefully that wasn't a mistake
+  
+  
+  #### pre-process data ------------------
+  
+  #define function to scale values between 0 and 1
+  # scale_values <- function(x){(x-min(x))/(max(x)-min(x))}
+  # df$images_acquired <- rescale(df$images_acquired)
+  
+  # split into train/test datasets
+  test_size = floor(0.3 * nrow(df))
+  samp = sample(nrow(df), test_size, replace = FALSE)
+  y_train = df |> select(all_of(outcome)) |> filter(!row_number() %in% samp) |> mutate(!!outcome := factor(.data[[outcome]]))
+  x_train = df |> select(-all_of(outcome)) |> filter(!row_number() %in% samp) #since the first column is just ID
+  y_test = df |> select(all_of(outcome)) |> filter(row_number() %in% samp) |> mutate(!!outcome := factor(.data[[outcome]]))
+  x_test = df |> select(-all_of(outcome)) |> filter(row_number() %in% samp) #since the first column is just ID
+  #convert labels to categorical
+  # y_train = factor(ifelse(y_train >=0, 1,0))
+  # y_test = factor(ifelse(y_test >=0, 1,0))
+  
+  #Create training set and testing set
+  train = cbind(y_train,x_train)
+  test = cbind(y_test,x_test)
+  
+  colnames(train)[1] = "label"
+  colnames(test)[1] = "label"
+  
+  xtest_0 = mutate(x_test, !!treatment := 0)
+  xtest_1 = mutate(x_test, !!treatment := 1)
+  cat("Read in and stratified data\n", file = log_file, append = TRUE)
+
+  #### check if models need to be created, then do ------------
+  if (model_yn == "No") {
+    cat("model_yn == no\n", file = log_file, append = TRUE)
+    cat("Setting up ML Classifiers\n", file = log_file, append = TRUE)
+    
+    ### Regression ----------------
+    model_lm <- lm(label~., data = train)
+    pred_lm0 = predict(model_lm, xtest_0)
+    pred_lm1 = predict(model_lm, xtest_1)
+    
+    lm_ate = mean(pred_lm1) - mean(pred_lm0)
+    #[1] 0.008077147
+    
+    model_dt <- rpart(label~., data = train, method = "class") #rpart fails when all "labels" are the same value, so we're wrapping a stupid if logic around it to prevent errors
+    pred_dt0 = predict(model_dt, xtest_0)[,2]
+    pred_dt1 = predict(model_dt, xtest_1)[,2]
+    # note: rpart returns two columns for prediction because it's a classifier predicting two classes. We only want its prediction for images_acquired being a success (i.e., '1'), so we just use the corresponding column from the predict() function
+    
+    dt_ate = mean(pred_dt1) - mean(pred_dt0)
+    #[1] 0
+    
+    ### svm -----------------------------
+    model_svm = svm(label ~ ., data = test)
+    
+    pred_svm0 = predict(model_svm, xtest_0)
+    pred_svm1 = predict(model_svm, xtest_1)
+    
+    svm_ate = mean(as.numeric(pred_svm1)) - mean(as.numeric(pred_svm0))
+    #[1] -0.07423194
+    
+    ### randomForest -------------------
+    model_rf = randomForest(label~., data = train, importance = TRUE)
+    ###  saving the model ------
+    # saveRDS(model_rf, file = paste0(AIRHome, "/input/model.rda"))
+    
+    pred_rf0 = predict(model_rf, xtest_0)
+    pred_rf1 = predict(model_rf, xtest_1)
+    
+    rf_ate = mean(as.numeric(pred_rf1)) - mean(as.numeric(pred_rf0))
+    #[1] 0.0009401413
+    
+    
+    covariate_list <- train |> 
+      select(-label) |> names()
+    ### superlearner example ----------------------
+    task <- sl3::make_sl3_Task(
+      data = train,
+      outcome = "label",
+      covariates = covariate_list
+    )
+
+    lrnr_glm <- sl3::Lrnr_glm$new()
+    lrnr_hal <- sl3::Lrnr_hal9001$new()
+    lrnr_ranger <- sl3::Lrnr_ranger$new()
+    lrnr_rforest <- sl3::Lrnr_randomForest$new()
+    lrnr_glmnet <- sl3::Lrnr_glmnet$new()
+    lrnr_xgboost <- sl3::Lrnr_xgboost$new()
+    lrnr_earth <- sl3::Lrnr_earth$new()
+    lrnr_nnet <- sl3::Lrnr_nnet$new()
+    lrnr_svm <- sl3::Lrnr_svm$new()
+    
+    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_glm,
+                                                # lrnr_ranger,
+                                                lrnr_rforest,
+                                                lrnr_glmnet,
+                                                lrnr_xgboost,
+                                                lrnr_earth,
+                                                lrnr_nnet,
+                                                lrnr_svm),
+                                           recursive = TRUE))
+    
+    stack <- sl3::Stack$new(lrnr_glm, lrnr_ranger,
+                            lrnr_rforest, lrnr_glmnet, lrnr_xgboost,
+                            lrnr_earth, lrnr_nnet, lrnr_svm )
+    
+    sl <- sl3::Lrnr_sl$new(learners = stack, metalearner = sl3::Lrnr_nnls$new())
+    
+    cat("Fitting ML Classifiers\n", file = log_file, append = TRUE)
+    
+    sl_fit <- sl3::sl_$train(task = task)
+
+    cat("Pulling ML Classifier Scores\n", file = log_file, append = TRUE)
+    
+    sl_preds <- sl3::sl_fit$predict(task = task)
+    
+    prediction_task_0 <- sl3::make_sl3_Task(
+      data = xtest_0, 
+      covariates = names(xtest_0)
+    )
+    prediction_task_1 <- sl3::make_sl3_Task(
+      data = xtest_1, 
+      covariates = names(xtest_1)
+    )
+    sl_preds_0 <- rowMeans(sl_fit$predict(task = prediction_task_0))
+    sl_preds_1 <- rowMeans(sl_fit$predict(task = prediction_task_1))
+    
+    # round(sl_preds_0$coefficients, 3)
+    sl_ate = mean(sl_preds_1) - mean(sl_preds_0)
+    #[1] -0.0158611
+    # }
+    cat("Processing ML Output\n", file = log_file, append = TRUE)
+    
+    ### combine and clean all results data ---------------
+    results <- read_csv(paste0(AIRHome, "/Results.csv"))
+    
+    data.frame(results) |> 
+      select(-Treatment) |>
+      mutate(Group = tolower(Group)) |>
+      pivot_longer(cols = -Group, names_to = "category", values_to = "value") |>
+      unite("new_col_name", c("Group", "category"), sep = "_") |>
+      pivot_wider(names_from = "new_col_name", values_from = "value") |>
+      bind_cols(data.frame("algorithm" = c("Logistic Regression","Decision Tree","Random Forest","Support Vector Machine","Stacked Super Learner"),
+                           "flag" = c(lm_ate,dt_ate,svm_ate,rf_ate, sl_ate))) |>
+      bind_cols(data.frame("Treatment" = outcome)) |>
+      mutate(z1_sig = case_when((flag > z1_LCI & flag > z1_UCI) | (flag < z1_LCI & flag < z1_UCI) ~ 1,
+                                TRUE ~ 0),
+             z2_sig = case_when((flag > z2_LCI & flag > z2_UCI) | (flag < z2_LCI & flag < z2_UCI) ~ 1,
+                                TRUE ~ 0),
+             significance = max(z1_sig, z2_sig)) |>
+      rename(z1_ATE = z1_Mean, z1_ATE_LCI = z1_LCI, z1_ATE_UCI = z1_UCI,
+             z2_ATE = z2_Mean, z2_ATE_LCI = z2_LCI, z2_ATE_UCI = z2_UCI) |>
+      mutate(avg.cond.ef = (z1_ATE + z2_ATE) / 2,
+             Lower.avg.cond.ef = min(z1_ATE_LCI, z2_ATE_LCI),
+             Upper.avg.cond.ef = max(z1_ATE_UCI, z2_ATE_UCI)) |>
+      write_csv(paste0(AIRHome, "/ResultsOut.csv"))
+    
+  } else {
+    cat("model_yn != no\n", file = log_file, append = TRUE)
+    if (model_yn == "Yes") {
+      cat("model_yn == yes\n", file = log_file, append = TRUE)
+      # model_in <- read_rds("input/model.rda")
+      pred_m0 = predict(model_in, xtest_0)
+      pred_m1 = predict(model_in, xtest_1)
+      # pred_m0 = predict(model_in, xtest_0)
+      # pred_m1 = predict(model_in, xtest_1)
+      
+      m_ate = mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
+    } else if (model_yn == "ATE") {
+      cat("model_yn == ate\n", file = log_file, append = TRUE)
+      m_ate = model_ate
+    }
+    cat("process ate results\n", file = log_file, append = TRUE)
+    ### combine and clean all results data ---------------
+    results <- read_csv(paste0(AIRHome, "/Results.csv"))
+    # results <- read_csv("../airtool_streamlined/data/Results.csv")
+    
+    data.frame(results) |> 
+      select(-Treatment) |>
+      mutate(Group = tolower(Group)) |>
+      pivot_longer(cols = -Group, names_to = "category", values_to = "value") |> 
+      unite("new_col_name", c("Group", "category"), sep = "_") |> 
+      pivot_wider(names_from = "new_col_name", values_from = "value") |>
+      bind_cols(data.frame("algorithm" = c("Existing Model"),
+                           "flag" = c(m_ate))) |>
+      bind_cols(data.frame("Treatment" = outcome)) |>
+      mutate(z1_sig = case_when((flag > z1_LCI & flag > z1_UCI) | (flag < z1_LCI & flag < z1_UCI) ~ 1,
+                                TRUE ~ 0),
+             z2_sig = case_when((flag > z2_LCI & flag > z2_UCI) | (flag < z2_LCI & flag < z2_UCI) ~ 1,
+                                TRUE ~ 0),
+             significance = max(z1_sig, z2_sig)) |>
+      rename(z1_ATE = z1_Mean, z1_ATE_LCI = z1_LCI, z1_ATE_UCI = z1_UCI,
+             z2_ATE = z2_Mean, z2_ATE_LCI = z2_LCI, z2_ATE_UCI = z2_UCI) |>
+      mutate(avg.cond.ef = (z1_ATE + z2_ATE) / 2,
+             Lower.avg.cond.ef = min(z1_ATE_LCI, z2_ATE_LCI),
+             Upper.avg.cond.ef = max(z1_ATE_UCI, z2_ATE_UCI)) |>
+      write_csv(paste0(AIRHome, "/ResultsOut.csv"))
+  }
+  
+  if (move_results) {
+    cat("moving results files\n", file = log_file, append = TRUE)
+    file.rename(from = paste0(AIRHome, "/Results.csv"),
+                to = paste0(AIRHome, "/data/Results.csv"))
+    
+    file.rename(from = paste0(AIRHome, "/ResultsOut.csv"),
+                to = paste0(AIRHome, "/data/ResultsOut.csv"))
+  }
+  
+}
+
+
+
+## Create four simple methods to help parse a line
+
+# Is the first character of a line a nonzero digit? If yes, then that line specifies an edge.
+is_edge_line <- function(line) {
+  # regular expression
+  return(grepl("^[1-9]", line))
+}
+
+# Split a string of space-delimited substrings into a list of those substrings
+split_line <- function(input_string) {
+  return(strsplit(input_string, " "))
+}
+
+# Return the first node from a line specifying an edge (after the line number)
+first_node <- function(line) {
+  line_components <- split_line(line)
+  return(line_components[[1]][2])
+}
+# Return the second node from a line specifying an edge (after the line number)
+second_node <- function(line) {
+  line_components <- split_line(line)
+  return(line_components[[1]][4])
+}
+
+## The key methods defined here are descendants (and its dual: ancestors)
+descendants <- function(node, children) {
+  checked_so_far <- set()
+  seen_not_checked <- set(node)
+  while (!set_is_empty(seen_not_checked)) {
+    check_these <- seen_not_checked
+    for (n in check_these) {
+      for (m in children[[n]]) {
+        if ( !(m %e% checked_so_far)) {
+          seen_not_checked <- seen_not_checked | set(m)
+        }
+      }
+      seen_not_checked <- seen_not_checked - set(n)
+      checked_so_far <- checked_so_far | set(n)
+    }
+  }
+  return(checked_so_far)
+}
+
+get_X_descendents <- function(TV, PATH) {
+  lines <- readLines(paste(PATH, "/graphtxt.txt", sep = ""))
+  
+  nodes <- set()
+  for (line in lines) {
+    if (is_edge_line(line)) {
+      if (!(first_node(line)  %e% nodes)) {
+        nodes <- nodes | set(first_node(line))
+      }
+      if (!(second_node(line) %e% nodes)) {
+        nodes <- nodes | set(second_node(line))
+      }
+    }
+  }
+
+  ## Create children and parents dictionaries
+  children <- hash()
+  for (n in nodes) {
+    children_of_n <- set()
+    for (line in lines) {
+      if (is_edge_line(line)) {
+        if ((first_node(line)  == n) && (!(second_node(line) %e% children_of_n))) {
+          children_of_n <- children_of_n | set(second_node(line))
+        }
+      }
+    }
+    children[[n]] <- children_of_n
+  }
+  return(unlist(descendants(TV, children)))
+}
+
+
+get_ribbon_plot <- function(AIRHome) {
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  
+  # code for generating ribbon plot
+  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI)) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI)) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  summary_color <- case_when(
+    inZ1 == TRUE & inZ2 == TRUE ~ "#378855",
+    inZ1 == TRUE | inZ2 == TRUE ~ "#FCB514",
+    inZ1 == FALSE & inZ2 == FALSE ~ "#C00000"
+  )
+  
+  dfr0 <- dfr[1,]
+  p <- ggplot(dfr0, aes(x = Treatment)) +
+    # ggplot(dfr0, aes(x = Treatment)) +
+    ## background
+    geom_linerange(aes(ymin = -1.05, ymax = 1.05),
+                   lwd = 6,
+                   col = "black",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    ## Annotations for '-' and '+'
+    # annotate("text", x = 0.92, y = -1.07, label = "-", hjust = 0, vjust = 0, size = 5, color = "white") +
+    # annotate("text", x = 0.88, y = 1.025,  label = "+", hjust = 0, vjust = 0, size = 5, color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the left side within the black background
+             y = -1,  # Center vertically within the black background
+             label = "-", 
+             hjust = 2.5, 
+             vjust = 0.25, 
+             size = 5, 
+             color = "white") +
+    annotate("text", 
+             x = 1,  # Position on the right side within the black background (adjust based on x-axis limits)
+             y = 1,  # Center vertically within the black background
+             label = "+", 
+             hjust = -0.75, 
+             vjust = 0.4, 
+             size = 5, 
+             color = "white") +## algorithm estimates
+    ## Z1
+    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#9394A2",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 1)) +
+    geom_point(aes(y = z1_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 1)) +
+    ## Z2
+    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
+                   lwd = 3.5,
+                   col = "#D4C7C7",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0.5)) +
+    geom_point(aes(y = z2_ATE),
+               col = "white",
+               cex = 3,
+               pch = 1,
+               stroke = 1.25,
+               position = position_nudge(x = 0.5)) +
+    # creating the ribbon
+    geom_linerange(aes(ymin = -1, ymax = 1),
+                   lwd = 3.5,
+                   col = "#C00000",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#FCB514",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_linerange(aes(ymin = max(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = min(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+                   lwd = 3.5,
+                   col = "#378855",
+                   alpha = 1,
+                   stat = "unique",
+                   lineend = "round",
+                   position = position_nudge(x = 0)) +
+    geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
+    ## algorithm estimates
+    labs(y = "",
+         x = "") +
+    geom_segment(data = dfr,
+                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
+                 arrow = arrow(length = unit(0.5, "cm")),
+                 lwd = 1.2,
+                 color = "#0F9ED5") +
+    geom_point(data = dfr,
+               aes(x = 2.5, y = flag, shape = algorithm),
+               size = 3,  # Adjust size as needed
+               color = "#0F9ED5") +  # Or any desired color
+    coord_flip(clip = "off") +
+    ## Adjust Scales to Remove Expansion and Compress Vertically
+    scale_x_discrete(expand = c(0, 0)) +
+    scale_y_continuous(expand = c(0, 0),
+                       limits = c(-1.1, 1.1)) +  # Tighten y-axis limits
+    ## Theme Adjustments to Minimize White Space
+    theme_void(base_size = 10) +
+    # theme(
+    #   # panel.spacing = unit(0, "pt"),
+    #   panel.background = element_rect(fill = "transparent", color = NA),
+    #   plot.background = element_rect(fill = "transparent", color = NA),
+    #   aspect.ratio = 0.2
+    # )
+    theme(
+      panel.background = element_rect(fill = "transparent", color = NA),
+      plot.background = element_rect(fill = "transparent", color = NA),
+      aspect.ratio = 0.2
+    )
+}
+
+get_figure_caption <- function(AIRHome, df_vars) {
+  caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to 'no significant effect.")
+  return(caption)
+}
+
+get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  
+  interpretation <- "What we can learn from these results"
+  dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
+  dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
+  
+  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
+      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
+    interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
+  } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
+    interpretation <- "Classifier Predictions match Causally-Derived ATE estimates. Your Classifier is healthy!"
+  } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
+    interpretation <- "Classifier Predictions do not match Causally-Derived ATE estimates. Your Classifier is to be considered unreliable. Consider looking into why this might be."
+  } else {
+    interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
+  }
+  
+  
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
+    inZ1 <- TRUE
+  } else { inZ1 <- FALSE }
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
+    inZ2 <- TRUE
+  } else { inZ2 <- FALSE }
+  
+  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  flagdir <- case_when(maxflag < 0 ~ "a negative",
+                       minflag > 0 ~ "a positive",
+                       TRUE ~ "no")
+  effect_estimation <- case_when(any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+                                 any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+                                 TRUE ~ "correctly estimating")
+  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
+                              effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
+                              TRUE ~ "")
+  effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
+                              TRUE ~ "Unfortunately")
+  
+  result_text <- paste0("Your classifier is ",
+                        effect_estimation, 
+                        " the effect that ", 
+                        df_vars[1,][[2]], 
+                        " is having on ", 
+                        df_vars[2,][[2]], 
+                        effect_percent, 
+                        ". AIR predicts that ", 
+                        df_vars[1,][[2]], 
+                        " should be having ", 
+                        flagdir, 
+                        " effect on ", 
+                        df_vars[2,][[2]],
+                        ". As ", 
+                        df_vars[1,][[2]], 
+                        " changes, the outcome of ", 
+                        df_vars[2,][[2]], 
+                        " is ", 
+                        case_when(flagdir == "a negative" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% less likely to occur. "),
+                                  flagdir == "a positive" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% more likely to occur. "),
+                                  TRUE ~ "unlikely to change. "),
+                        effect_fortune,
+                        ", your classifier is producing ",
+                        case_when(inZ1 & inZ2 ~ "un",
+                                  inZ1 | inZ2 ~ "potentially-",
+                                  TRUE ~ ""),
+                        "biased results, suggesting ",
+                        case_when(effect_estimation == "underestimating" ~ "a decreased ",
+                                  effect_estimation == "overestimating" ~ "an increased ",
+                                  TRUE ~ "an appropriate "),
+                        "change in likelihood of ", 
+                        df_vars[2,][[2]],
+                        " as ",
+                        df_vars[1,][[2]],
+                        " changes. ",
+                        case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
+                                  inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
+                                  inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
+                                  TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
+  )
+  return(result_text)
+}
+
+get_histogram_x <- function(df, xvar, tv_dir, tv_threshold) {
+  data <- df[[xvar]]
+  
+  # Ensure the selected variable is numeric
+  # validate(
+  #   need(is.numeric(data), "Selected variable must be numeric.")
+  # )
+  
+  # Define treatment condition based on operator and threshold
+  if (tv_dir == ">") {
+    treated <- data > tv_threshold
+    treated_label <- paste0("Treated (>", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (≤ ", tv_threshold, ")")
+  } else if (tv_dir == "<") {
+    treated <- data < tv_threshold
+    treated_label <- paste0("Treated (<", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (≥ ", tv_threshold, ")")
+  } else if (tv_dir == ">=") {
+    treated <- data >= tv_threshold
+    treated_label <- paste0("Treated (>=", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
+  } else if (tv_dir == "<=") {
+    treated <- data < tv_threshold
+    treated_label <- paste0("Treated (<=", tv_threshold, ")")
+    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
+  } else if (tv_dir == "=") {
+    treated <- data == tv_threshold
+    treated_label <- paste0("Treated (= ", tv_threshold, ")")
+    untreated_label <- "Untreated (≠)"
+  }
+  
+  # Create a dataframe for plotting
+  plot_df <- data.frame(
+    x = data,
+    Treatment = ifelse(treated, "Treated", "Untreated")
+  )
+  
+  # Define colors
+  colors <- c("Treated" = "#5D9AFF", "Untreated" = "#EAE1D7")
+  
+  # Generate the histogram
+  ggplot(plot_df, aes(x = x, fill = Treatment, color = Treatment)) +
+    geom_rug(sides = "b") +
+    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+    scale_fill_manual(values = colors, labels = c(untreated_label, treated_label)) +
+    scale_color_manual(values = colors, labels = c(untreated_label, treated_label)) +
+    geom_vline(xintercept = tv_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+    labs(
+      title = paste("Distribution of ", xvar),
+      x = NULL,
+      # y = "Count",
+      fill = "Treatment Status"
+    ) +
+    guides(color = "none") +  
+    theme_minimal() + 
+    theme(text = element_text(color = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", color = NA),
+          plot.background  = element_rect(fill = "transparent", color = NA),
+          legend.position = "bottom",
+          legend.direction = "horizontal") 
+}
+
+get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
+  data <- df[[yvar]]
+  
+  # Ensure the selected variable is numeric
+  # validate(
+  #   need(is.numeric(data), "Selected variable must be numeric.")
+  # )
+  
+  # Define treatment condition based on operator and threshold
+  if (ov_dir == ">") {
+    success <- data > ov_threshold
+    success_label <- paste0("Success (>", ov_threshold, ")")
+    fail_label <- paste0("Fail (≤ ", ov_threshold, ")")
+  } else if (ov_dir == "<") {
+    success <- data < ov_threshold
+    success_label <- paste0("Success (<", ov_threshold, ")")
+    fail_label <- paste0("Fail (≥ ", ov_threshold, ")")
+  } else if (ov_dir == ">=") {
+    success <- data >= ov_threshold
+    success_label <- paste0("Success (>=", ov_threshold, ")")
+    fail_label <- paste0("Fail (> ", ov_threshold, ")")
+  } else if (ov_dir == "<=") {
+    success <- data < ov_threshold
+    success_label <- paste0("Success (<=", ov_threshold, ")")
+    fail_label <- paste0("Fail (> ", ov_threshold, ")")
+  } else if (ov_dir == "=") {
+    success <- data == ov_threshold
+    success_label <- paste0("Success (= ", ov_threshold, ")")
+    fail_label <- "Fail (≠)"
+  }
+  
+  # Create a dataframe for plotting
+  plot_df <- data.frame(
+    x = data,
+    success = ifelse(success, "Success", "Fail")
+  )
+  
+  # Define colors
+  colors <- c("Success" = "#5D9AFF", "Fail" = "#EAE1D7")
+  # Generate the histogram
+  
+  ggplot(plot_df, aes(x = x, fill = success, color = success)) +
+    geom_rug(sides = "b") +
+    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
+    scale_fill_manual(values = colors, labels = c(fail_label, success_label)) +
+    scale_color_manual(values = colors, labels = c(fail_label, success_label)) +
+    geom_vline(xintercept = ov_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
+    labs(
+      title = paste("Distribution of ", yvar),
+      x = NULL,
+      # y = "Count",
+      fill = "Treatment Status"
+    ) +
+    guides(color = "none") +  
+    theme_minimal() + 
+    theme(text = element_text(color = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", color = NA),
+          plot.background  = element_rect(fill = "transparent", color = NA),
+          legend.position = "bottom",
+          legend.direction = "horizontal") 
+}
+
+get_updated_graph <- function(AIRHome, graph_update, xvar, yvar, Zvars) { 
+  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))  
+  if (graph_update) {
+    dot <- change_node_color(dot, xvar, "'#FFC107'")
+    dot <- change_node_color(dot, yvar, "'#FFC107'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
+    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+  }
+  return(dot)
+}
+
+get_final_graph <- function(AIRHome, xvar, yvar, Zvars) {
+  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))
+  dot <- change_node_color(dot, xvar, "'#FFC107'")
+  dot <- change_node_color(dot, yvar, "'#FFC107'")
+  # dot <- change_node_color(dot, xvar, "yellow")
+  # dot <- change_node_color(dot, yvar, "yellow")
+  
+  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  Z1 <- Zvars[Zvars$grp == "Z1",]$Z
+  Z2 <- Zvars[Zvars$grp == "Z2",]$Z
+  
+  # code for generating ribbon plot
+  if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z2, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
+    dot <- change_node_color(dot, Z1, "'#FFC107'")
+  } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
+    dot <- change_node_color(dot, Z1, "'#C00000'")
+    dot <- change_node_color(dot, Z2, "'#C00000'")
+  } 
+  
+  return(dot)
+}
+
+save_ggplot_to_png <- function(plot_obj, filename, width = 8, height = 6, dpi = 300) {
+  # Use ggsave to write the ggplot object to a file
+  ggsave(filename = filename, plot = plot_obj, width = width, height = height, dpi = dpi)
+}
+
+save_graphviz_to_png <- function(dot_code, filename) {
+  # Write the DOT code to a temporary file
+  dot_file <- tempfile(fileext = ".dot")
+  # writeLines(dot_code, dot_file)
+  dot <- paste(dot_code, collapse = "\n")
+  cat(dot, file = dot_file)
+  
+  # Call Graphviz's dot command to convert DOT to PNG
+  # Ensure that 'dot' is installed and available in your system PATH.
+  cmd <- sprintf('dot -Tpng -o "%s" "%s"', filename, dot_file)
+  system(cmd)
+}
+# --- END INLINE: scripts/AIR_functions.R ---
 
 disconnectMessage2()
 actionButton("disconnect", "Disconnect the app")
@@ -110,8 +1435,625 @@ if (!dir.exists(paste0(AIRHome, "/logs/"))) {
 }
 
 if (Sys.info()["sysname"] == "Linux") {
-  source("scripts/tetrad_utils.R")
-  source("scripts/TetradSearch.R")
+  # --- BEGIN INLINE: scripts/tetrad_utils.R ---
+# ----- Utility Functions -----
+
+# Constants for Java JDK URLs
+TETRAD_PATH <- Sys.getenv("TETRAD_PATH")
+
+if (TETRAD_PATH == "") {
+  stop("The TETRAD_PATH environment variable is not set. Please set it to the path of the Tetrad jar.")
+}
+
+# Function to create the variable list (ArrayList<Node>)
+#' Create variable list for Covariance Matrix
+#'
+#' This function creates an ArrayList of Nodes from the data frame's column names
+#' to be used in the Covariance Matrix.
+#'
+#' @param data The data frame containing the variables.
+#' @return A Java List of Nodes.
+create_variables <- function(data) {
+  #cat("Creating variable list from data...\n")
+  
+  vars <- .jnew("java/util/ArrayList")
+  
+  for (name in colnames(data)) {
+    #cat("Adding variable:", name, "to the list.\n")
+    variable <- .jnew("edu/cmu/tetrad/data/ContinuousVariable", name)
+    node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
+    .jcall(vars, "Z", "add", .jcast(node, "java/lang/Object"))
+  }
+  
+  vars <- .jcast(vars, "java/util/List")
+  #cat("Variable list creation complete. Number of variables added:", length(vars), "\n")
+  
+  return(vars)
+}
+
+# ----- Initialize Java and Check Version -----
+initialize_java <- function() {
+  library(rJava)
+  
+   .jinit()
+  .jaddClassPath(TETRAD_PATH)
+
+  java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
+  print(paste("Java version:", java_version))
+}
+
+# ----- Graph Visualization -----
+visualize_graph <- function(graph) {
+  if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
+    b <- TRUE
+  } else if (Sys.getenv("RSTUDIO") == "1") {
+    b <- TRUE
+  } else {
+    b <- FALSE
+  }
+  
+  if (b) {
+    if (!is.null(graph)) {
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph)
+      grViz(dot)
+    } else {
+      cat("No graph generated. Please check the BOSS execution.\n")
+    }
+  }
+}
+  # --- END INLINE: scripts/tetrad_utils.R ---
+# --- BEGIN INLINE: scripts/TetradSearch.R ---
+# This class translates some select methods from TetradSearch.py in py-tetrad
+# for use in R using rJava.
+#
+# This is a temporary class, as a much better effort at translating these
+# methods is underway by another group.
+
+TetradSearch <- setRefClass(
+  "TetradSearch",
+  
+  fields = list(
+    data = "data.frame",          # Input dataset
+    sample_size = "numeric",      # Sample size
+    data_model = "ANY",           # Data Model (Tabular data or Covariance Matrix)
+    score = "ANY",                # Score object
+    test = "ANY",                 # IndependenceTest object
+    mc_test = "ANY",              # IndependenceTest for the Markov Checker
+    mc_ind_results = "ANY",       # Markov Checker independence test results
+    knowledge = "ANY",            # Background knowledge object
+    graph = "ANY",                # Resulting graph
+    search = "ANY",               # Search object
+    params = "ANY"                # Parameters object
+  ),
+  
+  methods = list(
+    
+    # Initialize the TetradSearch object
+    #
+    # @param data A data frame containing the dataset to be analyzed.
+    # @return A TetradSearch object.
+    initialize = function(data) {
+      cat("Initializing TetradSearch object...\n")
+      
+      if (!is.data.frame(data)) {
+        stop("Data must be a data.frame")
+      }
+      
+      .self$data <- data
+      .self$sample_size <- nrow(data)
+      cat("Data frame dimensions:", dim(data), "\n")
+      cat("Sample size set to:", .self$sample_size, "\n")
+      
+      .self$data_model <- .self$data_frame_to_tetrad_dataset(data)
+      .self$data_model <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      cat("Tetrad DataSet created.\n")
+      
+      .self$params <- .jnew("edu.cmu.tetrad.util.Parameters")
+      
+      .self$knowledge <- .jnew("edu/cmu/tetrad/data/Knowledge")
+      cat("Knowledge instance created.\n")
+      cat("TetradSearch object initialized successfully.\n")
+    },
+    
+    # Make sure the score object is initialized
+    .check_score = function() {
+      if (is.null(.self$score)) {
+        stop("Error: The 'score' field has not been initialized yet. Please \
+                 set a score before running the algorithm.")
+      }
+    },
+    
+    .setParam = function(key, value) {
+      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Boolean", value), "java/lang/Object"))
+    },
+    
+    .setParamInt = function(key, value) {
+      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Integer", as.integer(value)), "java/lang/Object"))
+    },
+    
+    .set_knowledge = function() {
+      .jcall(.self$search, "V", "setKnowledge", .jcast(.self$knowledge, "edu.cmu.tetrad.data.Knowledge"))
+    },
+    
+    # Run the search algorithm, for the typical case
+    .run_search = function() {
+      .self$.set_knowledge()
+      .self$graph <- .jcast(.self$search$search(), "edu.cmu.tetrad.graph.Graph")
+    },
+    
+    # Make sure the test object is initialized
+    .check_test = function() {
+      if (is.null(.self$test)) {
+        stop("Error: The 'test' field has not been initialized yet. Please \
+                 set a test before running the algorithm.")
+      }
+    },
+    
+    # Add a variable to a specific tier in the knowledge
+    #
+    # @param tier The tier to which the variable should be added.
+    # @param var_name The name of the variable to add.
+    add_to_tier = function(tier, var_name) {
+      cat("Adding variable", var_name, "to tier", tier, "...\n")
+      tryCatch({
+        tier <- as.integer(tier)
+        var_name <- as.character(var_name)
+        .jcall(.self$knowledge, "V", "addToTier", tier, var_name)
+        cat("Variable", var_name, "added to tier", tier, ".\n")
+      }, error = function(e) {
+        cat("Error adding variable to tier:", e$message, "\n")
+      })
+    },
+    
+    # Set the verbose flag
+    #
+    # @param verbose TRUE or FALSE
+    set_verbose = function(verbose) {
+      .self$.setParam("verbose", verbose)
+    },
+    
+    # Set the score to the SEM BIC.
+    #
+    # @param penalty_discount The penalty discount to use in the SemBicScore calculation.
+    use_sem_bic = function(penalty_discount = 2) {
+      .self$.setParamDouble("penaltyDiscount", penalty_discount)
+      .self$score <- .jnew("edu.cmu.tetrad.algcomparison.score.SemBicScore")
+      .self$score <- .jcast(.self$score, "edu.cmu.tetrad.algcomparison.score.ScoreWrapper")
+      cat("SemBicScore object created with penalty discount set.\n")
+    },
+    
+    # Set the test to Fisher Z
+    #
+    # @param alpha The significance cutoff.
+    use_fisher_z = function(alpha = 0.01, use_for_mc = FALSE) {
+      .self$.setParamDouble("alpha", alpha)
+      
+      if (use_for_mc) {
+        .self$mc_test <- .jnew("edu.cmu.tetrad.algcomparison.independence.FisherZ")
+        .self$mc_test <- .jcast(.self$mc_test, "edu.cmu.tetrad.algcomparison.independence.IndependenceWrapper")
+      } else {
+        .self$test <- .jnew("edu.cmu.tetrad.algcomparison.independence.FisherZ")
+        .self$test <- .jcast(.self$test, "edu.cmu.tetrad.algcomparison.independence.IndependenceWrapper")
+      }
+      
+      cat("Fisher Z object created with alpha set.\n")
+    },
+    
+    # Runs the PC algorithm.
+    #
+    # @param conflict_rule The rule used for resolving collider conflicts: 1 = prioritize existing
+    #   colliders, 2 = orient bidirected edges, 3 = overwrite existing colliders.
+    # @param depth The maximum number of conditioning variables per test.
+    # @stable_fas TRUE is the stable FAS should be used.
+    # @guarantee_cpdag TRUE is a legal CPDAG output should be guaranteed.
+    # @return The estimated graph.
+    run_pc = function(conflict_rule=1, depth=-1, stable_fas=TRUE, guarantee_cpdag=FALSE) {
+      cat("Running PC algorithm...\n")
+      
+      .self$.setParamInt("conflictRule", conflict_rule)
+      .self$.setParamInt("depth", depth)
+      .self$.setParam("stableFas", stable_fas)
+      .self$.setParam("guaranteePag", guarantee_cpdag)
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      pc <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Pc", .self$test)
+      .jcall(pc, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(pc, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      .self$graph <- graph
+      
+      cat("PC search completed.\n")
+      return(.self$graph)
+    },
+    
+    # Run the FGES algorithm
+    #
+    # @param symmetric_first_step TRUE just in case the first step in scoring should be treated symmetricaly.
+    # @param max_degree The maximum degree of the graph, -1 if unlimited.
+    # @param parallelized TRUE is parallelization should be used.
+    # @oaram faithfulness_assumed TRUE if one-edge faithfulness should be assumed.
+    # @return The estimated graph.
+    run_fges = function(symmetric_first_step = FALSE, max_degree = -1, parallelized = FALSE, faithfulness_assumed = FALSE) {
+      cat("Running FGES algorithm...\n")
+      
+      .self$.setParam("symmetricFirstStep", symmetric_first_step)
+      .self$.setParamInt("maxDegree", max_degree)
+      .self$.setParam("parallelized", parallelized)
+      .self$.setParam("faithfulnessAssumed", faithfulness_assumed)
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      fges <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Fges", .self$score)
+      .jcall(fges, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(fges, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      .self$graph <- graph
+      
+      cat("FGES search completed.\n")
+      return(.self$graph)
+    },
+    
+    # --- Internal parameter helpers ---
+    
+    .setParamDouble = function(key, value) {
+      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Double", as.double(value)), "java/lang/Object"))
+    },
+    
+    # Run the BOSS algorithm
+    #
+    # @param num_starts The number of random restarts to do; the model with the best BIC score overall is returned.
+    # @param use_bes TRUE if the algorithm should finish up with a call to BES (Backward Equivalence Search from
+    #   the FGES algorithm) to guarantee correctness under Faithfulness.
+    # @param time_lag Default 0; if > 1, a time lag model of this order is constructed.
+    # @param use_data_order TRUE if the original data order should be used for the initial permutation. If
+    #   num_starts > 1, random permuatations are used for subsequent restarts.
+    # @param output_cpdag TRUE if a CPDAG should be output, FALSE if a DAG should be output.
+    # @return The estimated graph.
+    run_boss = function(num_starts = 1, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
+      cat("Running BOSS algorithm...\n")
+      
+      .self$.setParam("useBes", use_bes)
+      .self$.setParamInt("numStarts", num_starts)
+      .self$.setParamInt("timeLag", time_lag)
+      .self$.setParam("useDataOrder", use_data_order)
+      .self$.setParam("outputCpdag", output_cpdag)
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      boss <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Boss", .self$score)
+      .jcall(boss, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      .self$graph <- graph
+      
+      cat("BOSS search completed.\n")
+    },
+    
+    # Run the FCI algorithm
+    #
+    # @param depth The maximum size of any conditioning set for independence testing.
+    # @param stable_fas Whether the stable version of the PC adjacency search should be used.
+    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
+    # @param complete_rule_set_used TRUE if the tail and arrow complete (Zhang) FCI final orienation rule set
+    #   should be used, FALSE if the arrow-complete rule set from Causation, Prediction and Search should be used.
+    # @param guarangee_pag TRUE if a final pipeline should be run to guarantee a legal PAG estimated graph.
+    # @return The estimated graph
+    run_fci = function(depth = -1, stable_fas = TRUE, max_disc_path_length = -1, complete_rule_set_used = TRUE,
+                       guarantee_pag = FALSE) {
+      cat("Running FCI algorithm...\n")
+      
+      .self$.setParamInt("depth", depth)
+      .self$.setParam("stableFas", stable_fas)
+      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
+      .self$.setParam("completeRuleSetUsed", complete_rule_set_used)
+      .self$.setParam("guaranteePag", guarantee_pag)
+      
+      fci <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.Fci", .self$test)
+      .jcall(fci, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(fci, "Ledu/cmu/tetrad/graph/Graph;", "search", .self$data_model, .self$params)
+      .self$graph <- graph
+      
+      cat("FCI search completed.\n")
+    },
+    
+    # Run the BFCI algorithm
+    #
+    # @param depth The maximum size of any conditioning set for independence testing.
+    # @param stable_fas Whether the stable version of the PC adjacency search should be used.
+    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
+    # @param complete_rule_set_used TRUE if the tail and arrow complete (Zhang) FCI final orienation rule set
+    #   should be used, FALSE if the arrow-complete rule set from Causation, Prediction and Search should be used.
+    # @param guarangee_pag TRUE if a final pipeline should be run to guarantee a legal PAG estimated graph.
+    # @return The estimated graph
+    run_boss_fci = function(depth = -1, max_disc_path_length = -1, complete_rule_set_used = TRUE, guarantee_pag = FALSE) {
+      cat("Running BOSS-FCI algorithm...\n")
+      
+      .self$.setParamInt("depth", depth)
+      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
+      .self$.setParam("completeRuleSetUsed", complete_rule_set_used)
+      .self$.setParam("guaranteePag", guarantee_pag)
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      boss_fci <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.BossFci", .self$test, .self$score)
+      .jcall(boss_fci, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(boss_fci, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      .self$graph <- graph
+      
+      cat("BOSS-FCI search completed.\n")
+    },
+    
+    
+    # Run the FCI algorithm
+    #
+    # @param num_starts The number initial random starts for the initial CPDAG search; the one with the best
+    #   BIC score is used.
+    # @param max_blocking_path_length The maximum length of any blocking path length for the testing phase.
+    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
+    # @param depth The maximum size of any conditioning set for independence testing or -1 if unlimited.
+    # @return The estimated graph
+    run_fcit = function(num_starts = 1, max_blocking_path_length = 5, depth = 5, max_disc_path_length = -1) {
+      cat("Running FCIT algorithm...\n")
+      
+      # BOSS parameters
+      .self$.setParamInt("numStarts", num_starts)
+      
+      # FCIT parameters
+      .self$.setParamInt("maxBlockingPathLength", max_blocking_path_length)
+      .self$.setParamInt("depth", depth)
+      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      fcit <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.Fcit", .self$test, .self$score)
+      .jcall(fcit, "V", "setKnowledge", .self$knowledge)
+      
+      graph <- .jcall(fcit, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      .self$graph <- graph
+      
+      cat("FCIT search completed.\n")
+    },
+    
+    get_java = function() {
+      return(.self$graph)
+    },
+    
+    # This method prints the structure of the graph estimated by the most recent algorithm call.
+    print_graph = function() {
+      cat("Attempting to print the graph...\n")
+      if (is.null(.self$graph)) {
+        cat("No graph generated yet. Please run an algorithm first.\n")
+      } else {
+        cat("Graph structure:\n", .self$graph$toString(), "\n")
+      }
+      invisible(.self$graph)
+    },
+    
+    # An adjustment set for a pair of nodes <source, target> for a CPDAG is a set of nodes that blocks
+    # all paths from the source to the target that cannot contribute to a calculation for the total effect
+    # of the source on the target in any DAG in a CPDAG while not blocking any path from the source to the target
+    # that could be causal. In typical causal graphs, multiple adjustment sets may exist for a given pair of
+    # nodes. This method returns up to maxNumSets adjustment sets for the pair of nodes <source, target>
+    # fitting a certain description.
+    #
+    # The description is as follows. We look for adjustment sets of variables that are close to either the
+    # source or the target (or either) in the graph. We take all possibly causal paths from the source to the
+    # target into account but only consider other paths up to a certain specified length. (This maximum length
+    # can be unlimited for small graphs.)
+    #
+    # Within this description, we list adjustment sets in order or increasing size. Hopefully, these parameters
+    # along with the size ordering can help to give guidance for the user to choose the best adjustment set for
+    # their purposes when multiple adjustment sets are possible.
+    #
+    # @param source                  The source node whose sets will be used for adjustment.
+    # @param target                  The target node whose sets will be adjusted to match the source node.
+    # @param maxNumSets              The maximum number of sets to be adjusted. If this value is less than or equal to
+    #                                0, all sets in the target node will be adjusted to match the source node.
+    # @param maxDistanceFromEndpoint The maximum distance from the endpoint of the trek to consider for adjustment.
+    # @param nearWhichEndpoint       The endpoint(s) to consider for adjustment; 1 = near the source, 2 = near the
+    #                                target, 3 = near either.
+    # @param maxPathLength           The maximum length of the path to consider for backdoor paths. If a value of -1 is
+    #                                given, all paths will be considered.
+    # @return A list of adjustment sets for the pair of nodes &lt;source, target&gt;. Return an smpty
+    # list if source == target or there is no amenable path from source to target.
+    get_adjustment_sets = function(graph, source, target, max_num_sets = 10, max_distance_from_point = 5,
+                                   near_which_endpoint = 1, max_path_length = 20) {
+      cat("Getting adjustment sets for:", source, "->", target, "\n")
+      
+      # Look up Node objects by name
+      source_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", source)
+      target_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", target)
+      
+      if (is.jnull(source_node)) stop(paste("Source node", source, "not found in the graph."))
+      if (is.jnull(target_node)) stop(paste("Target node", target, "not found in the graph."))
+      
+      # Get Paths object from Graph
+      paths <- .jcall(graph, "Ledu/cmu/tetrad/graph/Paths;", "paths")
+      
+      # Java List<Set<Node>>
+      sets_list <- .jcall(paths,
+                          "Ljava/util/List;",
+                          "adjustmentSets",
+                          source_node,
+                          target_node,
+                          as.integer(max_num_sets),
+                          as.integer(max_distance_from_point),
+                          as.integer(near_which_endpoint),
+                          as.integer(max_path_length))
+      
+      
+      size <- .jcall(sets_list, "I", "size")
+      cat("Number of adjustment sets:", size, "\n")
+      
+      # Convert Java List<Set<Node>> to R list of character vectors
+      size <- .jcall(sets_list, "I", "size")
+      result <- vector("list", size)
+      
+      for (i in seq_len(size)) {
+        jset <- .jcall(sets_list, "Ljava/lang/Object;", "get", as.integer(i - 1))
+        jarray <- .jcall(jset, "[Ljava/lang/Object;", "toArray")
+        result[[i]] <- sapply(jarray, function(n) .jcall(n, "S", "getName"))
+      }
+      
+      return(result)
+    },
+    
+    print_adjustment_sets = function(adjustment_sets) {
+      if (length(adjustment_sets) == 0) {
+        cat("No adjustment sets found.\n")
+        return()
+      }
+      
+      for (i in seq_along(adjustment_sets)) {
+        set <- adjustment_sets[[i]]
+        cat(sprintf("Adjustment set %d: ", i))
+        if (length(set) == 0) {
+          cat("(empty set)\n")
+        } else {
+          cat(paste(set, collapse = ", "), "\n")
+        }
+      }
+    },
+    
+    # Performs a Markov check on a graph with respect to the supplied dataset and returns statistics
+    # showing performance on that check.
+    #
+    # @param graph The graph to perform the Markov check on. This may be a DAG, CPDAG, MAG or PAG.
+    # @param percent_resample Tests are done using random subsamples of the data per test, if this is
+    #   less than 1, or all of the data, if it is equal to 1.
+    # @param condition_set_type The type of conditioning set to use for the Markov check, one of:
+    #   GLOBAL_MARKOV, LOCAL_MARKOV, PARENTS_AND_NEIGHBORS, MARKOV_BLANKET, RECURSIVE_MSEP, NONCOLLIDERS_ONLY,
+    #   ORDERED_LOCAL_MARKOV, or ORDERED_LOCAL_MARKOV_MAG
+    # @param find_smallest_subset Whether to find the smallest subset for a given set that yields independence.
+    # @param parallelized TRUE if conditional independencies should be checked in parallel.
+    # @effective_sample_size The effective sample size to use for calculations, or -1 if the actual sample size.
+    # @return Marov checker statistics as a named list.
+    markov_check = function(graph, percent_resample = 1, condition_set_type = "ORDERED_LOCAL_MARKOV",
+                            find_smallest_subset = FALSE, parallelized = TRUE, effective_sample_size = -1) {
+      cat("Running Markov check...\n")
+      
+      if (is.null(.self$mc_test)) {
+        stop("A test for the Markov Checker has not been set. Please call a `use_*` method with `use_for_mc = TRUE`.")
+      }
+      
+      condition_set_type_ <- .jfield("edu.cmu.tetrad.search.ConditioningSetType",
+                                     name = condition_set_type,
+                                     sig = "Ledu/cmu/tetrad/search/ConditioningSetType;")
+      
+      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
+      
+      test_ <- .jcall(.self$mc_test, "Ledu/cmu/tetrad/search/IndependenceTest;",
+                      "getTest", dataModel, .self$params)
+      
+      mc <- .jnew("edu.cmu.tetrad.search.MarkovCheck", graph, test_, condition_set_type_)
+      
+      # Configure it
+      .jcall(mc, "V", "setPercentResample", as.double(percent_resample))
+      .jcall(mc, "V", "setFindSmallestSubset", find_smallest_subset)
+      .jcall(mc, "V", "setParallelized", parallelized)
+      
+      # Generate results
+      .jcall(mc, "V", "generateAllResults")
+      .self$mc_ind_results <- .jcall(mc, "Ljava/util/List;", "getResults", TRUE)
+      
+      # Set sample size if specified
+      ### temporary fix ((mdk)) ??
+      ### originally: if (sample_size != -1) {
+      if(effective_sample_size != -1) {
+        ### temporary fix ((mdk)) ??   
+        ### originally: .jcall(mc, "V", "setSampleSize", as.integer(sample_size))
+        .jcall(mc, "V", "setSampleSize", as.integer(effective_sample_size))
+      }
+      
+      # Extract statistics
+      ad_ind <- .jcall(mc, "D", "getAndersonDarlingP", TRUE)
+      ad_dep <- .jcall(mc, "D", "getAndersonDarlingP", FALSE)
+      ks_ind <- .jcall(mc, "D", "getKsPValue", TRUE)
+      ks_dep <- .jcall(mc, "D", "getKsPValue", FALSE)
+      bin_indep <- .jcall(mc, "D", "getBinomialPValue", TRUE)
+      bin_dep <- .jcall(mc, "D", "getBinomialPValue", FALSE)
+      frac_dep_ind <- .jcall(mc, "D", "getFractionDependent", TRUE)
+      frac_dep_dep <- .jcall(mc, "D", "getFractionDependent", FALSE)
+      num_tests_ind <- .jcall(mc, "I", "getNumTests", TRUE)
+      num_tests_dep <- .jcall(mc, "I", "getNumTests", FALSE)
+      
+      # Return as a named list
+      return(list(
+        ad_ind = ad_ind,
+        ad_dep = ad_dep,
+        ks_ind = ks_ind,
+        ks_dep = ks_dep,
+        bin_indep = bin_indep,
+        bin_dep = bin_dep,
+        frac_dep_ind = frac_dep_ind,
+        frac_dep_dep = frac_dep_dep,
+        num_tests_ind = num_tests_ind,
+        num_tests_dep = num_tests_dep,
+        mc = mc
+      ))
+    },
+    
+    # Converts the given R data frame to a (possibly mixed) Tetrad DataSet.
+    #
+    # @param df The R data frame to translate. Continuous columns should be of type 'numeric' and the
+    #   discrete columns of type 'integer'.
+    data_frame_to_tetrad_dataset = function(df) {
+      stopifnot(require(rJava))
+      
+      nrows <- nrow(df)
+      ncols <- ncol(df)
+      
+      # Create Java ArrayList<Node>
+      var_list <- .jnew("java/util/ArrayList")
+      
+      # Prepare empty double[][] and int[][] (as Java arrays)
+      cont_data <- vector("list", ncols)
+      disc_data <- vector("list", ncols)
+      
+      for (j in seq_len(ncols)) {
+        name <- colnames(df)[j]
+        col <- df[[j]]
+        
+        if (is.numeric(col)) {
+          variable <- .jnew("edu/cmu/tetrad/data/ContinuousVariable", name)
+          node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
+          .jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
+          cont_data[[j]] <- .jarray(as.numeric(col), dispatch = TRUE)
+          disc_data[[j]] <- .jnull("[I")  # null int[] for discrete
+        } else if (is.integer(col) || is.factor(col)) {
+          num_categories <- length(unique(na.omit(col)))
+          variable <- .jnew("edu/cmu/tetrad/data/DiscreteVariable", name, as.integer(num_categories))
+          node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
+          .jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
+          cont_data[[j]] <- .jnull("[D")  # null double[] for continuous
+          disc_data[[j]] <- .jarray(as.integer(col), dispatch = TRUE)
+        } else {
+          stop(paste("Unsupported column type:", name))
+        }
+      }
+      
+      # Convert R lists of arrays to Java double[][] and int[][]
+      j_cont_data <- .jarray(cont_data, dispatch = TRUE)
+      j_disc_data <- .jarray(disc_data, dispatch = TRUE)
+      
+      # Call static Java helper method
+      ds <- .jcall("edu.cmu.tetrad.util.DataSetHelper",
+                   "Ledu/cmu/tetrad/data/DataSet;",
+                   "fromR",
+                   .jcast(var_list, "java.util.List"),
+                   as.integer(nrows),
+                   .jcast(j_cont_data, "[[D"),
+                   .jcast(j_disc_data, "[[I"))
+      
+      return(ds)
+    }
+  )
+)
+# --- END INLINE: scripts/TetradSearch.R ---
   
   if (!dir.exists(paste0(AIRHome, "/data/"))) {
     dir.create(paste0(AIRHome, "/data/"), recursive = TRUE)
@@ -407,8 +2349,6 @@ observeEvent(input$updateButton, {
          data.frame("var" = c("TV","OV"),
                     "val" = c(input$xvar, input$yvar)),
          envir = .GlobalEnv)
-  # assign("df_vars", data.frame("var" = c("TV","OV"), "val" = c(xvar, yvar)), envir = .GlobalEnv)
-  # source_python(paste0(AIRHome, "/scripts/identify.py"))
   if (Sys.info()["sysname"] == "Linux") {
     adj_list <- AIR_getAdjSets(rv$ts,
                                input$xvar,
@@ -433,7 +2373,219 @@ observeEvent(input$updateButton, {
     # Z1 <- parsed$vector1
     # Z2 <- parsed$vector2
   } else {
-    source("scripts/identify.R")
+# --- BEGIN INLINE: scripts/identify.R ---
+# Purpose: Given Treatment (TV) and Outcome (OV) variables; and graph text file (saved from Tetrad) that
+#   encodes a DAG, compute the de-confounding sets Z1 and Z2 (based on those described in MDLAR Final Report).
+#   Caution: depending on the quality of the graph (and Markovianity), Z1 and Z2 might not actually be
+#   de-confounding sets. For example, there might be some unmeasured parents of the treatment variable (TV) or
+#   of other key variables.
+#   (This is why we need to have a good dataset to begin with and good-quality CD algorithm. We might not nail
+#   all conditions completely and tightly, but we may come close enough.)
+#
+# Prerequisite: Not checked, but we assume the DAG largely satisfies the Markov Condition (MC) and Faithfulness (FC)
+#   relative to a reference dataset.
+#   In particular, this means that there is no reason to believe there is a *significant* unmeasured confounder of TV and OV.
+#
+# TODO: Expansions for this program include:
+# (a) Multiple outcome variables (OV) [easy?]
+# (b) Multiple treatment variables (TV) [harder]
+# (c) Not just DAGs where all edges are directed but CPDAGs? [difficulty unknown]
+#
+# Assumptions:
+#   1. The hash and sets libraries are installed. (The info about sets is found here: https://quantifyinghealth.com/sets-in-r/)
+#   2. The graph spec text file has each edge specified in a numbered line in the format: "line_num. node1 --> node2"
+
+library("hash")
+library("sets")
+
+## Create four simple methods to help parse a line
+
+# Is the first character of a line a nonzero digit? If yes, then that line specifies an edge.
+is_edge_line <- function(line) {
+  # regular expression
+  return(grepl("^[1-9]", line))
+}
+
+# Split a string of space-delimited substrings into a list of those substrings
+split_line <- function(input_string) {
+    return(strsplit(input_string, " "))
+}
+
+# Return the first node from a line specifying an edge (after the line number)
+first_node <- function(line) {
+    line_components <- split_line(line)
+    return(line_components[[1]][2])
+}
+# Return the second node from a line specifying an edge (after the line number)
+second_node <- function(line) {
+    line_components <- split_line(line)
+    return(line_components[[1]][4])
+}
+
+## The key methods defined here are descendants (and its dual: ancestors)
+descendants <- function(node) {
+    checked_so_far <- set()
+    seen_not_checked <- set(node)
+    while ( ! set_is_empty(seen_not_checked)) {
+        check_these <- seen_not_checked
+        for (n in check_these) {
+            for (m in children[[n]]) {
+                if ( ! (m %e% checked_so_far)) {
+                    seen_not_checked <- seen_not_checked | set(m)
+                }
+            }
+            seen_not_checked <- seen_not_checked - set(n)
+            checked_so_far <- checked_so_far | set(n)
+        }
+    }
+    return(checked_so_far)
+}
+
+ancestors <- function(node) {
+    checked_so_far <- set()
+    seen_not_checked <- set(node)
+    while ( ! set_is_empty(seen_not_checked)) {
+        check_these <- seen_not_checked
+        for (n in check_these) {
+            for (m in parents[[n]]) {
+                if ( ! (m %e% checked_so_far)) {
+                    seen_not_checked <- seen_not_checked | set(m)
+                }
+            }
+            seen_not_checked <- seen_not_checked - set(n)
+            checked_so_far <- checked_so_far | set(n)
+        }
+    }
+    return(checked_so_far)
+}
+
+## Main
+
+## Several domain-specific initializations:
+
+## Set verbose printing on (TRUE) or off (not TRUE)
+PRINT_STATE <- !TRUE
+
+## Set USE_INIITIAL_ALGM to TRUE for 2022 version or not TRUE for 2024 version
+USE_INITIAL_ALGM <- TRUE
+
+## Specify which variables are the TV and OV; and which file has the graph spec
+# First block of lines support UAV demo application.
+# Second block of lines support Engine health demo application.
+
+# First block:
+# TV <- 'scenario_main_base'
+# OV <- 'images_acquired'  # TODO: test to see if different from TV
+# GRAPH_FILE <- 'graph6.txt'  # TODO: test to see if it includes TV and OV
+
+# Second block:
+TV <- df_vars$val[1]
+OV <- df_vars$val[2]  # TODO: test to see if different from TV
+GRAPH_FILE <- 'graphtxt.txt'  # TODO: test to see if it includes TV and OV
+
+## Read in graph
+PATH <- getwd()
+lines <- readLines(paste(PATH, "/", GRAPH_FILE, sep=""))
+
+## Create a set of the nodes in the graph
+nodes <- set()
+for (line in lines) {
+    if (is_edge_line(line)) {
+        if (!(first_node(line)  %e% nodes)) {
+            nodes <- nodes | set(first_node(line))
+        }
+        if (!(second_node(line) %e% nodes)) {
+            nodes <- nodes | set(second_node(line))
+        }
+    }
+}
+if (PRINT_STATE) {
+    print(nodes)
+}
+
+## Create children and parents dictionaries
+children <- hash()
+parents <- hash()
+for (n in nodes) {
+    children_of_n <- set()
+    parents_of_n <- set()
+    for (line in lines) {
+        if (is_edge_line(line)) {
+            if ((first_node(line)  == n) && (!(second_node(line) %e% children_of_n))) {
+                children_of_n <- children_of_n | set(second_node(line))
+            }
+            if ((second_node(line) == n) && (!(first_node(line)  %e% parents_of_n))) {
+                parents_of_n <- parents_of_n | set(first_node(line))
+            }
+        }
+    }
+    children[[n]] <- children_of_n
+    parents[[n]]  <- parents_of_n
+}
+if (PRINT_STATE) {
+    print(children)
+    print(parents)
+}
+
+## Print all ancestors and descendants
+for (n in nodes) {
+    if (PRINT_STATE) {
+        print(paste(n, " has these descendants: "))
+        print(descendants(n))
+        print(paste(n, " has these ancestors: "))
+        print(ancestors(n))
+    }
+}
+
+## Construct "deconfounding" sets Z1 and Z2 that include selected parents of
+#    the nodes in descendants({TV}).
+
+# Z1 is just the parents of TV. Not all will be measured, but take what's available
+Z1 <- parents[[TV]]
+# TODO: Can we do this: if there are no paths between such a parent and OV not through TV, then don't add it to Z1.
+
+# Per the 2022 (2024) algorithm, Z2 is just the parents of:
+#   (a) nodes on any directed path from TV to OV; inclusive of OV, but exclusive of TV (2022)
+#   (b) proper descendants of TV (2024)
+#   that are not themselves descendants of TV (both 2022 and 2024).
+Z2 <- set()
+desc_TV <- descendants(TV)
+prop_desc_TV <- desc_TV - set(TV)
+prop_anc_TV <- ancestors(TV) - set(TV)
+if (PRINT_STATE) {print(prop_anc_TV)}
+
+if (USE_INITIAL_ALGM) {
+  nodes_on_dir_path <- intersect(prop_desc_TV, ancestors(OV))
+  for (node in nodes_on_dir_path) {
+    parent_of_node_on_dir_path_not_a_desc <- (parents[[node]] - desc_TV)
+    if (PRINT_STATE) {
+      print(paste("----node is: ", node))
+      print(parents[[node]])
+      print(parent_of_node_on_dir_path_not_a_desc)
+    }
+    for (parent in parent_of_node_on_dir_path_not_a_desc) {
+      # if there's a trek between TV and parent, then add to Z2
+      if (PRINT_STATE) {print(paste("----parent considered: ", parent))}
+      if (!length(intersect(prop_anc_TV, ancestors(parent)))==0) {
+        if (PRINT_STATE) {print(unlist(intersect(prop_anc_TV, ancestors(parent))))}
+        Z2 <- Z2 | set(parent)
+      }
+    }
+  }
+} else {
+  for (node in prop_desc_TV) {
+    parent_of_prop_desc_not_a_desc <- parents[[node]] - desc_TV
+    Z2 <- Z2 | parent_of_prop_desc_not_a_desc
+    if (PRINT_STATE) {print(paste(node, parent_of_prop_desc_not_a_desc))}
+    }
+  }
+
+## print out these sets as ordered lists
+unlist_Z1 <- unlist(Z1)
+unlist_Z2 <- unlist(Z2)
+print(unlist_Z1[order(unlist_Z1)])
+print(unlist_Z2[order(unlist_Z2)])
+# --- END INLINE: scripts/identify.R ---
   }
   Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
   Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
