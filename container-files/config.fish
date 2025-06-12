@@ -227,6 +227,36 @@ function code_server --description="Starts code-server in the background."
     echo "code-server started on port 8080. Log file: $log_file"
 end
 
+function modified_today
+    find . -type f -newermt "today 00:00" ! -newermt "tomorrow 00:00"
+end
+
+function cleanup_garbage
+    echo "Cleaning up generated files..."
+
+    # Delete plots
+    rm -v plots/*.png 2>/dev/null
+
+    # Delete graphtext junk
+    rm -v graphtext*.txt graphtxt.txt dotfile.txt 2>/dev/null
+
+    # Delete logs
+    rm -v logs/*.txt 2>/dev/null
+
+    # Delete AIRTool HTML output and asset spam
+    rm -vrf AIRTool_v2.2.html AIRTool_v2.2_files 2>/dev/null
+
+    # Delete all Quarto build/cache/output files
+    rm -vrf .quarto 2>/dev/null
+
+    # Optionally clear data files (uncomment to enable)
+    rm -v data/*.csv Results*.csv 2>/dev/null
+
+    touch data/ResultsOut.csv
+
+    echo "Done."
+end
+
 # You'll want to install some nerd fonts, patched for powerline support of the theme.
 # Recommend: 'UbuntuMono Nerd Font 13'
 # gsettings set org.gnome.desktop.interface monospace-font-name 'UbuntuMono Nerd Font 13'
