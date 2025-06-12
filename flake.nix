@@ -365,6 +365,7 @@
             gfortran13
             gnupg
             ffmpeg                  # libavfilter-dev
+            graphviz
             curlFull                # libcurl4-openssl-dev
             fontconfig              # libfontconfig1-dev
             freetype                # libfreetype6-dev
