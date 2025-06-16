@@ -78,12 +78,32 @@ suppressMessages(library(doParallel))
 suppressMessages(library(earth))
 suppressMessages(library(hash))
 suppressMessages(library(sets))
+suppressMessages(library(base64enc))
 
+#options(warn = 2)
 
 AIRHome <- here()
 setwd(AIRHome)
 set.seed(123)
 
+# --- Buffers --- #
+results_buffer <- reactiveVal(data.frame())
+results_out_buffer <- reactiveVal(data.frame())
+datafile_buffer <- reactiveVal(NULL)
+superlearner_output_buffer <- reactiveVal(list())
+graphtxt_buffer <- reactiveVal(NULL)
+dotfile_buffer <- reactiveVal(NULL)
+rv <- reactiveValues()
+
+# ── NEW: keep TMLE rows, ML rows, and the 1-row summary apart ────────────────
+tmle_buffer     <- reactiveVal(data.frame())   # 1 row per adjustment set
+ml_buffer       <- reactiveVal(data.frame())   # 1 row per ML algorithm
+combined_buffer <- reactiveVal(data.frame())   # exactly 1 row (ribbon plot)
+
+# create a shared reactiveValues object to pass variables around
+rv$dot <- NULL  # define once in app init
+
+options(shiny.trace = TRUE)
 
 # --- BEGIN INLINE: scripts/AIR_functions.R ---
 getLocalTags <- function() {
@@ -305,92 +325,151 @@ change_node_color <- function(dot_code, node, color) {
   return(dot_code)
 }
 
-AIR_getGraph <- function(data, knowledge){
+AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
   headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
   cat(headers_string, "\n")
- 
- 
-  # initialize whether a cpdag meeting the MC threshold has already been found (used in for loop)
-  MC_passing_cpdag_already_found = FALSE
- 
-  for (i in seq(0,15)) {
-	pd <- 0.5 + (i * 0.1)
-	# select printing destination
-	sink("/dev/null")  # suppress any printing, initially, at each iteration
-    
-	# Create a BOSS object with the data
-	ts <- TetradSearch$new(data)
-    
-	# Add knowledge to specific tiers
-	for (j in 1:nrow(knowledge)) {
-  	ts$add_to_tier(knowledge[j,]$level, knowledge[j,]$variable)
-	}
 
-	# Run the BOSS algorithm
-	ts$use_sem_bic(penalty_discount = pd)
-	ts$run_boss()
-	g2 <- ts$get_java()
-	sink()
-	sink(sprintf("graphtext%.1f.txt", pd)) # print graph to an external file
-	sink()
-    
-	bic <- g2$getAttribute("BIC")
-	num_edges <- g2$getNumEdges()
-    
-	sink("/dev/null")
-	ts$use_fisher_z(use_for_mc = TRUE)
-    
-	ret <- ts$markov_check(g2)
-	sink()
+  MC_passing_cpdag_already_found <- FALSE
+  best_cpdag_seen_so_far <- NULL
+  best_cpdag_seen_so_far_num_edges <- Inf
+  best_cpdag_seen_so_far_params <- "<unset>"
+  cpdag_graph_when_PD_is_1 <- NULL
+  last_ts <- NULL
 
-	cpdag_graph_when_PD_is_1 <- g2
-
-	if (ret$ad_ind > 0.1) {
-  	print_param_and_results_string <-
-    	sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
-            	pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
-            	ret$num_tests_ind, ret$num_tests_dep)
-  	cat(print_param_and_results_string, "\n")
-  	if (MC_passing_cpdag_already_found == FALSE) {
-    	best_cpdag_seen_so_far <- g2
-    	best_cpdag_seen_so_far_num_edges <- num_edges
-    	best_cpdag_seen_so_far_params <- print_param_and_results_string
-    	MC_passing_cpdag_already_found <- TRUE
-  	}
-  	# this needs to be separate
-  	if (num_edges < best_cpdag_seen_so_far_num_edges) {
-    	best_cpdag_seen_so_far <- g2
-    	best_cpdag_seen_so_far_num_edges <- num_edges
-    	best_cpdag_seen_so_far_params <- print_param_and_results_string
-    	}
-  	}
-	if (pd == 1.0) {
-      print_param_and_results_string <-
-        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
-                pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
-                ret$num_tests_ind, ret$num_tests_dep)
-
-  	best_cpdag_seen_so_far <- g2
-  	best_cpdag_seen_so_far_num_edges <- num_edges
-  	best_cpdag_seen_so_far_params <- print_param_and_results_string
-  	}
+  suppress_output <- function(expr) {
+    sink("/dev/null")
+    on.exit(sink(), add = TRUE)
+    force(expr)
   }
- 
+
+  for (i in seq(0, 15)) {
+    pd <- 0.5 + (i * 0.1)
+
+    tryCatch({
+      ts <- TetradSearch$new(data)
+      last_ts <- ts
+
+      # Validate and apply knowledge tiers
+      if (!is.null(knowledge) && nrow(knowledge) > 0) {
+        if (!all(c("level", "variable") %in% colnames(knowledge))) {
+          warning("Knowledge file is missing required columns 'level' and 'variable'; skipping tier assignment.")
+        } else {
+          # Add knowledge to specific tiers
+          for (j in seq_len(nrow(knowledge))) {
+            level <- knowledge$level[j]
+            variable <- knowledge$variable[j]
+            
+            if (is.numeric(level) && is.character(variable)) {
+              tryCatch({
+                ts$add_to_tier(level, variable)
+              }, error = function(e) {
+                warning(sprintf("Failed to add variable '%s' to tier %s: %s", 
+                                as.character(variable), as.character(level), conditionMessage(e)))
+              })
+            } else {
+              warning(sprintf("Invalid knowledge row at index %d: level=%s, variable=%s",
+                              j, deparse(level), deparse(variable)))
+            }
+          }
+        }
+      }
+      
+      ts$use_sem_bic(penalty_discount = pd)
+
+      suppress_output(ts$run_boss())
+      g2 <- ts$get_java()
+
+      bic <- tryCatch(g2$getAttribute("BIC"), error = function(e) NA_real_)
+      num_edges <- tryCatch(g2$getNumEdges(), error = function(e) NA_integer_)
+
+      suppress_output(ts$use_fisher_z(use_for_mc = TRUE))
+      ret <- suppress_output(ts$markov_check(g2))
+
+      cpdag_graph_when_PD_is_1 <- g2
+
+      result_line <- tryCatch({
+        sprintf(
+          "%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
+          pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
+          ret$num_tests_ind, ret$num_tests_dep
+        )
+      }, error = function(e) {
+        "<incomplete>"
+      })
+
+      if (!is.null(ret) && is.list(ret) && !is.null(ret$ad_ind) && ret$ad_ind > 0.1) {
+        cat(result_line, "\n")
+
+        if (!MC_passing_cpdag_already_found || (num_edges < best_cpdag_seen_so_far_num_edges)) {
+          best_cpdag_seen_so_far <- g2
+          best_cpdag_seen_so_far_num_edges <- num_edges
+          best_cpdag_seen_so_far_params <- result_line
+          MC_passing_cpdag_already_found <- TRUE
+        }
+      }
+
+      # If PD==1.0 and still no valid CPDAG found, keep something usable
+      if (pd == 1.0 && is.null(best_cpdag_seen_so_far)) {
+        best_cpdag_seen_so_far <- g2
+        best_cpdag_seen_so_far_num_edges <- num_edges
+        best_cpdag_seen_so_far_params <- result_line
+      }
+
+    }, error = function(e) {
+      warning(sprintf("Failed iteration for PD=%.1f: %s", pd, conditionMessage(e)))
+    })
+  }
+
+  # Bail out early if absolutely nothing passed any threshold
+  if (!MC_passing_cpdag_already_found && is.null(cpdag_graph_when_PD_is_1)) {
+    stop(structure(
+      list(
+        message = "No valid graph found; TetradSearch may have failed",
+        call = match.call()
+      ),
+      class = c("simpleError", "error", "condition")
+    ))
+  }
+
   cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
   cat(headers_string, "\n")
   cat(best_cpdag_seen_so_far_params, "\n")
- 
-  if (MC_passing_cpdag_already_found == TRUE) {
-	  graph <- best_cpdag_seen_so_far
-  } else {
-	  graph <- cpdag_graph_when_PD_is_1
-  }
- 
-  readr::write_file(x = .jcall(graph, "Ljava/lang/String;", "toString"), file = "graphtxt.txt")
 
-  return(list(graph, ts,
-          	MC_passing_cpdag_already_found,
-          	best_cpdag_seen_so_far))
+  graph <- if (!is.null(best_cpdag_seen_so_far)) {
+    # A valid CPDAG passed Markov Check
+    best_cpdag_seen_so_far
+  } else {
+    # Nothing passed, but fallback to something rather than crashing
+    warning("Falling back to cpdag at PD=1.0, as no unif > 0.1 CPDAG was found")
+    cpdag_graph_when_PD_is_1
+  }
+
+  graph_str <- tryCatch(
+    .jcall(graph, "Ljava/lang/String;", "toString"),
+    error = function(e) {
+      warning(sprintf("Failed to convert graph to string: %s", conditionMessage(e)))
+      NULL
+    }
+  )
+
+  if (!is.null(graphtxt_buffer)) {
+    if (is.null(graph_str) || !nzchar(graph_str)) {
+      warning("graph_str is NULL or empty, not updating graphtxt_buffer.")
+      graphtxt_buffer(NULL)
+    } else {
+      graphtxt_buffer(
+        tryCatch(
+          gsub("(?s)Graph Attributes:.*", "", graph_str, perl = TRUE),
+          error = function(e) {
+            warning(sprintf("Regex failed on graph_str: %s", conditionMessage(e)))
+            graph_str  # fallback to raw string
+          }
+        )
+      )
+    }
+  }
+
+  return(list(graph, last_ts, MC_passing_cpdag_already_found, best_cpdag_seen_so_far))
 }
 
 AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpdag_seen_so_far){
@@ -497,7 +576,11 @@ scale_ <- function(x){
   (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
 }
 
-runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, log_file){ 
+runSuperLearner <- function(settings, AIRHome,
+                            data_df,
+                            tv_dir, tv_threshold,
+                            ov_dir, ov_threshold,
+                            log_file){ 
   cat(paste0(Sys.time(), " - ","Started superlearner with ",
              paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold), collapse = ", ")), "\n", 
       file = log_file, 
@@ -509,8 +592,8 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   confounders <- as.character(strsplit(x = settings$confounders, split = " ")[[1]])
   treatment <- as.character(settings$varName)
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
-  # mediators = df |> select(-c(treatment, outcome, confounders)) |> colnames() # unnecessary unless doing mediation analysis
-  df <- read_csv(paste0(AIRHome,"/data/datafile.csv")) # can probably remove this as it's likely redundant
+
+  df <- data_df
   if (tv_dir == ">") {
     df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
   } else if (tv_dir == ">=") {
@@ -534,6 +617,22 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
     df[[outcome]] <- ifelse(df[[outcome]] == ov_threshold, 1, 0)
   } 
 
+  ## ────────────────────────────────────────────────────────────────
+  ##  Coerce the *outcome* to numeric if it’s still a factor
+  ##  (TMLE + sl3 learners expect a numeric Y for a “continuous”
+  ##   outcome; leaving it as factor triggers the warning you saw)
+  ## ────────────────────────────────────────────────────────────────
+  if (is.factor(df[[outcome]])) {
+    warning(sprintf(
+      "Outcome %s is a factor – coercing to numeric {0,1}.",
+      outcome
+    ), call. = FALSE)
+
+    ## factor levels are usually 1 / 2 after the binarisation above,
+    ## so subtract 1 to make them {0,1}
+    df[[outcome]] <- as.numeric(df[[outcome]]) - 1
+  }
+
   #### TMLE -------------------------------------
   ##### Define Superlearner -------------------
   # sl3_list_learners("binomial") 
@@ -543,28 +642,32 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   lrnr_glm <- sl3::make_learner(sl3::Lrnr_glm)
   lrnr_hal <- sl3::make_learner(sl3::Lrnr_hal9001)
   lrnr_nnet <- sl3::make_learner(sl3::Lrnr_nnet)
-  lrnr_rforest <- sl3::make_learner(sl3::Lrnr_randomForest)
-  lrnr_ranger <- sl3::make_learner(sl3::Lrnr_ranger)
+
+  ## sl3 ≥ 0.3.0:  Lrnr_ranger            (C++ backend, seed-respecting)
+  ## sl3 ≤ 0.2.x:  Lrnr_randomForest      (R backend)
+  lrnr_rf  <- if ("Lrnr_ranger" %in% getNamespaceExports("sl3"))
+                sl3::make_learner(sl3::Lrnr_ranger)
+              else
+                sl3::make_learner(sl3::Lrnr_randomForest)
+
   lrnr_glmnet <- sl3::make_learner(sl3::Lrnr_glmnet)
-  lrnr_xgboost <- sl3::make_learner(sl3::Lrnr_xgboost, max_depth = 4, eta = 0.01, nrounds = 100)  
-  lrnr_earth <- sl3::make_learner(sl3::Lrnr_earth)  
+  lrnr_xgboost <- sl3::make_learner(sl3::Lrnr_xgboost, max_depth = 4, eta = 0.01, nrounds = 100)
+  lrnr_earth <- sl3::make_learner(sl3::Lrnr_earth)
   if (length(confounders) > 1) {
     sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
                                            lrnr_glm,
                                            lrnr_hal,
-                                           lrnr_ranger, 
-                                           lrnr_rforest,
-                                           lrnr_glmnet, # this is the difference. It needs 2+ confounders
+                                           lrnr_rf,
+                                           lrnr_glmnet,
                                            lrnr_xgboost,
                                            lrnr_earth,
-                                           lrnr_nnet), 
+                                           lrnr_nnet),
                                       recursive = TRUE))
   } else {
     sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_mean, 
                                            lrnr_glm,
                                            lrnr_hal,
-                                           lrnr_ranger, 
-                                           lrnr_rforest,
+                                           lrnr_rf,
                                            lrnr_xgboost,
                                            lrnr_earth,
                                            lrnr_nnet), 
@@ -621,13 +724,29 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
                   pscore = propensity_score |> pull())
   
   plap_$sw <- plap_$exposure * (mean(plap_$exposure)/propensity_score) + (1 - plap_$exposure) * ((1 - mean(plap_$exposure)) / (1 - propensity_score))
-  ##### Save results ----------------------------
-  # results to results file
-  write.table(cbind(treatment, Z_level, tmle_fit_$summary[,c(8:10)], deparse.level = 0), 
-              file = paste0(AIRHome, "/Results.csv"), 
-              sep = ",", append = TRUE, quote = FALSE, col.names = FALSE, row.names = FALSE)
+
+  ## inside runSuperLearner() – after tmle_fit_ is available
+  prefix <- tolower(Z_level)    # "z1"  or  "z2"
+
+  ## Extract the three CI numbers *as vectors*
+  est  <- as.numeric(tmle_fit_$summary[[8]])
+  lci  <- as.numeric(tmle_fit_$summary[[9]])
+  uci  <- as.numeric(tmle_fit_$summary[[10]])
+
+  tmle_row <- tibble::tibble(
+    Treatment = treatment,
+    Group     = Z_level,
   
+    ## fill the columns that belong to *this* adjustment set …
+    z1_Mean = if (prefix == "z1") est else NA_real_,
+    z1_LCI  = if (prefix == "z1") lci else NA_real_,
+    z1_UCI  = if (prefix == "z1") uci else NA_real_,
   
+    z2_Mean = if (prefix == "z2") est else NA_real_,
+    z2_LCI  = if (prefix == "z2") lci else NA_real_,
+    z2_UCI  = if (prefix == "z2") uci else NA_real_
+  )
+
   # save outcome predictions for diagnosis
   # initial_likelihood_preds was formerly labeled outcome_preds
   initial_likelihood_preds <- initial_likelihood$get_likelihoods(tmle_task,"Y")
@@ -681,265 +800,397 @@ runSuperLearner <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_
   df_out$counterfactual_1 <- cf_likelihood_values1
   df_out$g_fit_pred <- g_fit$predict() 
   df_out$Q_fit_pred <- Q_fit$predict()
-  
-  write_csv(df_out, paste0(AIRHome, "/data/", settings$doc_title,"-data.csv"))
-  cat("Finished SuperLearner\n", file = log_file, append = TRUE)
+  cat("Finished SuperLearner – returning results\n", file = log_file, append = TRUE)
+
+  # -------- FINAL RETURN (nothing after this executes) ------------
+  list(
+    tmle = tmle_row,                                # one‐row summary
+    diag = list(doc_title = doc_title, data = df_out)  # diagnostics
+  )
 }
 
-processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE){
-  
-  # setwd("~/Projects/20221005-MDLAR/Auto_Rmd/")
-  cat(paste0(Sys.time(), " - ","Started processResults() with ",
-             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate, log_file), collapse = ", ")), "\n", 
-      file = log_file, 
-      append = TRUE)
-  
+processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE) {
+  log_msg <- function(...) {
+    cat(paste0(Sys.time(), " - ", ...), "\n", file = log_file, append = TRUE)
+  }
+
+  log_msg("Started processResults()")
+  log_msg("Settings:", paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate), collapse = ", "))
+
   treatment <- as.character(settings$varName)
-  outcome <- as.character(df_vars[df_vars$var == "OV",]$val)
-  confounders <-  as.character(unique(Zvars$Z)) #strsplit(x = settings$confounders, split = " ")[[1]]
+  outcome <- as.character(df_vars[df_vars$var == "OV", ]$val)
+  confounders <- as.character(unique(Zvars$Z))
   doc_title <- settings$doc_title
-  
+
+  df <- req(datafile_buffer())
   set.seed(123)
-  cat("Assigned variables\n", file = log_file, append = TRUE)
-  df <- read_csv(paste0(AIRHome, "/data/datafile.csv"))
-  if (tv_dir == ">") {
-    df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
-  } else if (tv_dir == ">=") {
-    df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  } else if (tv_dir == "<") {
-    df[[treatment]] <- ifelse(df[[treatment]] < tv_threshold, 1, 0)
-  } else if (tv_dir == "<=") {
-    df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)
-  } else if (tv_dir == "=") {
-    df[[treatment]] <- ifelse(df[[treatment]] == tv_threshold, 1, 0)
-  } 
-  if (ov_dir == ">") {
-    df[[outcome]] <- ifelse(df[[outcome]] > ov_threshold, 1, 0)
-  } else if (ov_dir == ">=") {
-    df[[outcome]] <- ifelse(df[[outcome]] >= ov_threshold, 1, 0)
-  } else if (ov_dir == "<") {
-    df[[outcome]] <- ifelse(df[[outcome]] < ov_threshold, 1, 0)
-  } else if (ov_dir == "<=") {
-    df[[outcome]] <- ifelse(df[[outcome]] <= ov_threshold, 1, 0)
-  } else if (ov_dir == "=") {
-    df[[outcome]] <- ifelse(df[[outcome]] == ov_threshold, 1, 0)
-  } 
-  
-  #### read in data ------------------
-  # I think these are not necessary...I added the code above to transform the treatment variable and am commenting out all the rest,  just like in the superlearner function
-  # df[treatment] <- ifelse(df[treatment] >= 0, 1, 0)
-  # df[confounders] <- ifelse(df[confounders] >= 0, 1, 0)
-  # df[outcome] <- ifelse(df[outcome] >= 0, 1, 0) # removed the >= for >, because it makes more sense... hopefully that wasn't a mistake
-  
-  
-  #### pre-process data ------------------
-  
-  #define function to scale values between 0 and 1
-  # scale_values <- function(x){(x-min(x))/(max(x)-min(x))}
-  # df$images_acquired <- rescale(df$images_acquired)
-  
-  # split into train/test datasets
-  test_size = floor(0.3 * nrow(df))
-  samp = sample(nrow(df), test_size, replace = FALSE)
-  y_train = df |> select(all_of(outcome)) |> filter(!row_number() %in% samp) |> mutate(!!outcome := factor(.data[[outcome]]))
-  x_train = df |> select(-all_of(outcome)) |> filter(!row_number() %in% samp) #since the first column is just ID
-  y_test = df |> select(all_of(outcome)) |> filter(row_number() %in% samp) |> mutate(!!outcome := factor(.data[[outcome]]))
-  x_test = df |> select(-all_of(outcome)) |> filter(row_number() %in% samp) #since the first column is just ID
-  #convert labels to categorical
-  # y_train = factor(ifelse(y_train >=0, 1,0))
-  # y_test = factor(ifelse(y_test >=0, 1,0))
-  
-  #Create training set and testing set
-  train = cbind(y_train,x_train)
-  test = cbind(y_test,x_test)
-  
-  colnames(train)[1] = "label"
-  colnames(test)[1] = "label"
-  
-  xtest_0 = mutate(x_test, !!treatment := 0)
-  xtest_1 = mutate(x_test, !!treatment := 1)
-  cat("Read in and stratified data\n", file = log_file, append = TRUE)
 
-  #### check if models need to be created, then do ------------
+  # Bin conversion logic
+  binarize_var <- function(df, var, dir, threshold) {
+    if (dir == ">") df[[var]] <- ifelse(df[[var]] > threshold, 1, 0)
+    else if (dir == ">=") df[[var]] <- ifelse(df[[var]] >= threshold, 1, 0)
+    else if (dir == "<") df[[var]] <- ifelse(df[[var]] < threshold, 1, 0)
+    else if (dir == "<=") df[[var]] <- ifelse(df[[var]] <= threshold, 1, 0)
+    else if (dir == "=") df[[var]] <- ifelse(df[[var]] == threshold, 1, 0)
+    return(df)
+  }
+
+  df <- binarize_var(df, treatment, tv_dir, tv_threshold)
+  df <- binarize_var(df, outcome, ov_dir, ov_threshold)
+
+  # Split into train/test
+  test_size <- floor(0.3 * nrow(df))
+  samp <- sample(nrow(df), test_size)
+  ## ML learners downstream need a *numeric* 0/1 response.  Coerce once here
+  ## and keep the original column name.
+  y_train <- df[-samp, outcome, drop = FALSE] |>
+             mutate(!!outcome := as.numeric(.data[[outcome]]))
+  x_train <- df[-samp, setdiff(names(df), outcome), drop = FALSE]
+  y_test  <- df[samp,  outcome, drop = FALSE] |>
+             mutate(!!outcome := as.numeric(.data[[outcome]]))
+  x_test <- df[samp, setdiff(names(df), outcome), drop = FALSE]
+  train <- cbind(label = y_train[[1]], x_train)
+  test <- cbind(label = y_test[[1]], x_test)
+  colnames(train)[1] <- "label"
+  colnames(test)[1] <- "label"
+  xtest_0 <- mutate(x_test, !!treatment := 0)
+  xtest_1 <- mutate(x_test, !!treatment := 1)
+
+  log_msg("Data loaded and split.")
+
   if (model_yn == "No") {
-    cat("model_yn == no\n", file = log_file, append = TRUE)
-    cat("Setting up ML Classifiers\n", file = log_file, append = TRUE)
-    
-    ### Regression ----------------
-    model_lm <- lm(label~., data = train)
-    pred_lm0 = predict(model_lm, xtest_0)
-    pred_lm1 = predict(model_lm, xtest_1)
-    
-    lm_ate = mean(pred_lm1) - mean(pred_lm0)
-    #[1] 0.008077147
-    
-    model_dt <- rpart(label~., data = train, method = "class") #rpart fails when all "labels" are the same value, so we're wrapping a stupid if logic around it to prevent errors
-    pred_dt0 = predict(model_dt, xtest_0)[,2]
-    pred_dt1 = predict(model_dt, xtest_1)[,2]
-    # note: rpart returns two columns for prediction because it's a classifier predicting two classes. We only want its prediction for images_acquired being a success (i.e., '1'), so we just use the corresponding column from the predict() function
-    
-    dt_ate = mean(pred_dt1) - mean(pred_dt0)
-    #[1] 0
-    
-    ### svm -----------------------------
-    model_svm = svm(label ~ ., data = test)
-    
-    pred_svm0 = predict(model_svm, xtest_0)
-    pred_svm1 = predict(model_svm, xtest_1)
-    
-    svm_ate = mean(as.numeric(pred_svm1)) - mean(as.numeric(pred_svm0))
-    #[1] -0.07423194
-    
-    ### randomForest -------------------
-    model_rf = randomForest(label~., data = train, importance = TRUE)
-    ###  saving the model ------
-    # saveRDS(model_rf, file = paste0(AIRHome, "/input/model.rda"))
-    
-    pred_rf0 = predict(model_rf, xtest_0)
-    pred_rf1 = predict(model_rf, xtest_1)
-    
-    rf_ate = mean(as.numeric(pred_rf1)) - mean(as.numeric(pred_rf0))
-    #[1] 0.0009401413
-    
-    
-    covariate_list <- train |> 
-      select(-label) |> names()
-    ### superlearner example ----------------------
-    task <- sl3::make_sl3_Task(
-      data = train,
-      outcome = "label",
-      covariates = covariate_list
-    )
+    log_msg("Running new ML models")
 
-    lrnr_glm <- sl3::Lrnr_glm$new()
-    lrnr_hal <- sl3::Lrnr_hal9001$new()
-    lrnr_ranger <- sl3::Lrnr_ranger$new()
-    lrnr_rforest <- sl3::Lrnr_randomForest$new()
-    lrnr_glmnet <- sl3::Lrnr_glmnet$new()
-    lrnr_xgboost <- sl3::Lrnr_xgboost$new()
-    lrnr_earth <- sl3::Lrnr_earth$new()
-    lrnr_nnet <- sl3::Lrnr_nnet$new()
-    lrnr_svm <- sl3::Lrnr_svm$new()
-    
-    sl_ <- sl3::make_learner(sl3::Stack, unlist(list(lrnr_glm,
-                                                # lrnr_ranger,
-                                                lrnr_rforest,
-                                                lrnr_glmnet,
-                                                lrnr_xgboost,
-                                                lrnr_earth,
-                                                lrnr_nnet,
-                                                lrnr_svm),
-                                           recursive = TRUE))
-    
-    stack <- sl3::Stack$new(lrnr_glm, lrnr_ranger,
-                            lrnr_rforest, lrnr_glmnet, lrnr_xgboost,
-                            lrnr_earth, lrnr_nnet, lrnr_svm )
-    
-    sl <- sl3::Lrnr_sl$new(learners = stack, metalearner = sl3::Lrnr_nnls$new())
-    
-    cat("Fitting ML Classifiers\n", file = log_file, append = TRUE)
-    
-    sl_fit <- sl3::sl_$train(task = task)
-
-    cat("Pulling ML Classifier Scores\n", file = log_file, append = TRUE)
-    
-    sl_preds <- sl3::sl_fit$predict(task = task)
-    
-    prediction_task_0 <- sl3::make_sl3_Task(
-      data = xtest_0, 
-      covariates = names(xtest_0)
-    )
-    prediction_task_1 <- sl3::make_sl3_Task(
-      data = xtest_1, 
-      covariates = names(xtest_1)
-    )
-    sl_preds_0 <- rowMeans(sl_fit$predict(task = prediction_task_0))
-    sl_preds_1 <- rowMeans(sl_fit$predict(task = prediction_task_1))
-    
-    # round(sl_preds_0$coefficients, 3)
-    sl_ate = mean(sl_preds_1) - mean(sl_preds_0)
-    #[1] -0.0158611
-    # }
-    cat("Processing ML Output\n", file = log_file, append = TRUE)
-    
-    ### combine and clean all results data ---------------
-    results <- read_csv(paste0(AIRHome, "/Results.csv"))
-    
-    data.frame(results) |> 
-      select(-Treatment) |>
-      mutate(Group = tolower(Group)) |>
-      pivot_longer(cols = -Group, names_to = "category", values_to = "value") |>
-      unite("new_col_name", c("Group", "category"), sep = "_") |>
-      pivot_wider(names_from = "new_col_name", values_from = "value") |>
-      bind_cols(data.frame("algorithm" = c("Logistic Regression","Decision Tree","Random Forest","Support Vector Machine","Stacked Super Learner"),
-                           "flag" = c(lm_ate,dt_ate,svm_ate,rf_ate, sl_ate))) |>
-      bind_cols(data.frame("Treatment" = outcome)) |>
-      mutate(z1_sig = case_when((flag > z1_LCI & flag > z1_UCI) | (flag < z1_LCI & flag < z1_UCI) ~ 1,
-                                TRUE ~ 0),
-             z2_sig = case_when((flag > z2_LCI & flag > z2_UCI) | (flag < z2_LCI & flag < z2_UCI) ~ 1,
-                                TRUE ~ 0),
-             significance = max(z1_sig, z2_sig)) |>
-      rename(z1_ATE = z1_Mean, z1_ATE_LCI = z1_LCI, z1_ATE_UCI = z1_UCI,
-             z2_ATE = z2_Mean, z2_ATE_LCI = z2_LCI, z2_ATE_UCI = z2_UCI) |>
-      mutate(avg.cond.ef = (z1_ATE + z2_ATE) / 2,
-             Lower.avg.cond.ef = min(z1_ATE_LCI, z2_ATE_LCI),
-             Upper.avg.cond.ef = max(z1_ATE_UCI, z2_ATE_UCI)) |>
-      write_csv(paste0(AIRHome, "/ResultsOut.csv"))
-    
-  } else {
-    cat("model_yn != no\n", file = log_file, append = TRUE)
-    if (model_yn == "Yes") {
-      cat("model_yn == yes\n", file = log_file, append = TRUE)
-      # model_in <- read_rds("input/model.rda")
-      pred_m0 = predict(model_in, xtest_0)
-      pred_m1 = predict(model_in, xtest_1)
-      # pred_m0 = predict(model_in, xtest_0)
-      # pred_m1 = predict(model_in, xtest_1)
-      
-      m_ate = mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
-    } else if (model_yn == "ATE") {
-      cat("model_yn == ate\n", file = log_file, append = TRUE)
-      m_ate = model_ate
+    ## --- helper: a “safe” GLM that gracefully falls back to lm() -------------
+    safe_glm <- function(formula, data, ...) {
+      tryCatch(
+        {
+          suppressWarnings(                     # keep harmless warnings quiet
+            glm(formula, data = data, family = binomial, ...)
+          )
+        },
+        warning = function(w) {
+          log_msg(sprintf(
+            "⚠️  glm(): %s – falling back to linear regression.", 
+            conditionMessage(w)
+          ))
+          lm(formula, data = data)              # fall back → numeric preds
+        },
+        error = function(e) {
+          log_msg(sprintf(
+            "❌  glm() failed: %s – using lm() instead.", 
+            conditionMessage(e)
+          ))
+          lm(formula, data = data)
+        }
+      )
     }
-    cat("process ate results\n", file = log_file, append = TRUE)
-    ### combine and clean all results data ---------------
-    results <- read_csv(paste0(AIRHome, "/Results.csv"))
-    # results <- read_csv("../airtool_streamlined/data/Results.csv")
-    
-    data.frame(results) |> 
-      select(-Treatment) |>
-      mutate(Group = tolower(Group)) |>
-      pivot_longer(cols = -Group, names_to = "category", values_to = "value") |> 
-      unite("new_col_name", c("Group", "category"), sep = "_") |> 
-      pivot_wider(names_from = "new_col_name", values_from = "value") |>
-      bind_cols(data.frame("algorithm" = c("Existing Model"),
-                           "flag" = c(m_ate))) |>
-      bind_cols(data.frame("Treatment" = outcome)) |>
-      mutate(z1_sig = case_when((flag > z1_LCI & flag > z1_UCI) | (flag < z1_LCI & flag < z1_UCI) ~ 1,
-                                TRUE ~ 0),
-             z2_sig = case_when((flag > z2_LCI & flag > z2_UCI) | (flag < z2_LCI & flag < z2_UCI) ~ 1,
-                                TRUE ~ 0),
-             significance = max(z1_sig, z2_sig)) |>
-      rename(z1_ATE = z1_Mean, z1_ATE_LCI = z1_LCI, z1_ATE_UCI = z1_UCI,
-             z2_ATE = z2_Mean, z2_ATE_LCI = z2_LCI, z2_ATE_UCI = z2_UCI) |>
-      mutate(avg.cond.ef = (z1_ATE + z2_ATE) / 2,
-             Lower.avg.cond.ef = min(z1_ATE_LCI, z2_ATE_LCI),
-             Upper.avg.cond.ef = max(z1_ATE_UCI, z2_ATE_UCI)) |>
-      write_csv(paste0(AIRHome, "/ResultsOut.csv"))
+
+    ## all four learners now see a numeric 0/1 outcome
+    model_lm  <- safe_glm(label ~ ., data = train)
+    ## --- helper: run rpart in "class" mode when the response is 0/1 ----------
+    safe_rpart <- function(formula, data, ...) {
+      y <- data[[all.vars(formula)[1L]]]
+      is_binary <- is.numeric(y) && setequal(unique(y), c(0, 1))
+      method    <- if (is_binary) "class" else "anova"
+
+      tryCatch(
+        {
+          suppressWarnings(
+            rpart::rpart(formula, data = data, method = method, ...)
+          )
+        },
+        warning = function(w) {
+          log_msg(sprintf(
+            "⚠️  rpart(): %s – continuing with produced tree.", 
+            conditionMessage(w)
+          ))
+          invokeRestart("muffleWarning")        # keep going
+        }
+      )
+    }
+
+    ## --- helper: pick the right SVM mode & silence benign warnings --------
+    safe_svm <- function(formula, data, ...) {
+      y <- data[[all.vars(formula)[1L]]]
+      is_binary <- is.numeric(y) && setequal(unique(y), c(0, 1))
+      svm_type  <- if (is_binary) "C-classification" else "eps-regression"
+
+      tryCatch(
+        {
+          suppressWarnings(
+            e1071::svm(formula,
+                       data = data,
+                       type = svm_type,
+                       ...)
+          )
+        },
+        warning = function(w) {
+          log_msg(sprintf(
+            "⚠️  svm(): %s – continuing with produced model.",
+            conditionMessage(w)
+          ))
+          invokeRestart("muffleWarning")
+        }
+      )
+    }
+
+    model_dt  <- safe_rpart(label ~ ., data = train)               # tree
+    model_svm <- safe_svm(label ~ ., data = train)                 # SVM
+    model_rf  <- randomForest(label ~ ., data = train)
+
+    pred_lm0 <- predict(model_lm, xtest_0)
+    pred_lm1 <- predict(model_lm, xtest_1)
+    pred_dt0 <- predict(model_dt, xtest_0)
+    pred_dt1 <- predict(model_dt, xtest_1)
+
+    ## SVM: use probabilities when we trained a classifier (otherwise numeric)
+    if (model_svm$type == "C-classification") {
+      pred_svm0 <- attr(predict(model_svm, xtest_0, probability = TRUE),
+                        "probabilities")[, "yes"]
+      pred_svm1 <- attr(predict(model_svm, xtest_1, probability = TRUE),
+                        "probabilities")[, "yes"]
+    } else {
+      pred_svm0 <- as.numeric(predict(model_svm, xtest_0))
+      pred_svm1 <- as.numeric(predict(model_svm, xtest_1))
+    }
+    pred_rf0 <- predict(model_rf, xtest_0)
+    pred_rf1 <- predict(model_rf, xtest_1)
+
+    lm_ate <- mean(pred_lm1) - mean(pred_lm0)
+    dt_ate <- mean(pred_dt1) - mean(pred_dt0)
+    svm_ate <- mean(as.numeric(pred_svm1)) - mean(as.numeric(pred_svm0))
+    rf_ate <- mean(as.numeric(pred_rf1)) - mean(as.numeric(pred_rf0))
+
+    covariates <- setdiff(names(train), "label")
+    ## choose the proper outcome_type ------------------------------------------
+    out_type <- if (is.numeric(train$label) &&
+                    setequal(unique(train$label), c(0, 1)))
+                  "binomial" else "continuous"
+
+    task <- sl3::make_sl3_Task(data         = train,
+                               outcome      = "label",
+                               covariates   = covariates,
+                               outcome_type = out_type)
+    learners <- list(
+      sl3::Lrnr_glm$new(),
+      sl3::Lrnr_glmnet$new(),
+      sl3::Lrnr_xgboost$new(),
+      sl3::Lrnr_earth$new(),
+      sl3::Lrnr_nnet$new(),
+      sl3::Lrnr_svm$new()
+    )
+    sl <- sl3::Lrnr_sl$new(
+      learners     = sl3::Stack$new(learners),
+      metalearner  = sl3::Lrnr_nnls$new()
+    )
+    sl_fit <- sl$train(task)
+
+    ## -- helper: always hand rowMeans() a 2-D object ------------------------
+    make_pred <- function(task) {
+      p <- sl_fit$predict(task)
+      if (is.null(dim(p)))               # <- only one learner returned
+        p <- matrix(p, ncol = 1)         #    promote to 1-col matrix
+      rowMeans(p, na.rm = TRUE)
+    }
+
+    pred_sl0 <- make_pred(sl3::make_sl3_Task(data = xtest_0,
+                                             covariates = covariates))
+    pred_sl1 <- make_pred(sl3::make_sl3_Task(data = xtest_1,
+                                             covariates = covariates))
+    sl_ate <- mean(pred_sl1) - mean(pred_sl0)
+
+    log_msg("Model training complete")
+
+  ate_df <- data.frame(
+    algorithm = c("Logistic Regression", "Decision Tree", "Support Vector Machine",
+                  "Random Forest", "Stacked Super Learner"),
+    flag      = c(lm_ate, dt_ate, svm_ate, rf_ate, sl_ate),
+    ## give every row the variable name that the model is estimating
+    ## (vector recycling takes care of the length-mismatch)
+    Treatment = outcome
+  )
+
+  ## stash them – ONE row per algorithm
+  ml_buffer(ate_df)
+
+  } else {
+    log_msg(sprintf("Using existing model config: %s", model_yn))
+
+    if (model_yn == "Yes") {
+      if (is.null(model_in)) {
+        log_msg("⚠️  No model file was supplied – skipping custom-model ATE.")
+        return(invisible(NULL))            # bail out, nothing downstream to do
+      }
+  
+      pred_m0 <- predict(model_in, xtest_0)
+      pred_m1 <- predict(model_in, xtest_1)
+      m_ate   <- mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
+    } else if (model_yn == "ATE") {
+      m_ate <- model_ate
+    }
+
+    ate_df <- data.frame(
+      algorithm = "Existing Model",
+      flag      = m_ate,
+      Treatment = outcome
+    )
+
+    ml_buffer(ate_df)
+  }
+
+  # ---------------------------------------------------------------------------
+  # small helpers
+  # ---------------------------------------------------------------------------
+  safe_drop <- function(.data, cols) {
+    dplyr::select(.data, -dplyr::any_of(cols))
   }
   
-  if (move_results) {
-    cat("moving results files\n", file = log_file, append = TRUE)
-    file.rename(from = paste0(AIRHome, "/Results.csv"),
-                to = paste0(AIRHome, "/data/Results.csv"))
-    
-    file.rename(from = paste0(AIRHome, "/ResultsOut.csv"),
-                to = paste0(AIRHome, "/data/ResultsOut.csv"))
+  force_numeric_cols <- function(.data, cols) {
+    missing <- setdiff(cols, names(.data))
+    if (length(missing) > 0) .data[missing] <- NA_real_
+    dplyr::mutate(.data, dplyr::across(all_of(cols), as.numeric))
   }
   
+  # ---------------------------------------------------------------------------
+  # 1. pull whatever the workers have written so far --------------------------
+  # ---------------------------------------------------------------------------
+  results <- results_buffer() |> tibble::as_tibble()
+  
+  ## ── NEW: bail out if *all* learners failed ─────────────────────────────
+  if (nrow(results) == 0 ||
+      purrr::every(
+        results[c("z1_Mean","z1_LCI","z1_UCI",
+                  "z2_Mean","z2_LCI","z2_UCI")],
+        ~ all(is.na(.x))
+      )) {
+    log_msg("❌ All TMLE calls returned NA — nothing to summarise.")
+    shiny::showNotification(
+      "All adjustment-set learners failed – no ATEs to display.",
+      type = "error", duration = 8
+    )
+    return(invisible(NULL))   # abort before any plotting math
+  }
+  
+  # ---------------------------------------------------------------------------
+  # 2. schema guards – be SURE the numeric columns are really numeric ----------
+  # ---------------------------------------------------------------------------
+  if (!"Group" %in% names(results)) results <- dplyr::mutate(results, Group = "z")
+  
+  # keep Treatment as character; coerce everything else (except Group)
+  results <- results |>
+    dplyr::mutate(
+      Treatment = as.character(Treatment),
+      dplyr::across(-c(Group, Treatment), ~ as.numeric(unlist(.x)))
+    )
+  
+  log_msg(
+    "results snapshot >>>\n",
+    paste(
+      utils::capture.output({
+        print(utils::head(results, 6))
+        str(results)
+      }),
+      collapse = "\n"
+    ),
+    "\n<<< end snapshot"
+  )
+  
+  # ---------------------------------------------------------------------------
+  # 3. (A) build the *causal* results frame – **ML stays outside**
+  # ---------------------------------------------------------------------------
+  causal_df <- results |>                       # **only TMLE rows here**
+    dplyr::mutate(
+      Treatment = outcome %||% Treatment        # ensure present / non-NA
+    ) |>
+    ## rename ONLY *after* the sig-test so those columns still exist
+    dplyr::rename(
+      z1_ATE     = z1_Mean,
+      z1_ATE_LCI = z1_LCI,
+      z1_ATE_UCI = z1_UCI,
+      z2_ATE     = z2_Mean,
+      z2_ATE_LCI = z2_LCI,
+      z2_ATE_UCI = z2_UCI
+    )
+
+  # ---------------------------------------------------------------------------
+  # 3. (B) bind in the *ML* ATEs and derive significance flags
+  #       – this is now a clean join of two equally-shaped tables
+  # ---------------------------------------------------------------------------
+  ml_df <- ml_buffer()                           # <- comes from runSuperLearner()
+  
+  final_results <- dplyr::full_join(causal_df, ml_df,
+                                    by = "Treatment") |>
+    dplyr::mutate(
+      z1_sig = ifelse(
+        !is.na(z1_ATE_LCI) & !is.na(z1_ATE_UCI) &
+        (flag < z1_ATE_LCI | flag > z1_ATE_UCI),
+        1, 0
+      ),
+      z2_sig = ifelse(
+        !is.na(z2_ATE_LCI) & !is.na(z2_ATE_UCI) &
+        (flag < z2_ATE_LCI | flag > z2_ATE_UCI),
+        1, 0
+      ),
+      significance = pmax(z1_sig, z2_sig, na.rm = TRUE)
+    )
+
+  ## ── NEW: extra guard & verbose logging ──────────────────────────────
+  if (!"Treatment" %in% names(final_results)) {
+    log_msg("⚠️  Treatment column absent – creating it from settings$varName.")
+    final_results <- dplyr::mutate(final_results,
+                                   Treatment = settings$varName)
+  } else {
+    final_results <- dplyr::mutate(final_results,
+                                   Treatment = tidyr::replace_na(Treatment,
+                                                                 settings$varName))
+  }
+
+  # crash loudly *here* (where the problem is easy to see) if anything
+  # critical is still NA/NULL
+  req_cols <- c("Treatment", "z1_ATE_LCI", "z1_ATE_UCI",
+                "z2_ATE_LCI", "z2_ATE_UCI")
+  missing_vals <- purrr::keep(final_results[req_cols], ~ all(is.na(.x)))
+  if (length(missing_vals) > 0) {
+    stop("processResults(): critical columns still NA – see log for details")
+  }
+
+  # log a concise snapshot for post-mortem debugging
+  log_msg(
+    "final_results snapshot →\n",
+    paste(
+      utils::capture.output({
+        print(utils::head(final_results, 6))
+        str(final_results)
+      }),
+      collapse = "\n"
+    )
+  )
+  
+  # ---------------------------------------------------------------------------
+  # 4. provide a one-row "combined" summary the UI helpers expect -------------
+  # ---------------------------------------------------------------------------
+  combined_row <- final_results |>
+    summarise(across(
+      c(z1_ATE, z1_ATE_LCI, z1_ATE_UCI,
+        z2_ATE, z2_ATE_LCI, z2_ATE_UCI,
+        flag, z1_sig, z2_sig, significance),
+      ~ first(na.omit(.x))
+    )) |>
+    mutate(Group = "combined",
+           Treatment = first(final_results$Treatment),
+           algorithm = first(final_results$algorithm))
+  
+  # ---------------------------------------------------------------------------
+  # 5. stash both flavours for later use --------------------------------------
+  #    • the detailed two-row frame (if you need it somewhere else)
+  #    • the one-row “combined” frame the plots/text expect
+  # ---------------------------------------------------------------------------
+  results_out_buffer(combined_row)
+  assign("results_detailed", final_results, envir = .GlobalEnv)   # <<- optional
+  
+  log_msg("Results processed and stored.")
 }
-
-
 
 ## Create four simple methods to help parse a line
 
@@ -984,8 +1235,8 @@ descendants <- function(node, children) {
   return(checked_so_far)
 }
 
-get_X_descendents <- function(TV, PATH) {
-  lines <- readLines(paste(PATH, "/graphtxt.txt", sep = ""))
+get_X_descendents <- function(TV, graphtxt_buffer) {
+  lines <- strsplit(graphtxt_buffer(), "\n")[[1]]
   
   nodes <- set()
   for (line in lines) {
@@ -1017,8 +1268,36 @@ get_X_descendents <- function(TV, PATH) {
 
 
 get_ribbon_plot <- function(AIRHome) {
-  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
+  dfr <- results_out_buffer()
+
+  if (nrow(dfr) == 0) {
+    return(tags$em("No results – model fitting failed. Check the log."))
+  }
+
+  nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+  nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
+
+  # safety check:
+  #  * use new column names after the earlier rename()
+  if (nrow(dfr) == 0 || all(is.na(dfr$z1_ATE)) ) {
+    return(tags$div("No causal estimates available for this run."))
+  }
   
+  # derive *safe* CI bounds up-front (no ±Inf, no NA explosions)
+  lo_all     <- nz_min(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
+  hi_all     <- nz_max(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
+  lo_overlap <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
+  hi_overlap <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
+
+  # If *everything* is NA we can’t draw a ribbon — tell the user and bail out
+  if (is.na(lo_all) || is.na(hi_all)) {
+    shiny::showNotification(
+      "Both confidence intervals are NA – nothing to plot.",
+      type = "warning", duration = 8
+    )
+    return(tags$div("No confidence intervals to plot."))
+  }
+
   # code for generating ribbon plot
   if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI)) {
     inZ1 <- TRUE
@@ -1035,7 +1314,7 @@ get_ribbon_plot <- function(AIRHome) {
   
   dfr0 <- dfr[1,]
   p <- ggplot(dfr0, aes(x = Treatment)) +
-    # ggplot(dfr0, aes(x = Treatment)) +
+
     ## background
     geom_linerange(aes(ymin = -1.05, ymax = 1.05),
                    lwd = 6,
@@ -1099,14 +1378,20 @@ get_ribbon_plot <- function(AIRHome) {
                    stat = "unique",
                    lineend = "round",
                    position = position_nudge(x = 0)) +
-    geom_linerange(aes(ymin = min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+
+                   # full (yellow) ribbon: min of all LCIs → max of all UCIs
+                   geom_linerange(aes(ymin = lo_all, ymax = hi_all),
+
                    lwd = 3.5,
                    col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
                    lineend = "round",
                    position = position_nudge(x = 0)) +
-    geom_linerange(aes(ymin = max(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI), ymax = min(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)),
+
+                   # overlap (green) ribbon: max LCI → min UCI
+                   geom_linerange(aes(ymin = lo_overlap, ymax = hi_overlap),
+
                    lwd = 3.5,
                    col = "#378855",
                    alpha = 1,
@@ -1152,8 +1437,12 @@ get_figure_caption <- function(AIRHome, df_vars) {
 }
 
 get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
-  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
-  
+  dfr <- results_out_buffer()
+
+  if (nrow(dfr) == 0) {
+    return(tags$em("No results – model fitting failed. Check the log."))
+  }
+
   interpretation <- "What we can learn from these results"
   dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
   dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
@@ -1358,8 +1647,7 @@ get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
           legend.direction = "horizontal") 
 }
 
-get_updated_graph <- function(AIRHome, graph_update, xvar, yvar, Zvars) { 
-  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))  
+get_updated_graph <- function(dot, graph_update, xvar, yvar, Zvars) { 
   if (graph_update) {
     dot <- change_node_color(dot, xvar, "'#FFC107'")
     dot <- change_node_color(dot, yvar, "'#FFC107'")
@@ -1369,18 +1657,16 @@ get_updated_graph <- function(AIRHome, graph_update, xvar, yvar, Zvars) {
   return(dot)
 }
 
-get_final_graph <- function(AIRHome, xvar, yvar, Zvars) {
-  dot <- readLines(paste0(AIRHome, "/dotfile.txt"))
+get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
+  # Highlight treatment and outcome nodes
   dot <- change_node_color(dot, xvar, "'#FFC107'")
   dot <- change_node_color(dot, yvar, "'#FFC107'")
-  # dot <- change_node_color(dot, xvar, "yellow")
-  # dot <- change_node_color(dot, yvar, "yellow")
-  
-  dfr <- read_csv(paste0(AIRHome, "/data/ResultsOut.csv"))
-  Z1 <- Zvars[Zvars$grp == "Z1",]$Z
-  Z2 <- Zvars[Zvars$grp == "Z2",]$Z
-  
-  # code for generating ribbon plot
+
+  # Extract Z1 and Z2 sets
+  Z1 <- Zvars[Zvars$grp == "Z1", ]$Z
+  Z2 <- Zvars[Zvars$grp == "Z2", ]$Z
+
+  # Ribbon plot flag logic to color additional nodes
   if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
     dot <- change_node_color(dot, Z2, "'#FFC107'")
   } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
@@ -1391,27 +1677,34 @@ get_final_graph <- function(AIRHome, xvar, yvar, Zvars) {
   } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
     dot <- change_node_color(dot, Z1, "'#C00000'")
     dot <- change_node_color(dot, Z2, "'#C00000'")
-  } 
-  
+  }
+
   return(dot)
 }
 
-save_ggplot_to_png <- function(plot_obj, filename, width = 8, height = 6, dpi = 300) {
-  # Use ggsave to write the ggplot object to a file
-  ggsave(filename = filename, plot = plot_obj, width = width, height = height, dpi = dpi)
+get_ggplot_image_data <- function(plot_obj, width = 8, height = 6, dpi = 300) {
+  img <- magick::image_graph(width = width * dpi, height = height * dpi, res = dpi)
+  print(plot_obj)
+  dev.off()
+  img_data <- magick::image_write(img, format = "png", density = dpi)
+  return(img_data)
 }
 
-save_graphviz_to_png <- function(dot_code, filename) {
-  # Write the DOT code to a temporary file
-  dot_file <- tempfile(fileext = ".dot")
-  # writeLines(dot_code, dot_file)
-  dot <- paste(dot_code, collapse = "\n")
-  cat(dot, file = dot_file)
-  
-  # Call Graphviz's dot command to convert DOT to PNG
-  # Ensure that 'dot' is installed and available in your system PATH.
-  cmd <- sprintf('dot -Tpng -o "%s" "%s"', filename, dot_file)
-  system(cmd)
+graphviz_to_png_data <- function(dot_code) {
+  library(DiagrammeR)
+  library(rsvg)
+  library(xml2)
+
+  svg_str <- DiagrammeRsvg::export_svg(grViz(dot_code))
+  svg_obj <- xml2::read_xml(svg_str)
+
+  # Write PNG to raw vector
+  raw_conn <- rawConnection(raw(0), open = "wb")
+  on.exit(close(raw_conn), add = TRUE)
+
+  rsvg::rsvg_png(svg_obj, file = raw_conn)
+
+  rawConnectionValue(raw_conn)
 }
 # --- END INLINE: scripts/AIR_functions.R ---
 
@@ -1640,61 +1933,6 @@ TetradSearch <- setRefClass(
       cat("Fisher Z object created with alpha set.\n")
     },
     
-    # Runs the PC algorithm.
-    #
-    # @param conflict_rule The rule used for resolving collider conflicts: 1 = prioritize existing
-    #   colliders, 2 = orient bidirected edges, 3 = overwrite existing colliders.
-    # @param depth The maximum number of conditioning variables per test.
-    # @stable_fas TRUE is the stable FAS should be used.
-    # @guarantee_cpdag TRUE is a legal CPDAG output should be guaranteed.
-    # @return The estimated graph.
-    run_pc = function(conflict_rule=1, depth=-1, stable_fas=TRUE, guarantee_cpdag=FALSE) {
-      cat("Running PC algorithm...\n")
-      
-      .self$.setParamInt("conflictRule", conflict_rule)
-      .self$.setParamInt("depth", depth)
-      .self$.setParam("stableFas", stable_fas)
-      .self$.setParam("guaranteePag", guarantee_cpdag)
-      
-      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
-      
-      pc <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Pc", .self$test)
-      .jcall(pc, "V", "setKnowledge", .self$knowledge)
-      
-      graph <- .jcall(pc, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
-      .self$graph <- graph
-      
-      cat("PC search completed.\n")
-      return(.self$graph)
-    },
-    
-    # Run the FGES algorithm
-    #
-    # @param symmetric_first_step TRUE just in case the first step in scoring should be treated symmetricaly.
-    # @param max_degree The maximum degree of the graph, -1 if unlimited.
-    # @param parallelized TRUE is parallelization should be used.
-    # @oaram faithfulness_assumed TRUE if one-edge faithfulness should be assumed.
-    # @return The estimated graph.
-    run_fges = function(symmetric_first_step = FALSE, max_degree = -1, parallelized = FALSE, faithfulness_assumed = FALSE) {
-      cat("Running FGES algorithm...\n")
-      
-      .self$.setParam("symmetricFirstStep", symmetric_first_step)
-      .self$.setParamInt("maxDegree", max_degree)
-      .self$.setParam("parallelized", parallelized)
-      .self$.setParam("faithfulnessAssumed", faithfulness_assumed)
-      
-      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
-      
-      fges <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Fges", .self$score)
-      .jcall(fges, "V", "setKnowledge", .self$knowledge)
-      
-      graph <- .jcall(fges, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
-      .self$graph <- graph
-      
-      cat("FGES search completed.\n")
-      return(.self$graph)
-    },
-    
     # --- Internal parameter helpers ---
     
     .setParamDouble = function(key, value) {
@@ -1725,99 +1963,12 @@ TetradSearch <- setRefClass(
       boss <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Boss", .self$score)
       .jcall(boss, "V", "setKnowledge", .self$knowledge)
       
-      graph <- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      graph <<- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
       .self$graph <- graph
       
       cat("BOSS search completed.\n")
     },
-    
-    # Run the FCI algorithm
-    #
-    # @param depth The maximum size of any conditioning set for independence testing.
-    # @param stable_fas Whether the stable version of the PC adjacency search should be used.
-    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
-    # @param complete_rule_set_used TRUE if the tail and arrow complete (Zhang) FCI final orienation rule set
-    #   should be used, FALSE if the arrow-complete rule set from Causation, Prediction and Search should be used.
-    # @param guarangee_pag TRUE if a final pipeline should be run to guarantee a legal PAG estimated graph.
-    # @return The estimated graph
-    run_fci = function(depth = -1, stable_fas = TRUE, max_disc_path_length = -1, complete_rule_set_used = TRUE,
-                       guarantee_pag = FALSE) {
-      cat("Running FCI algorithm...\n")
-      
-      .self$.setParamInt("depth", depth)
-      .self$.setParam("stableFas", stable_fas)
-      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
-      .self$.setParam("completeRuleSetUsed", complete_rule_set_used)
-      .self$.setParam("guaranteePag", guarantee_pag)
-      
-      fci <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.Fci", .self$test)
-      .jcall(fci, "V", "setKnowledge", .self$knowledge)
-      
-      graph <- .jcall(fci, "Ledu/cmu/tetrad/graph/Graph;", "search", .self$data_model, .self$params)
-      .self$graph <- graph
-      
-      cat("FCI search completed.\n")
-    },
-    
-    # Run the BFCI algorithm
-    #
-    # @param depth The maximum size of any conditioning set for independence testing.
-    # @param stable_fas Whether the stable version of the PC adjacency search should be used.
-    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
-    # @param complete_rule_set_used TRUE if the tail and arrow complete (Zhang) FCI final orienation rule set
-    #   should be used, FALSE if the arrow-complete rule set from Causation, Prediction and Search should be used.
-    # @param guarangee_pag TRUE if a final pipeline should be run to guarantee a legal PAG estimated graph.
-    # @return The estimated graph
-    run_boss_fci = function(depth = -1, max_disc_path_length = -1, complete_rule_set_used = TRUE, guarantee_pag = FALSE) {
-      cat("Running BOSS-FCI algorithm...\n")
-      
-      .self$.setParamInt("depth", depth)
-      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
-      .self$.setParam("completeRuleSetUsed", complete_rule_set_used)
-      .self$.setParam("guaranteePag", guarantee_pag)
-      
-      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
-      
-      boss_fci <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.BossFci", .self$test, .self$score)
-      .jcall(boss_fci, "V", "setKnowledge", .self$knowledge)
-      
-      graph <- .jcall(boss_fci, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
-      .self$graph <- graph
-      
-      cat("BOSS-FCI search completed.\n")
-    },
-    
-    
-    # Run the FCI algorithm
-    #
-    # @param num_starts The number initial random starts for the initial CPDAG search; the one with the best
-    #   BIC score is used.
-    # @param max_blocking_path_length The maximum length of any blocking path length for the testing phase.
-    # @param max_disc_path_length The maximum length of any discriminating path considered, or -1 if unlimited.
-    # @param depth The maximum size of any conditioning set for independence testing or -1 if unlimited.
-    # @return The estimated graph
-    run_fcit = function(num_starts = 1, max_blocking_path_length = 5, depth = 5, max_disc_path_length = -1) {
-      cat("Running FCIT algorithm...\n")
-      
-      # BOSS parameters
-      .self$.setParamInt("numStarts", num_starts)
-      
-      # FCIT parameters
-      .self$.setParamInt("maxBlockingPathLength", max_blocking_path_length)
-      .self$.setParamInt("depth", depth)
-      .self$.setParamInt("maxDiscriminatingPathLength", max_disc_path_length)
-      
-      dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
-      
-      fcit <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.pag.Fcit", .self$test, .self$score)
-      .jcall(fcit, "V", "setKnowledge", .self$knowledge)
-      
-      graph <- .jcall(fcit, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
-      .self$graph <- graph
-      
-      cat("FCIT search completed.\n")
-    },
-    
+
     get_java = function() {
       return(.self$graph)
     },
@@ -2109,7 +2260,6 @@ if (length(old_files) > 0) {
 
 ```{r info-tab, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
 # Read the file and output its content as-is
-# cat(paste(readLines("info.qmd"), collapse = "\n"))
 knitr::opts_knit$set(root.dir = AIRHome)
 knitr::opts_chunk$set(progress = FALSE)
 options(knitr.progress = FALSE)
@@ -2167,99 +2317,133 @@ uiOutput('second_column_content')
 
 
 ### variable declarations --------------------------------------------------------------
+# --- Reactive value containers --- #
 calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_update <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
 
 
-# sendSweetAlert(
-#   session = shiny::getDefaultReactiveDomain(),
-#   title = "Welcome to the AIR Tool!",
-#   text = "For best results, please view the tool without forced darkmode readers.",
-#   type = "info",
-#   btn_labels = "Continue",
-#   btn_colors = "#3085d6",
-#   closeOnClickOutside = TRUE,
-#   showCloseButton = FALSE
-#   )
-
 ### input reactives -------------------------------------------------------------------
+## ------------------------------------------------------------
+## Read either .rds or .rda / .RData and return the first object
+## ------------------------------------------------------------
 model_in <- reactive({
   req(input$model_in)
-  #loading the model
-  model_in = read_rds(input$model_in$datapath)
-  cat(paste0(Sys.time(), " - ","Read in model: " ,input$model_in$datapath, "\n"), file = log_file, append = TRUE)
 
-  # model_in = read_rds("input/model.rda")
-  # ext <- tools::file_ext(input$modelFile$datapath)
-    
-  #model_in <- switch(ext,
-  #         "rds" = read_rds(input$modelFile$datapath),  # R models
-  #         "model" = xgb.load(input$modelFile$datapath),  # XGBoost model
-  #         stop("Unsupported file type")
-  #  )
-  
-  return(model_in)
+  ## use the original filename to preserve the extension
+  ext <- tolower(tools::file_ext(input$model_in$name))
+
+  cat(sprintf("%s - Upload received: %s → %s  (ext = %s)\n",
+              Sys.time(),
+              input$model_in$name,
+              input$model_in$datapath,
+              ext),
+      file = log_file, append = TRUE)
+  tryCatch({
+
+    mdl <- switch(
+      ext,
+
+      ## ----------------------------------------------------------------
+      ## 1)  readRDS – single-object files
+      ## ----------------------------------------------------------------
+      "rds" = base::readRDS(input$model_in$datapath),
+
+      ## ----------------------------------------------------------------
+      ## 2)  load() – standard .rda / .RData
+      ##     – if that fails we *try* readRDS as a fall-back
+      ## ----------------------------------------------------------------
+      "rda" = , "rdata" = {
+        env <- new.env()
+        obj_names <- tryCatch(
+          base::load(input$model_in$datapath, envir = env),
+          error = function(e) {
+            message("load() failed, trying readRDS() …")
+            NULL
+          }
+        )
+
+        if (is.null(obj_names)) {
+          ## ‘.rda’ file was actually an .rds – give it one more shot
+          base::readRDS(input$model_in$datapath)
+
+        } else if (length(obj_names) == 0) {
+          stop("No objects found inside the .rda/.RData file")
+
+        } else {
+          env[[obj_names[1]]]
+        }
+      },
+
+      ## ----------------------------------------------------------------
+      ## 3)  anything else → hard-fail
+      ## ----------------------------------------------------------------
+      stop(sprintf("Unsupported model file extension: %s", ext))
+    )
+
+    ## ------- basic sanity-check: does it respond to predict() ? ----------
+    validate(
+      need(is.function(tryCatch(predict(mdl, head(mtcars)), error = function(e) NULL)),
+           "Loaded object does not appear to have a usable predict() method.")
+    )
+
+    cat(sprintf("%s - Model loaded (%s): %s\n", Sys.time(), ext, input$model_in$name), file = log_file, append = TRUE)
+    mdl
+  }, error = function(e) {
+    cat(sprintf("%s - Error reading model: %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
+    NULL
+  })
 })
 
-# df <- read_csv("input/data.csv", col_types = cols(.default = col_number()))
 df <- reactive({
-  df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
-  cat(paste0(Sys.time(), " - ","Read in data file: ", input$file1$datapath, "\n"), file = log_file, append = TRUE)
-  continuous_columns <- c(1, ncol(df))
-  df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
-  return(df)
+  tryCatch({
+    df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
+    cat(sprintf("%s - Read in data file: %s\n", Sys.time(), input$file1$datapath), file = log_file, append = TRUE)
+    continuous_columns <- c(1, ncol(df))
+    df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
+    df
+  }, error = function(e) {
+    cat(sprintf("%s - Error reading data file: %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
+    NULL
+  })
 })
 
-# knowledge <- read_csv("input/knowledge.csv", col_names = T)
 knowledge <- reactive({
-  req(input$file2)  # Make sure the file is uploaded
-  path2 <- input$file2$datapath
-  cat(paste0(Sys.time(), " - ","Read in knowledge file: " ,input$file2$datapath, "\n"), file = log_file, append = TRUE)
+  req(input$file2)
+  tryCatch({
+    path2 <- input$file2$datapath
+    cat(sprintf("%s - Read in knowledge file: %s\n", Sys.time(), path2), file = log_file, append = TRUE)
 
-  extension <- tolower(tools::file_ext(path2))
-  
-  if (extension == "csv") {
-    knowledge_in <- read_csv(path2, col_names = TRUE)
-  } else if (extension == "xlsx") {
-    knowledge_in <- readxl::read_excel(path2, col_names = TRUE)
-  } else {
+    ext <- tolower(tools::file_ext(path2))
+    knowledge_in <- switch(ext,
+      csv = read_csv(path2, col_names = TRUE),
+      xlsx = readxl::read_excel(path2, col_names = TRUE),
+      {
+        sendSweetAlert(...); return(NULL)
+      }
+    )
+
+    fixed <- fix_knowledge(knowledge_in)
+
+    if (is.character(fixed)) {
+      sendSweetAlert(...); return(NULL)
+    }
+
+    file_check(TRUE)
+    fixed
+  }, error = function(e) {
+    cat(sprintf("%s - Error in knowledge(): %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "Upload Failed",
-      text = "Unsupported file extension. Please upload a CSV or XLSX file.",
-      type = "warning",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE
+      text = "An error occurred while reading the knowledge file.",
+      type = "error",
+      btn_labels = "Continue"
     )
-    return(NA)
-  }
-  
-  # Process the data with fix_knowledge
-  fixed <- fix_knowledge(knowledge_in)
-  # Check the outcome of fix_knowledge
-  if (is.character(fixed)) {
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "Upload Failed",
-      text = fixed,
-      type = "warning",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE
-    )
-    return(NA)
-  } else {
-    file_check(TRUE)  # Set the reactiveVal if all is good
-    return(fixed)
-  }
+    NULL
+  })
 })
-
-
 
 ### event observations ----------------------------------------------------------------
 options(shiny.error = function() {
@@ -2271,530 +2455,331 @@ options(shiny.error = function() {
   ))
 })
 
+# Disconnect observer
 observeEvent(input$disconnect, {
+  tryCatch({
     session$close()
+  }, error = function(e) {
+    cat(sprintf("Error in disconnect observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
   })
+})
 
+# File input triggers reactive evaluation
 observeEvent(input$file2, {
-  # Call the reactive to force its evaluation
-  result <- knowledge()
-  # Optionally, you can print or log the result for debugging
-  #print(result)
+  tryCatch({
+    result <- knowledge()
+    # Optionally log result
+    # cat(str(result), file = log_file, append = TRUE)
+  }, error = function(e) {
+    cat(sprintf("Error in file2 observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
+  })
 })
 
-# create a shared reactiveValues object to pass variables around
-rv <- reactiveValues()
-
+# Causal graph build button
 observeEvent(input$buildButton, {
-  ### AIR Step 1 ----------------
-    if (Sys.info()["sysname"] == "Linux") {
-      print("let's see if this works...")
+  tryCatch({
 
-      graphlist <- AIR_getGraph(df(), knowledge()) # prod
-  	  graphtxt <- .jcall(graphlist[[1]], "Ljava/lang/String;", "toString")
-  	  graphtxt <- gsub("(?s)Graph Attributes:.*", "", graphtxt, perl = TRUE)
-  	  rv$ts <- graphlist[[2]]
-  	  rv$MC_passing_cpdag_already_found <- graphlist[[3]]
-  	  rv$best_cpdag_seen_so_far <- graphlist[[4]]
-  	  dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphlist[[1]])
-  	  write(gsub("(?m)^\\s*\\n", "", graphtxt, perl = TRUE), "graphtxt.txt")
-  	  write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
-      
-    } else {
-      graph <- read_file("graphtxt.txt") # test
-      dot <- read_file("dotfile.txt") # test
+    if (Sys.info()["sysname"] != "Linux") {
+      stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
     }
-  
-    # graph <- AIR_getGraph(df, knowledge)
-    
-    # graph_data <- .jcall(graph, "Ljava/lang/String;", "toString")
-    # writeLines(graph_data, "graphtxt.txt")
-  
-    # Visualize the resulting graph
-    # visualize_graph(graph)
-    write(gsub("(?m)^\\s*\\n", "", dot, perl = TRUE), "dotfile.txt")
-  
-    output$blankGraph <- renderGrViz({
-      req(graph_complete())
-      cat("Graph Built\n", file = log_file, append = TRUE)
-  
-      dot <- readLines("dotfile.txt")  
-      # for (node in names(df())) {
-      #   dot <- change_node_color(dot, node, "'#ffffff'")
-      # }
-  
-      grViz(dot)
-    })
-    
-    if (graph_complete()) {
-      sendSweetAlert(
-        session = shiny::getDefaultReactiveDomain(),
-        title = "Your Causal Graph is Ready",
-        text = NULL,
-        type = "success",
-        btn_labels = "Continue",
-        btn_colors = "#3085d6",
-        closeOnClickOutside = TRUE,
-        showCloseButton = FALSE,
-        )
+
+    graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
+
+    graphtxt_raw <- .jcall(graphlist[[1]], "Ljava/lang/String;", "toString")
+
+    if (is.null(graphtxt_raw) || !nzchar(graphtxt_raw)) {
+      stop("Tetrad returned an empty graph string")
     }
-    graph_complete(TRUE)
-    
-})
 
-observeEvent(input$updateButton, {
-  ### AIR Step 2 ---------------
-  # assign global variables
-  assign("df_vars",
-         data.frame("var" = c("TV","OV"),
-                    "val" = c(input$xvar, input$yvar)),
-         envir = .GlobalEnv)
-  if (Sys.info()["sysname"] == "Linux") {
-    adj_list <- AIR_getAdjSets(rv$ts,
-                               input$xvar,
-                               input$yvar,
-                               rv$MC_passing_cpdag_already_found,
-                               rv$best_cpdag_seen_so_far)
-    Z1 <- adj_list[[1]]
-    Z2 <- adj_list[[2]]
-    # deprecated rust section
-    # param1 = df_vars$val[1]
-    # param2 = df_vars$val[2]
-    # param3 = paste0(AIRHome, "/graphtxt.txt")
-    # 
-    # rust_bin = "identify"
-    # json_output <- system2(rust_bin,
-    #                        args = c(paste0("--param1=", param1),
-    #                                 paste0("--param2=", param2),
-    #                                 paste0("--param3=", param3)),
-    #                        stdout = TRUE)
-    # parsed <- fromJSON(json_output[1])
-    # # Now `parsed` should be a list with two elements: $vector1 and $vector2
-    # Z1 <- parsed$vector1
-    # Z2 <- parsed$vector2
-  } else {
-# --- BEGIN INLINE: scripts/identify.R ---
-# Purpose: Given Treatment (TV) and Outcome (OV) variables; and graph text file (saved from Tetrad) that
-#   encodes a DAG, compute the de-confounding sets Z1 and Z2 (based on those described in MDLAR Final Report).
-#   Caution: depending on the quality of the graph (and Markovianity), Z1 and Z2 might not actually be
-#   de-confounding sets. For example, there might be some unmeasured parents of the treatment variable (TV) or
-#   of other key variables.
-#   (This is why we need to have a good dataset to begin with and good-quality CD algorithm. We might not nail
-#   all conditions completely and tightly, but we may come close enough.)
-#
-# Prerequisite: Not checked, but we assume the DAG largely satisfies the Markov Condition (MC) and Faithfulness (FC)
-#   relative to a reference dataset.
-#   In particular, this means that there is no reason to believe there is a *significant* unmeasured confounder of TV and OV.
-#
-# TODO: Expansions for this program include:
-# (a) Multiple outcome variables (OV) [easy?]
-# (b) Multiple treatment variables (TV) [harder]
-# (c) Not just DAGs where all edges are directed but CPDAGs? [difficulty unknown]
-#
-# Assumptions:
-#   1. The hash and sets libraries are installed. (The info about sets is found here: https://quantifyinghealth.com/sets-in-r/)
-#   2. The graph spec text file has each edge specified in a numbered line in the format: "line_num. node1 --> node2"
-
-library("hash")
-library("sets")
-
-## Create four simple methods to help parse a line
-
-# Is the first character of a line a nonzero digit? If yes, then that line specifies an edge.
-is_edge_line <- function(line) {
-  # regular expression
-  return(grepl("^[1-9]", line))
-}
-
-# Split a string of space-delimited substrings into a list of those substrings
-split_line <- function(input_string) {
-    return(strsplit(input_string, " "))
-}
-
-# Return the first node from a line specifying an edge (after the line number)
-first_node <- function(line) {
-    line_components <- split_line(line)
-    return(line_components[[1]][2])
-}
-# Return the second node from a line specifying an edge (after the line number)
-second_node <- function(line) {
-    line_components <- split_line(line)
-    return(line_components[[1]][4])
-}
-
-## The key methods defined here are descendants (and its dual: ancestors)
-descendants <- function(node) {
-    checked_so_far <- set()
-    seen_not_checked <- set(node)
-    while ( ! set_is_empty(seen_not_checked)) {
-        check_these <- seen_not_checked
-        for (n in check_these) {
-            for (m in children[[n]]) {
-                if ( ! (m %e% checked_so_far)) {
-                    seen_not_checked <- seen_not_checked | set(m)
-                }
-            }
-            seen_not_checked <- seen_not_checked - set(n)
-            checked_so_far <- checked_so_far | set(n)
-        }
-    }
-    return(checked_so_far)
-}
-
-ancestors <- function(node) {
-    checked_so_far <- set()
-    seen_not_checked <- set(node)
-    while ( ! set_is_empty(seen_not_checked)) {
-        check_these <- seen_not_checked
-        for (n in check_these) {
-            for (m in parents[[n]]) {
-                if ( ! (m %e% checked_so_far)) {
-                    seen_not_checked <- seen_not_checked | set(m)
-                }
-            }
-            seen_not_checked <- seen_not_checked - set(n)
-            checked_so_far <- checked_so_far | set(n)
-        }
-    }
-    return(checked_so_far)
-}
-
-## Main
-
-## Several domain-specific initializations:
-
-## Set verbose printing on (TRUE) or off (not TRUE)
-PRINT_STATE <- !TRUE
-
-## Set USE_INIITIAL_ALGM to TRUE for 2022 version or not TRUE for 2024 version
-USE_INITIAL_ALGM <- TRUE
-
-## Specify which variables are the TV and OV; and which file has the graph spec
-# First block of lines support UAV demo application.
-# Second block of lines support Engine health demo application.
-
-# First block:
-# TV <- 'scenario_main_base'
-# OV <- 'images_acquired'  # TODO: test to see if different from TV
-# GRAPH_FILE <- 'graph6.txt'  # TODO: test to see if it includes TV and OV
-
-# Second block:
-TV <- df_vars$val[1]
-OV <- df_vars$val[2]  # TODO: test to see if different from TV
-GRAPH_FILE <- 'graphtxt.txt'  # TODO: test to see if it includes TV and OV
-
-## Read in graph
-PATH <- getwd()
-lines <- readLines(paste(PATH, "/", GRAPH_FILE, sep=""))
-
-## Create a set of the nodes in the graph
-nodes <- set()
-for (line in lines) {
-    if (is_edge_line(line)) {
-        if (!(first_node(line)  %e% nodes)) {
-            nodes <- nodes | set(first_node(line))
-        }
-        if (!(second_node(line) %e% nodes)) {
-            nodes <- nodes | set(second_node(line))
-        }
-    }
-}
-if (PRINT_STATE) {
-    print(nodes)
-}
-
-## Create children and parents dictionaries
-children <- hash()
-parents <- hash()
-for (n in nodes) {
-    children_of_n <- set()
-    parents_of_n <- set()
-    for (line in lines) {
-        if (is_edge_line(line)) {
-            if ((first_node(line)  == n) && (!(second_node(line) %e% children_of_n))) {
-                children_of_n <- children_of_n | set(second_node(line))
-            }
-            if ((second_node(line) == n) && (!(first_node(line)  %e% parents_of_n))) {
-                parents_of_n <- parents_of_n | set(first_node(line))
-            }
-        }
-    }
-    children[[n]] <- children_of_n
-    parents[[n]]  <- parents_of_n
-}
-if (PRINT_STATE) {
-    print(children)
-    print(parents)
-}
-
-## Print all ancestors and descendants
-for (n in nodes) {
-    if (PRINT_STATE) {
-        print(paste(n, " has these descendants: "))
-        print(descendants(n))
-        print(paste(n, " has these ancestors: "))
-        print(ancestors(n))
-    }
-}
-
-## Construct "deconfounding" sets Z1 and Z2 that include selected parents of
-#    the nodes in descendants({TV}).
-
-# Z1 is just the parents of TV. Not all will be measured, but take what's available
-Z1 <- parents[[TV]]
-# TODO: Can we do this: if there are no paths between such a parent and OV not through TV, then don't add it to Z1.
-
-# Per the 2022 (2024) algorithm, Z2 is just the parents of:
-#   (a) nodes on any directed path from TV to OV; inclusive of OV, but exclusive of TV (2022)
-#   (b) proper descendants of TV (2024)
-#   that are not themselves descendants of TV (both 2022 and 2024).
-Z2 <- set()
-desc_TV <- descendants(TV)
-prop_desc_TV <- desc_TV - set(TV)
-prop_anc_TV <- ancestors(TV) - set(TV)
-if (PRINT_STATE) {print(prop_anc_TV)}
-
-if (USE_INITIAL_ALGM) {
-  nodes_on_dir_path <- intersect(prop_desc_TV, ancestors(OV))
-  for (node in nodes_on_dir_path) {
-    parent_of_node_on_dir_path_not_a_desc <- (parents[[node]] - desc_TV)
-    if (PRINT_STATE) {
-      print(paste("----node is: ", node))
-      print(parents[[node]])
-      print(parent_of_node_on_dir_path_not_a_desc)
-    }
-    for (parent in parent_of_node_on_dir_path_not_a_desc) {
-      # if there's a trek between TV and parent, then add to Z2
-      if (PRINT_STATE) {print(paste("----parent considered: ", parent))}
-      if (!length(intersect(prop_anc_TV, ancestors(parent)))==0) {
-        if (PRINT_STATE) {print(unlist(intersect(prop_anc_TV, ancestors(parent))))}
-        Z2 <- Z2 | set(parent)
+    graphtxt <- tryCatch(
+      gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
+      error = function(e) {
+        warning(sprintf("Regex error on graph string: %s", conditionMessage(e)))
+        graphtxt_raw  # fallback to raw if regex fails
       }
-    }
-  }
-} else {
-  for (node in prop_desc_TV) {
-    parent_of_prop_desc_not_a_desc <- parents[[node]] - desc_TV
-    Z2 <- Z2 | parent_of_prop_desc_not_a_desc
-    if (PRINT_STATE) {print(paste(node, parent_of_prop_desc_not_a_desc))}
-    }
-  }
+    )
 
-## print out these sets as ordered lists
-unlist_Z1 <- unlist(Z1)
-unlist_Z2 <- unlist(Z2)
-print(unlist_Z1[order(unlist_Z1)])
-print(unlist_Z2[order(unlist_Z2)])
-# --- END INLINE: scripts/identify.R ---
-  }
-  Z1 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z1), perl = T), ", ")[[1]]
-  Z2 = strsplit(gsub("(\\}|\\{|\\')","",toString(Z2), perl = T), ", ")[[1]]
-  # Z1 = "region_sensitivity"
-  # Z2 = "mission_urgency"
-  ### overlaps in function with df_vars. consider combining and slimming down. consider appending to df_vars ---------
-  Zvars_loc <- data.frame("name" = character(),
-                          "grp" = character(),
-                          "Z" = character())
+    rv$ts <- graphlist[[2]]
+    rv$MC_passing_cpdag_already_found <- graphlist[[3]]
+    rv$best_cpdag_seen_so_far <- graphlist[[4]]
 
-  for (i in Z1) {
-    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z1", i))
-  }
+    dot_raw <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphlist[[1]])
 
-  for (i in Z2) {
-    Zvars_loc <- rbind(Zvars_loc, c(df_vars[df_vars$var == "TV",]$val, "Z2", i))
-  }
+    rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
 
-  colnames(Zvars_loc) <- c("name", "grp", "Z")
-  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
-  cat("Graph Updated\n", file = log_file, append = TRUE)
+    graph_complete(TRUE)
 
-  if (graph_update()) {
+    output$blankGraph <- renderGrViz({
+      req(graph_complete(), rv$dot)
+      cat("Graph Built\n", file = log_file, append = TRUE)
+      grViz(rv$dot)
+    })
+
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
-      title = "Causal Graph Updated",
+      title = "Your Causal Graph is Ready",
       text = NULL,
       type = "success",
       btn_labels = "Continue",
       btn_colors = "#3085d6",
       closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
-      )
-  }
-  graph_update(TRUE)
+      showCloseButton = FALSE
+    )
 
-  # update the graph
-  output$blankGraph <- renderGrViz({
-  req(graph_complete())
-  dot <- readLines("dotfile.txt")  
-  if (graph_update()) {
-    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
-    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
-  }
-  grViz(dot)
+  },
+  error = function(e) {
+    err_summary <- tryCatch({
+      paste0("Error in buildButton observer: ", conditionMessage(e), "\n")
+    }, error = function(inner) {
+      paste0("Unknown error in buildButton observer: ", capture.output(str(e)), collapse = "\n")
+    })
+    cat(err_summary, file = log_file, append = TRUE)
   })
+})
 
-  cat(paste0(Sys.time(), " - ","Selected X variable: ", input$xvar,"\n"), file = log_file, append = TRUE)
-  cat(paste0(Sys.time(), " - ","Selected Y variable: ", input$yvar,"\n"), file = log_file, append = TRUE)
-  cat(paste0(Sys.time(), " - ","Selected X threshold: ", input$tv_dir," ", input$tv_threshold,"\n"), file = log_file, append = TRUE)
-  cat(paste0(Sys.time(), " - ","Selected Y threshold: ", input$ov_dir," ", input$ov_threshold,"\n"), file = log_file, append = TRUE)
+observeEvent(input$updateButton, {
+  tryCatch({
 
+    assign("df_vars",
+           data.frame("var" = c("TV", "OV"),
+                      "val" = c(input$xvar, input$yvar),
+                      stringsAsFactors = FALSE),
+           envir = .GlobalEnv)
+
+    if (Sys.info()["sysname"] != "Linux") {
+      stop("Non-Linux platforms are not supported without in-memory graph. File fallback removed.")
+    }
+
+    adj_list <- AIR_getAdjSets(
+      rv$ts,
+      input$xvar,
+      input$yvar,
+      rv$MC_passing_cpdag_already_found,
+      rv$best_cpdag_seen_so_far
+    )
+
+    Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]]), perl = TRUE), ", ")[[1]]
+    Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]]), perl = TRUE), ", ")[[1]]
+
+    Zvars_loc <- rbind(
+      data.frame(name = input$xvar, grp = "Z1", Z = Z1, stringsAsFactors = FALSE),
+      data.frame(name = input$xvar, grp = "Z2", Z = Z2, stringsAsFactors = FALSE)
+    )
+    assign("Zvars", Zvars_loc, envir = .GlobalEnv)
+
+    cat("Graph Updated\n", file = log_file, append = TRUE)
+
+    if (graph_update()) {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Causal Graph Updated",
+        text = NULL,
+        type = "success",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE
+      )
+    }
+
+    graph_update(TRUE)
+
+    output$blankGraph <- renderGrViz({
+      req(graph_complete())
+      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", rv$best_cpdag_seen_so_far)
+      if (graph_update()) {
+        dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+        dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+        dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1", ]$Z, "'#9394A2'")
+        dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2", ]$Z, "'#D4C7C7'")
+      }
+      grViz(dot)
+    })
+
+    cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar), file = log_file, append = TRUE)
+    cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar), file = log_file, append = TRUE)
+    cat(sprintf("%s - Selected X threshold: %s %s\n", Sys.time(), input$tv_dir, input$tv_threshold), file = log_file, append = TRUE)
+    cat(sprintf("%s - Selected Y threshold: %s %s\n", Sys.time(), input$ov_dir, input$ov_threshold), file = log_file, append = TRUE)
+
+  }, error = function(e) {
+    cat(sprintf("Error in updateButton observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
+  })
 })
   
 observeEvent(input$goButton, {
-  cat(paste0(Sys.time(), " - ","Selected model_exist: ", input$model_exist,"\n"), file = log_file, append = TRUE)
-  cat(paste0(Sys.time(), " - ","Selected ate_in: ", input$ate_in,"\n"), file = log_file, append = TRUE)
+  tryCatch({
+    print(ls(pattern = "df", envir = .GlobalEnv))
 
-  withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+    cat(paste0(Sys.time(), " - Selected model_exist: ", input$model_exist, "\n"), file = log_file, append = TRUE)
+    cat(paste0(Sys.time(), " - Selected ate_in: ", input$ate_in, "\n"), file = log_file, append = TRUE)
 
-    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
+    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+      incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
 
-    ### AIR Step 3 ----------------
-    
-    write_csv(df(), paste0(AIRHome, "/data/datafile.csv"), col_names = T)
-    # write_csv(df, paste0(AIRHome, "/data/datafile.csv"), col_names = T)
+      datafile_buffer(df())
+      rv$model_yn <- input$model_exist
+      rv$model_ate <- input$ate_in
 
-    incProgress(0.1, message = "Estimating Causal Effects")
-    assign("model_yn",
-           input$model_exist,
-           envir = .GlobalEnv)
+      results_out_buffer(data.frame(
+        Row = numeric(),
+        Treatment = character(),
+        Group = character(),
+        Mean = numeric(),
+        LCI = numeric(),
+        UCI = numeric(),
+        stringsAsFactors = FALSE
+      ))
 
-    assign("model_ate",
-           input$ate_in,
-           envir = .GlobalEnv)
-
-    # assign("model_yn", model_exist, envir = .GlobalEnv); assign("model_ate", ate_in, envir = .GlobalEnv)
-
-    write.csv(file = "Results.csv",
-              x = data.frame("Row" = vector(),
-                             "Treatment" = vector(),
-                             "Group" = vector(),
-                             "Mean" = vector(),
-                             "LCI" = vector(),
-                             "UCI" = vector()),
-              row.names = FALSE)
-    
-    if (Sys.info()["sysname"] == "Linux") {
-      Sys.chmod("Results.csv", mode = "0777")
-    }
-    incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
       cat("Calculating Adjustment Sets\n", file = log_file, append = TRUE)
 
-    ### have to figure out how many cores there are
-    ## for now, just hardcode that in
-    
-    tryCatch({
-        # foreach(i = unique(Zvars$name)) %dopar% {
-        #   foreach(j = unique(Zvars$grp)) %do% {
-        combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = F) 
+      tryCatch({
+        combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
         tv_dir_val <- input$tv_dir
         tv_threshold_val <- input$tv_threshold
         ov_dir_val <- input$ov_dir
         ov_threshold_val <- input$ov_threshold
-        
-        # How many cores does your CPU have
-        n_cores <- detectCores()
-        n_cores <- min(nrow(combos), n_cores - 1)
-        
-        # Register cluster
+
+        n_cores <- min(nrow(combos), parallel::detectCores() - 1L)
         cluster <- makeCluster(n_cores)
+        on.exit(stopCluster(cluster), add = TRUE)
+
         clusterEvalQ(cluster, {
           library(tmle3)
           library(sl3)
         })
+
+        ## Only truly-static objects go through the automatic
+        ## foreach `.export` mechanism
+        vars_to_export <- c(
+          "Zvars",
+          "runSuperLearner",
+          "log_file"
+        )
+
+        ## while we *explicitly* push the big lookup table once
+        ## so every worker sees it
+        clusterExport(cluster, "df_vars", envir = environment())
+
         registerDoParallel(cluster)
-        
-        }, error = function(e) {
-          errMsg <- sprintf("Failed setting up parallel clusters", conditionMessage(e))
-          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
-          NULL
-        })
 
-    tryCatch({
-      incProgress(0.1, detail = paste0("\nCalculating ATE for multiple Adjustment Sets"))
-      }, error = function(e) {
-        NULL
-    })
-    
-    foreach(k = 1:nrow(combos), 
-            .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2", "hal9001", "nnet", "randomForest", "readr", "scales", "sl3", "tidyr", "tmle3", "xgboost", "foreach", "doParallel", "shiny"),
-            .export = c("Zvars", "runSuperLearner", "AIRHome", "tv_dir_val", "tv_threshold_val", "ov_dir_val", "ov_threshold_val", "df_vars", "processResults", "model_yn", "log_file")) %dopar% {
-        i <- combos[k, "i"]
-        j <- combos[k, "j"]
-        settings <- data.frame(doc_title = paste0(i,"-",j),
-                                  nfold = 20,
-                                  Z_level = j,
-                                  varName = i,
-                                  confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
-        # write.csv(settings, file = "settings_log.csv", append = TRUE)
-        tryCatch({
-          runSuperLearner(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, log_file)
-        # runSuperLearner(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold)
-        }, error = function(e) {
-          errMsg <- sprintf("SuperLearner: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
-          cat(errMsg, file = log_file, sep = "\n", append = TRUE)
-          NULL
-        })
-      }
-    # }
-    # Don't fotget to stop the cluster
-    stopCluster(cl = cluster)
-    incProgress(0.2, message = "Processing Results")
-    cat("Successfully closed parallel cluster\n", file = log_file, append = TRUE)
+        incProgress(0.1, detail = "Calculating ATE for multiple Adjustment Sets")
 
+        # ---- take immutable copies while we're still in the main thread ----
+        df_snapshot     <- isolate(datafile_buffer())   # <-- plain data.frame now
+        graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
 
-    for (i in unique(Zvars$name)) {
-      for (j in unique(Zvars$grp)) {
-        settings <- data.frame(doc_title = paste0(i,"-",j),
-                               nfold = 20,
-                               Z_level = j,
-                               varName = i,
-                               confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j,]$Z, collapse = " "))
-        tryCatch({
-          if (i == tail(unique(Zvars$name), 1) & j == tail(unique(Zvars$name), 1) ) {
-            move_results <- TRUE
-          } else { move_results <- FALSE }
-          processResults(settings, AIRHome, tv_dir_val, tv_threshold_val, ov_dir_val, ov_threshold_val, model_in(), model_yn, model_ate, log_file, move_results)
-          }, error = function(e) {
-            errMsg <- sprintf("Results Processing: Error in combination i=%s, j=%s: %s", i, j, conditionMessage(e))
-            cat(errMsg, file = log_file, sep = "\n", append = TRUE)
-            NULL
-          })
+        # pass the snapshots to the workers; nothing reactive inside anymore
+        results_list <- foreach(k = 1:nrow(combos),
+                .packages = c("AIPW", "dplyr", "e1071", "earth", "ggplot2",
+                              "hal9001", "nnet", "randomForest", "readr",
+                              "scales", "sl3", "tidyr", "tmle3", "xgboost",
+                              "foreach", "doParallel", "shiny"),
+                .export   = vars_to_export) %dopar% {
+          i <- combos[k, "i"]
+          j <- combos[k, "j"]
+          settings <- data.frame(
+            doc_title = paste0(i, "-", j),
+            nfold = 20,
+            Z_level = j,
+            varName = i,
+            confounders = paste0(Zvars[Zvars$name == i & Zvars$grp == j, ]$Z, collapse = " ")
+          )
+
+          res <- tryCatch(
+            runSuperLearner(settings,
+                            graph_snapshot,   # was  rv$dot
+                            df_snapshot,      # <-- new arg (next step)
+                            tv_dir_val, tv_threshold_val,
+                            ov_dir_val, ov_threshold_val,
+                            log_file),
+            error = function(e) {
+              cat(sprintf("SuperLearner: Error i=%s, j=%s: %s",
+                          i, j, conditionMessage(e)),
+                  file = log_file, sep = "\n", append = TRUE)
+              NULL
+            }
+          )
+          res
         }
-      }
-    
-    
-   calc_complete(TRUE)
- 
-   output$blankGraph <- renderGrViz({
-      # req(calc_complete())
-      dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
-      grViz(dot)
+
+        ## Main thread again.
+        for (res in results_list) {
+          if (!is.null(res)) {
+            results_buffer(
+              dplyr::bind_rows(results_buffer(), res$tmle)
+            )
+            superlearner_output_buffer(
+              append(superlearner_output_buffer(), res$diag)
+            )
+          }
+        }
+
+        # -----------------------------------------------------------------
+        # Build the final combined data-frame so the UI can see it
+        # -----------------------------------------------------------------
+        tryCatch({
+          # “settings_stub” supplies the few fields processResults() still reads
+          settings_stub <- data.frame(
+            doc_title  = "Combined",
+            nfold      = 20,
+            Z_level    = "Z?",
+            varName    = input$xvar,
+            confounders = ""
+          )
+        
+          processResults(settings_stub,
+                         AIRHome       = graph_snapshot,
+                         tv_dir        = tv_dir_val,
+                         tv_threshold  = tv_threshold_val,
+                         ov_dir        = ov_dir_val,
+                         ov_threshold  = ov_threshold_val,
+                         model_in      = if (identical(input$model_exist, "Yes"))
+                                            model_in() else NULL,
+                         model_yn      = input$model_exist,
+                         model_ate     = input$ate_in,
+                         log_file      = log_file)
+        }, error = function(e) {
+          cat(sprintf("processResults() failed: %s", conditionMessage(e)),
+              file = log_file, append = TRUE)
+        })
+
+        incProgress(0.2, message = "Processing Results")
+        cat("Successfully closed parallel cluster\n", file = log_file, append = TRUE)
+
+      }, error = function(e) {
+        cat(sprintf("Fatal error during ATE estimation: %s", conditionMessage(e)), file = log_file, append = TRUE)
       })
 
-   sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "Causal Estimates Successfully Calculated",
-      text = "",
-      type = "success",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE,
+      calc_complete(TRUE)
+
+      output$blankGraph <- renderGrViz({
+        dot <- get_final_graph(rv$dot, input$xvar, input$yvar, Zvars)
+        grViz(dot)
+      })
+
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Causal Estimates Successfully Calculated",
+        text = "",
+        type = "success",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE
       )
+    })
+
+  }, error = function(e) {
+    cat(paste0(Sys.time(), " - Top-level observeEvent(goButton) failure: ", conditionMessage(e), "\n"),
+        file = log_file, append = TRUE)
   })
 })
-
-
-
 
 ### output definitions ------------------------------------------------------------------
 
 output$ui_graph_pane = renderUI({
   grVizOutput('blankGraph')
 })
-
 
 output$second_column_content <- renderUI({
     if (calc_complete()) {
@@ -2839,8 +2824,6 @@ output$ui_dl_btn <- renderUI({
             )
 })
 
-
-
 output$step3 = renderUI({
   req(graph_complete())
   tagList(
@@ -2868,7 +2851,6 @@ output$yvar = renderUI({
               )
   # yvar = "images_acquired"
 })
-
 
 output$ui_threshold_x = renderUI({
   req(input$xvar)
@@ -3004,7 +2986,7 @@ output$step4 = renderUI({
 
 
 output$ui_graphViz = renderUI({
-  req(calc_complete())  
+  req(calc_complete())
   h4("Causal graph")
   grVizOutput("graphViz")
 })
@@ -3015,11 +2997,51 @@ output$ui_ci_plot = renderUI({
   plotOutput("ci_plot")
 })
 
-output$ui_ribbon_plot = renderUI({
-  req(calc_complete())  
-  h4("Comparison of ATE for AIR and ML")
-  imageOutput("ribbon_plot")
+output$ui_ribbon_plot <- renderUI({
+  req(calc_complete())
+  tagList(
+    h4("Comparison of ATE for AIR and ML"),
+    imageOutput("ribbon_plot")
+  )
 })
+
+output$ui_ribbon_plot <- renderUI({
+  req(calc_complete())
+  tags$div(
+    style = "max-width: 600px;
+            margin: 0 auto;",
+    h4("Comparison of ATE for AIR and ML"),
+    # make the <img> responsive
+    imageOutput("ribbon_plot",
+                width  = "100%",
+                height = "auto")
+  )
+})
+
+output$ribbon_plot <- renderImage(
+  {
+    req(calc_complete())
+    tmp <- tempfile(fileext = ".png")
+    plt <- get_ribbon_plot(AIRHome)
+
+    # bail out early if we didn't get an actual plot
+    if (!inherits(plt, "gg")) {
+      return(list(           # let Shiny show the <div> instead of an image
+        src  = NULL,
+        alt  = "No ribbon plot to display"
+      ))
+    }
+
+    ggsave(tmp, plot = plt,
+           width = 6.5, height = 4, units = "in", bg = "transparent")
+           list(src         = tmp,
+                contentType = "image/png",
+                alt         = "ATE ribbon plot",
+                width       = "100%",   # let CSS handle final size
+                height      = NULL)     # keep aspect ratio
+  },
+  deleteFile = TRUE
+)
 
 output$ui_figurecaption = renderUI({
   req(calc_complete())
@@ -3056,20 +3078,20 @@ output$ui_updateButton = renderUI({
     )
 })
 
-# output$graphViz = renderGrViz({
-#   req(calc_complete())
-#   
-#   dot <- get_final_graph(AIRHome, input$xvar, input$yvar, Zvars)
-#   grViz(dot)
-# })
-  
+output$my_plot <- renderImage({
+  # Use magick to draw and save to temp file
+  temp_file <- tempfile(fileext = ".png")
+  img <- magick::image_graph(width = 800, height = 600, res = 100)
+  print(my_ggplot())
+  dev.off()
+  magick::image_write(img, path = temp_file, format = "png")
 
-# output$ribbon_plot = renderImage({
-output$ribbon_plot = renderPlot({
-  req(calc_complete())  
-  p <- get_ribbon_plot(AIRHome)
-  p  
-}, bg = "transparent")
+  list(
+    src = temp_file,
+    contentType = "image/png",
+    alt = "Generated plot"
+  )
+}, deleteFile = FALSE)
 
 output$figurecaption = renderUI({
   req(calc_complete())
@@ -3088,57 +3110,70 @@ output$ui_interpretation = renderUI({
   )
 })
 
-
 output$download_report <- downloadHandler(
   filename = function() {
     paste0('AIRTool-Report_', Sys.Date(), '.pdf')
-    },
-    content = function(file) {
-      # Pre-evaluate reactive values
-      loc_xvar <- input$xvar
-      loc_yvar <- input$yvar
-      loc_df <- df()
-      loc_tv_dir <- input$tv_dir
-      loc_tv_threshold <- input$tv_threshold
-      loc_ov_dir <- input$ov_dir
-      loc_ov_threshold <- input$ov_threshold
-      loc_df_vars <- df_vars
-      loc_Zvars <- Zvars
-      loc_graph_update <- graph_update()
-      loc_figure_cap <- get_figure_caption(AIRHome, df_vars)
-      loc_result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
-    
-      # Save plots
-      save_ggplot_to_png(get_histogram_x(loc_df, loc_xvar, loc_tv_dir, loc_tv_threshold), "plots/xhist.png")
-      save_ggplot_to_png(get_histogram_y(loc_df, loc_yvar, loc_ov_dir, loc_ov_threshold), "plots/yhist.png")
-      save_ggplot_to_png(get_ribbon_plot(AIRHome), "plots/ribbon.png")
-      save_graphviz_to_png(get_updated_graph(AIRHome, loc_graph_update, loc_xvar, loc_yvar, loc_Zvars), "plots/updatedgraph.png")
-      save_graphviz_to_png(get_final_graph(AIRHome, loc_xvar, loc_yvar, loc_Zvars), "plots/finalgraph.png")
-    
-      # Render Quarto report
-      quarto::quarto_render(
-        input = "scripts/AIRReport.qmd",
-        output_format = "pdf",
-        execute_params = list(
-          AIRHome = AIRHome,
-          xvar = loc_xvar,
-          yvar = loc_yvar,
-          figure_cap = loc_figure_cap,
-          result_text = loc_result_text
-        )
-      )
-    
-      # Manually find the generated file
-      generated_file_path <- "scripts/AIRReport.pdf"
-    
-      # Make sure it actually exists before copying
-      if (!file.exists(generated_file_path)) {
-        stop("Failed to find generated PDF at ", generated_file_path)
-      }
-    
-      # Now copy it to where Shiny expects it
-      file.copy(generated_file_path, file, overwrite = TRUE)
+  },
+  content = function(file) {
+    tmpdir <- tempfile("airtool_report_")
+    dir.create(tmpdir, recursive = TRUE)
+
+    # Pre-evaluate reactive values
+    loc_xvar <- input$xvar
+    loc_yvar <- input$yvar
+    loc_df <- df()
+    loc_tv_dir <- input$tv_dir
+    loc_tv_threshold <- input$tv_threshold
+    loc_ov_dir <- input$ov_dir
+    loc_ov_threshold <- input$ov_threshold
+    loc_df_vars <- df_vars
+    loc_Zvars <- Zvars
+    loc_graph_update <- graph_update()
+    loc_figure_cap <- get_figure_caption(AIRHome, df_vars)
+    loc_result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
+
+    # Draw ggplots to files using magick
+    save_plot <- function(plot_func, path) {
+      img <- magick::image_graph(width = 800, height = 600, res = 100)
+      print(plot_func)
+      dev.off()
+      magick::image_write(img, path = path, format = "png")
     }
+
+    save_plot(get_histogram_x(loc_df, loc_xvar, loc_tv_dir, loc_tv_threshold), file.path(tmpdir, "xhist.png"))
+    save_plot(get_histogram_y(loc_df, loc_yvar, loc_ov_dir, loc_ov_threshold), file.path(tmpdir, "yhist.png"))
+    save_plot(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.png"))
+
+    # Save Graphviz images (assume save_dot_to_png already uses DiagrammeRsvg + magick::image_write)
+    save_dot_to_png(get_updated_graph(AIRHome, loc_graph_update, loc_xvar, loc_yvar, loc_Zvars), file.path(tmpdir, "updatedgraph.png"))
+    save_dot_to_png(get_final_graph(AIRHome, loc_xvar, loc_yvar, loc_Zvars), file.path(tmpdir, "finalgraph.png"))
+
+    # Copy the .qmd into the tmpdir so quarto doesn't pollute source folder
+    file.copy("scripts/AIRReport.qmd", file.path(tmpdir, "AIRReport.qmd"))
+
+    # Render to tmpdir
+    quarto::quarto_render(
+      input = file.path(tmpdir, "AIRReport.qmd"),
+      output_format = "pdf",
+      output_file = "AIRReport.pdf",
+      output_dir = tmpdir,
+      execute_params = list(
+        AIRHome = AIRHome,
+        xvar = loc_xvar,
+        yvar = loc_yvar,
+        figure_cap = loc_figure_cap,
+        result_text = loc_result_text
+      )
+    )
+
+    final_path <- file.path(tmpdir, "AIRReport.pdf")
+    if (!file.exists(final_path)) {
+      stop("Failed to generate report")
+    }
+
+    # Deliver it to Shiny
+    file.copy(final_path, file, overwrite = TRUE)
+  }
 )
 ```
 
