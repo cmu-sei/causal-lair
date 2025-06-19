@@ -60,15 +60,6 @@
       };
     };
 
-    # VSCode Extensions
-    nix-vscode-extensions = {
-      url = "github:nix-community/nix-vscode-extensions";
-      inputs = {
-        nixpkgs.follows = "nixpkgs";
-        flake-utils.follows = "flake-utils";
-      };
-    };
-
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
       inputs.nixpkgs-lib.url = "github:NixOS/nixpkgs/eb9ceca17df2ea50a250b6b27f7bf6ab0186f198";
@@ -76,7 +67,7 @@
 
   };
 
-  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, nix-vscode-extensions, tetrad, ... }:
+  outputs = { flake-utils, nixpkgs, rust-overlay, myNeovimOverlay, tetrad, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = import nixpkgs {
@@ -148,53 +139,59 @@
         };
 
         # We create an account for the container user. These are necessary user files.
-        baseInfo = with pkgs; [
-          # Set up shadow file with user information
-          (writeTextDir "etc/shadow" ''
-            root:!x:::::::
-          '')
-          # Set up passwd file with user information
-          (writeTextDir "etc/passwd" ''
-            root:x:0:0::/root:${runtimeShell}
-          '')
-          # Set up group file with user information
-          (writeTextDir "etc/group" ''
-            root:x:0:
-          '')
-          # Set up gshadow file with user information
-          (writeTextDir "etc/gshadow" ''
-            root:x::
-          '')
-          # Set up os-release file with NixOS information
-          (writeTextDir "etc/os-release" ''
-            NAME="NixOS"
-            ID=nixos
-            VERSION="unstable"
-            VERSION_CODENAME=unstable
-            PRETTY_NAME="NixOS (unstable)"
-            HOME_URL="https://nixos.org/"
-            SUPPORT_URL="https://nixos.org/nixos/manual/"
-            BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
-          '')
-        ];
+        baseInfo = pkgs.buildEnv {
+          name  = "base-info";
+          paths = with pkgs; [
+            # Set up shadow file with user information
+            (writeTextDir "etc/shadow" ''
+              root:!x:::::::
+            '')
+            # Set up passwd file with user information
+            (writeTextDir "etc/passwd" ''
+              root:x:0:0::/root:${runtimeShell}
+            '')
+            # Set up group file with user information
+            (writeTextDir "etc/group" ''
+              root:x:0:
+            '')
+            # Set up gshadow file with user information
+            (writeTextDir "etc/gshadow" ''
+              root:x::
+            '')
+            # Set up os-release file with NixOS information
+            (writeTextDir "etc/os-release" ''
+              NAME="NixOS"
+              ID=nixos
+              VERSION="unstable"
+              VERSION_CODENAME=unstable
+              PRETTY_NAME="NixOS (unstable)"
+              HOME_URL="https://nixos.org/"
+              SUPPORT_URL="https://nixos.org/nixos/manual/"
+              BUG_REPORT_URL="https://github.com/NixOS/nixpkgs/issues"
+            '')
 
-        extensions = nix-vscode-extensions.extensions.${system};
+            # stock fonts.conf copied verbatim so it’s writable
+            (pkgs.writeTextDir "etc/fonts/fonts.conf"
+              (builtins.readFile "${pkgs.fontconfig.out}/etc/fonts/fonts.conf"))
 
-        code-extended = pkgs.vscode-with-extensions.override {
-          vscode = pkgs.code-server;
-          vscodeExtensions = [
-            extensions.open-vsx-release.rust-lang.rust-analyzer
-            extensions.vscode-marketplace.vadimcn.vscode-lldb
-            extensions.vscode-marketplace.tamasfe.even-better-toml
-            extensions.vscode-marketplace.jnoortheen.nix-ide
-            extensions.vscode-marketplace.jinxdash.prettier-rust
-            extensions.vscode-marketplace.dustypomerleau.rust-syntax
-            extensions.vscode-marketplace.ms-vscode.test-adapter-converter
-            extensions.vscode-marketplace.hbenl.vscode-test-explorer
-            extensions.vscode-marketplace.swellaby.vscode-rust-test-adapter
-            extensions.vscode-marketplace.vscodevim.vim
-            extensions.vscode-marketplace.redhat.vscode-yaml
-            extensions.vscode-marketplace.ms-azuretools.vscode-docker
+            # /etc/fonts/local.conf
+            (pkgs.writeTextDir "etc/fonts/local.conf" ''
+              <?xml version="1.0"?>
+              <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+              <fontconfig>
+                <dir>${dejavuDir}</dir>
+              </fontconfig>
+            '')
+
+            # /etc/fonts/conf.d/50-dejavu-extra.conf
+            (pkgs.writeTextDir "etc/fonts/conf.d/50-dejavu-extra.conf" ''
+              <?xml version="1.0"?>
+              <!DOCTYPE fontconfig SYSTEM "urn:fontconfig:fonts.dtd">
+              <fontconfig>
+                <!-- extra faces for R -->
+                <dir>${dejavuDir}</dir>
+              </fontconfig>
+            '')
           ];
         };
 
@@ -229,6 +226,7 @@
             pkgs.rPackages.AIPW
             pkgs.rPackages.devtools
             pkgs.rPackages.DiagrammeR
+            pkgs.rPackages.DiagrammeRsvg
             pkgs.rPackages.doParallel
             pkgs.rPackages.e1071
             pkgs.rPackages.earth
@@ -238,7 +236,6 @@
             pkgs.rPackages.igraph
             pkgs.rPackages.knitr
             pkgs.rPackages.lintr
-            pkgs.rPackages.magick
             pkgs.rPackages.nnet
             pkgs.rPackages.randomForest
             pkgs.rPackages.ranger
@@ -247,6 +244,7 @@
             pkgs.rPackages.rJava
             pkgs.rPackages.rmarkdown
             pkgs.rPackages.rsconnect
+            pkgs.rPackages.rsvg
             pkgs.rPackages.sets
             pkgs.rPackages.shiny
             pkgs.rPackages.shinyWidgets
@@ -355,8 +353,12 @@
           paths = [
             rWithPkgs
             quartoPatched
+            identify
           ];
         };
+
+        # Writable /etc/fonts tree
+        dejavuDir   = "${pkgs.dejavu_fonts}/share/fonts/truetype";
 
         myEnv = pkgs.buildEnv {
           name = "my-env";
@@ -368,6 +370,7 @@
             graphviz
             curlFull                # libcurl4-openssl-dev
             fontconfig              # libfontconfig1-dev
+            dejavu_fonts
             freetype                # libfreetype6-dev
             fribidi                 # libfribidi-dev
             giflib                  # libgif-dev
@@ -375,7 +378,6 @@
             harfbuzz                # libharfbuzz-dev
             libjpeg                 # libjpeg-dev
             #lapack                  # liblapack-dev    <- seems to be provided by openblas
-            imagemagick_light       # libmagick++-dev
             libmysqlclient          # libmariadb-dev
                                     # libmariadb-dev-compat
             openblasCompat                # libopenblas-dev
@@ -464,10 +466,6 @@
             fishPlugins.foreign-env
             fishPlugins.grc
 
-            # If for some reason you don't want VS Code Server, remove this and
-            # its overlay.
-            code-extended
-
             # -- Rust Toolchain --
             rust-analyzer
             (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
@@ -479,12 +477,8 @@
               # targets = [ "wasm32-unknown-unknown" ];
             }))
 
-            #quartoPatched
-            #sl3
-            #rWithPkgs
             quartoEnv
             tetrad.packages.${system}.default
-            identify
             score
           ];
           pathsToLink = [
@@ -507,12 +501,6 @@
           text = builtins.readFile ./container-files/plugins.fish;
         };
 
-        codeSettings = pkgs.writeTextFile {
-          name = "container-files/settings.json";
-          destination = "/root/.local/share/code-server/User/settings.json";
-          text = builtins.readFile ./container-files/settings.json;
-        };
-
         license = pkgs.writeTextFile {
           name = "container-files/license.txt";
           destination = "/root/license.txt";
@@ -526,7 +514,7 @@
           text = builtins.readFile ./container-files/create-user.sh;
           executable = true;
         };
-
+ 
         # Materialize the flake directory
         workspacePath = pkgs.runCommand "materialized-flake" {} ''
           mkdir -p $out/workspace
@@ -550,7 +538,6 @@
             myEnv
             baseInfo
             fishConfig
-            codeSettings
             license
             createUserScript
             fishPluginsFile

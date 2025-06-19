@@ -1,5 +1,5 @@
 ---
-title: "AIRTOOL PROTOTYPE--not intended for public consumption"
+title: "AIR -- This is prototype software, use without warranty."
 format: 
   dashboard:
     theme: spacelab
@@ -52,39 +52,50 @@ document.addEventListener("DOMContentLoaded", () => {
 #| echo: false
 #| include: false
 
-# suppressMessages(library(tidyverse))
-suppressMessages(library(AIPW))
-suppressMessages(library(DiagrammeR))
-suppressMessages(library(dplyr))
-suppressMessages(library(e1071))
-suppressMessages(library(ggplot2))
-suppressMessages(library(hal9001))
-suppressMessages(library(here))
-suppressMessages(library(nnet))
-suppressMessages(library(randomForest))
-suppressMessages(library(readr))
-suppressMessages(library(rJava))
-suppressMessages(library(rpart))
-suppressMessages(library(scales))
-suppressMessages(library(shiny))
-suppressMessages(library(shinyWidgets))
-suppressMessages(library(sl3))
-suppressMessages(library(tidyr))
-suppressMessages(library(tmle3))
-suppressMessages(library(xgboost))
-suppressMessages(library(jsonlite))
-suppressMessages(library(foreach))
-suppressMessages(library(doParallel))
-suppressMessages(library(earth))
-suppressMessages(library(hash))
-suppressMessages(library(sets))
-suppressMessages(library(base64enc))
+#suppressMessages({
+  library(AIPW)
+  library(base64enc)
+  library(DiagrammeR)
+  library(DiagrammeRsvg)  # SVG export
+  library(doParallel)
+  library(dplyr)
+  library(e1071)
+  library(earth)
+  library(foreach)
+  library(ggplot2)
+  library(hal9001)
+  library(hash)
+  library(here)
+  library(jsonlite)
+  library(nnet)
+  library(rJava)
+  library(randomForest)
+  library(readr)
+  library(rpart)
+  library(rsvg)
+  library(scales)
+  library(sets)
+  library(shiny)
+  library(shinyWidgets)
+  library(sl3)
+  library(tidyr)
+  library(tmle3)
+  library(xgboost)
+  library(xml2)
+#})
 
-#options(warn = 2)
+# --- session-wide defaults --------------------------------------------------
+theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc.
+
+options(warn = 2)
 
 AIRHome <- here()
 setwd(AIRHome)
 set.seed(123)
+
+## Also tell the R graphics device so axis labels use it too
+grDevices::png(type = "cairo")            # ensure Pango/Cairo backend
+par(family = "DejaVu Sans")               # default plotting family
 
 # --- Buffers --- #
 results_buffer <- reactiveVal(data.frame())
@@ -1002,17 +1013,19 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
 
     log_msg("Model training complete")
 
-  ate_df <- data.frame(
-    algorithm = c("Logistic Regression", "Decision Tree", "Support Vector Machine",
-                  "Random Forest", "Stacked Super Learner"),
-    flag      = c(lm_ate, dt_ate, svm_ate, rf_ate, sl_ate),
-    ## give every row the variable name that the model is estimating
-    ## (vector recycling takes care of the length-mismatch)
-    Treatment = outcome
-  )
+    ## five learners → PICK ONE that represents “the classifier”
+    ate_df_all <- data.frame(
+      algorithm = c("Logistic Regression", "Decision Tree", "Support Vector Machine",
+                    "Random Forest", "Stacked Super Learner"),
+      flag      = c(lm_ate, dt_ate, svm_ate, rf_ate, sl_ate),
+      Treatment = outcome
+    )
 
-  ## stash them – ONE row per algorithm
-  ml_buffer(ate_df)
+    ## keep only the stacked-SL row so we have ONE reference ATE
+    ate_df_ref <- dplyr::filter(ate_df_all,
+                                algorithm == "Stacked Super Learner")
+
+    ml_buffer(ate_df_ref)       # now identical semantics to options 1 & 2
 
   } else {
     log_msg(sprintf("Using existing model config: %s", model_yn))
@@ -1682,19 +1695,7 @@ get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) 
   return(dot)
 }
 
-get_ggplot_image_data <- function(plot_obj, width = 8, height = 6, dpi = 300) {
-  img <- magick::image_graph(width = width * dpi, height = height * dpi, res = dpi)
-  print(plot_obj)
-  dev.off()
-  img_data <- magick::image_write(img, format = "png", density = dpi)
-  return(img_data)
-}
-
 graphviz_to_png_data <- function(dot_code) {
-  library(DiagrammeR)
-  library(rsvg)
-  library(xml2)
-
   svg_str <- DiagrammeRsvg::export_svg(grViz(dot_code))
   svg_obj <- xml2::read_xml(svg_str)
 
@@ -1766,7 +1767,6 @@ create_variables <- function(data) {
 
 # ----- Initialize Java and Check Version -----
 initialize_java <- function() {
-  library(rJava)
   
    .jinit()
   .jaddClassPath(TETRAD_PATH)
@@ -2540,11 +2540,15 @@ observeEvent(input$buildButton, {
 observeEvent(input$updateButton, {
   tryCatch({
 
-    assign("df_vars",
-           data.frame("var" = c("TV", "OV"),
-                      "val" = c(input$xvar, input$yvar),
-                      stringsAsFactors = FALSE),
-           envir = .GlobalEnv)
+    ## inside the observer / reactive that updates the variable choices
+    df_vars <- data.frame(
+      var = c("TV", "OV"),
+      val = c(input$xvar, input$yvar),   # <- current selections
+      stringsAsFactors = FALSE
+    )
+
+    ## make it available everywhere that still relies on the global
+    assign("df_vars", df_vars, envir = .GlobalEnv)
 
     if (Sys.info()["sysname"] != "Linux") {
       stop("Non-Linux platforms are not supported without in-memory graph. File fallback removed.")
@@ -2658,7 +2662,7 @@ observeEvent(input$goButton, {
 
         ## while we *explicitly* push the big lookup table once
         ## so every worker sees it
-        clusterExport(cluster, "df_vars", envir = environment())
+        clusterExport(cluster, "df_vars", envir = .GlobalEnv)
 
         registerDoParallel(cluster)
 
@@ -3078,21 +3082,6 @@ output$ui_updateButton = renderUI({
     )
 })
 
-output$my_plot <- renderImage({
-  # Use magick to draw and save to temp file
-  temp_file <- tempfile(fileext = ".png")
-  img <- magick::image_graph(width = 800, height = 600, res = 100)
-  print(my_ggplot())
-  dev.off()
-  magick::image_write(img, path = temp_file, format = "png")
-
-  list(
-    src = temp_file,
-    contentType = "image/png",
-    alt = "Generated plot"
-  )
-}, deleteFile = FALSE)
-
 output$figurecaption = renderUI({
   req(calc_complete())
   caption <- get_figure_caption(AIRHome, df_vars)
@@ -3110,70 +3099,154 @@ output$ui_interpretation = renderUI({
   )
 })
 
-output$download_report <- downloadHandler(
-  filename = function() {
-    paste0('AIRTool-Report_', Sys.Date(), '.pdf')
-  },
-  content = function(file) {
-    tmpdir <- tempfile("airtool_report_")
-    dir.create(tmpdir, recursive = TRUE)
+# -----------------------------------------------------------------
+# 2) DiagrammeR graph → PDF   (SVG → PDF via librsvg)
+# -----------------------------------------------------------------
+save_dot_to_pdf <- function(gr,
+                            path,
+                            width  = 8,   # inches
+                            height = 6) {
 
-    # Pre-evaluate reactive values
-    loc_xvar <- input$xvar
-    loc_yvar <- input$yvar
-    loc_df <- df()
-    loc_tv_dir <- input$tv_dir
-    loc_tv_threshold <- input$tv_threshold
-    loc_ov_dir <- input$ov_dir
-    loc_ov_threshold <- input$ov_threshold
-    loc_df_vars <- df_vars
-    loc_Zvars <- Zvars
-    loc_graph_update <- graph_update()
-    loc_figure_cap <- get_figure_caption(AIRHome, df_vars)
-    loc_result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
+  svg_raw <- charToRaw(DiagrammeRsvg::export_svg(gr))
 
-    # Draw ggplots to files using magick
-    save_plot <- function(plot_func, path) {
-      img <- magick::image_graph(width = 800, height = 600, res = 100)
-      print(plot_func)
-      dev.off()
-      magick::image_write(img, path = path, format = "png")
-    }
-
-    save_plot(get_histogram_x(loc_df, loc_xvar, loc_tv_dir, loc_tv_threshold), file.path(tmpdir, "xhist.png"))
-    save_plot(get_histogram_y(loc_df, loc_yvar, loc_ov_dir, loc_ov_threshold), file.path(tmpdir, "yhist.png"))
-    save_plot(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.png"))
-
-    # Save Graphviz images (assume save_dot_to_png already uses DiagrammeRsvg + magick::image_write)
-    save_dot_to_png(get_updated_graph(AIRHome, loc_graph_update, loc_xvar, loc_yvar, loc_Zvars), file.path(tmpdir, "updatedgraph.png"))
-    save_dot_to_png(get_final_graph(AIRHome, loc_xvar, loc_yvar, loc_Zvars), file.path(tmpdir, "finalgraph.png"))
-
-    # Copy the .qmd into the tmpdir so quarto doesn't pollute source folder
-    file.copy("scripts/AIRReport.qmd", file.path(tmpdir, "AIRReport.qmd"))
-
-    # Render to tmpdir
-    quarto::quarto_render(
-      input = file.path(tmpdir, "AIRReport.qmd"),
-      output_format = "pdf",
-      output_file = "AIRReport.pdf",
-      output_dir = tmpdir,
-      execute_params = list(
-        AIRHome = AIRHome,
-        xvar = loc_xvar,
-        yvar = loc_yvar,
-        figure_cap = loc_figure_cap,
-        result_text = loc_result_text
-      )
-    )
-
-    final_path <- file.path(tmpdir, "AIRReport.pdf")
-    if (!file.exists(final_path)) {
-      stop("Failed to generate report")
-    }
-
-    # Deliver it to Shiny
-    file.copy(final_path, file, overwrite = TRUE)
+  # rsvg >= 2.6 has rsvg_pdf(); earlier versions only rsvg_svg() + system()
+  if (isTRUE(utils::packageVersion("rsvg") >= "2.6")) {
+    rsvg::rsvg_pdf(svg_raw, file = path,
+                   width  = width * 72,   # points
+                   height = height * 72)
+  } else {
+    tmp_svg <- tempfile(fileext = ".svg")
+    writeBin(svg_raw, tmp_svg)
+    rsvg::rsvg_pdf(tmp_svg, file = path,
+                   width  = width * 72,
+                   height = height * 72)
+    unlink(tmp_svg)
   }
+  invisible(path)
+}
+
+output$download_report <- downloadHandler(
+  filename = function() paste0("AIRTool-Report_", Sys.Date(), ".pdf"),
+  content = function(file) {
+    tryCatch({
+      tmpdir <- tempfile("airtool_report_")
+      dir.create(tmpdir, recursive = TRUE)
+      on.exit(unlink(tmpdir, recursive = TRUE), add = TRUE)
+  
+      # ── freeze reactive values ─────────────────────────────────────────────
+      vals <- isolate(list(
+        xvar          = input$xvar,
+        yvar          = input$yvar,
+        df            = df(),
+        tv_dir        = input$tv_dir,
+        tv_threshold  = input$tv_threshold,
+        ov_dir        = input$ov_dir,
+        ov_threshold  = input$ov_threshold,
+        Zvars         = Zvars,
+        graph_update  = graph_update()
+      ))
+
+      ## --- rebuild the little helper table *locally* ------------------
+      df_vars <- data.frame(
+        var = c("TV", "OV"),
+        val = c(vals$xvar, vals$yvar),
+        stringsAsFactors = FALSE
+      )
+  
+      figure_cap   <- get_figure_caption(AIRHome, df_vars)
+      result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars)
+
+      graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
+  
+      # -----------------------------------------------------------------
+      # 1) ggplot → PDF  (histograms, ribbon)
+      # -----------------------------------------------------------------
+      save_plot_pdf <- function(plot_obj,
+                              path,
+                              width  = 8,   # inches
+                              height = 6) {
+
+      grDevices::cairo_pdf(               # <-- NOTE:  file=  not filename=
+          file   = path,
+          width  = width,
+          height = height,
+          family = "DejaVu Sans",
+          onefile = TRUE
+      )
+      on.exit(dev.off(), add = TRUE)
+
+      print(plot_obj)
+      invisible(path)
+      }
+  
+      # ── generate images ────────────────────────────────────────────────────
+      save_plot_pdf(
+        get_histogram_x(vals$df, vals$xvar, vals$tv_dir, vals$tv_threshold),
+        file.path(tmpdir, "xhist.pdf")
+      )
+      save_plot_pdf(
+        get_histogram_y(vals$df, vals$yvar, vals$ov_dir, vals$ov_threshold),
+        file.path(tmpdir, "yhist.pdf")
+      )
+      save_plot_pdf(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.pdf"))
+
+      stopifnot(
+        is.data.frame(vals$Zvars),
+        all(c("name", "grp", "Z") %in% names(vals$Zvars))
+      )
+
+      # ---- updated ribbon / final graph PNGs ------------------------------------
+      save_dot_to_pdf(
+        DiagrammeR::grViz(                       # << wrap the DOT string
+          get_updated_graph(graph_snapshot,
+                            vals$graph_update,
+                            vals$xvar, vals$yvar, vals$Zvars)
+        ),
+        file.path(tmpdir, "updatedgraph.pdf")
+      )
+
+      save_dot_to_pdf(
+        DiagrammeR::grViz(                       # << same here
+          get_final_graph(graph_snapshot,
+                          vals$xvar, vals$yvar, vals$Zvars)
+        ),
+        file.path(tmpdir, "finalgraph.pdf")
+      )
+        
+      # ── render report ──────────────────────────────────────────────────────
+      file.copy("scripts/AIRReport.qmd", file.path(tmpdir, "AIRReport.qmd"))
+  
+      withr::with_dir(tmpdir, {
+        quarto::quarto_render(
+          input         = "AIRReport.qmd",
+          output_format = "pdf",
+          output_file   = "AIRReport.pdf",
+          execute_params = list(
+            AIRHome      = AIRHome,
+            xvar         = vals$xvar,
+            yvar         = vals$yvar,
+            figure_cap   = figure_cap,
+            result_text  = result_text
+          )
+        )
+      })
+  
+      final_path <- file.path(tmpdir, "AIRReport.pdf")
+      if (!file.exists(final_path))
+        stop("Failed to generate report")
+  
+      # deliver to browser
+      file.copy(final_path, file, overwrite = TRUE)
+    },
+    error = function(e) {
+      message("PDF-build failed: ", e$message)
+      shiny::showNotification(
+        paste("Report generation failed:", e$message), type = "error", duration = NULL
+      )
+      stop(e)   # re-throw for Shiny’s 500 handler
+    })
+  }
+  ,contentType = "application/pdf"
 )
 ```
 
