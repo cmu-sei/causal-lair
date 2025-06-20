@@ -147,6 +147,7 @@ suppressMessages({
   library(hash)
   library(here)
   library(jsonlite)
+  library(logger)
   library(nnet)
   library(rJava)
   library(randomForest)
@@ -165,13 +166,68 @@ suppressMessages({
 })
 
 # --- session-wide defaults --------------------------------------------------
+
+AIRHome  <- here::here()
+setwd(AIRHome)
+
+log_dir  <- file.path(AIRHome, "logs")
+dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
+
+log_file <- file.path(
+  log_dir,
+  sprintf("%s_error_log.txt", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+)
+
+init_logging <- function(file) {
+  logger::log_appender(logger::appender_file(file))
+  logger::log_layout(logger::layout_glue_colors)  # pretty colours in console
+  logger::log_threshold(level = "DEBUG")
+}
+
+init_logging(log_file)
+
+# convenience shortcuts -------------------------------------------------
+log_debug <- function(...) logger::log_debug(...)
+log_info  <- function(...) logger::log_info(...)
+log_warn  <- function(...) logger::log_warn(...)
+log_error <- function(...) logger::log_error(...)
+
+log_info("AIR Tool startup – log initialised.")
+
+# send all console output from this point on to the log file
+log_con <- file(log_file, open = "a")
+sink(log_con) # stdout
+sink(log_con, type = "message") # stderr / messages / warnings
+
+on.exit({
+  sink(type = "message")    # restore when the session ends
+  sink()
+  close(log_con)
+}, add = TRUE)
+
+# Define the log directory and calculate the time threshold (30 days ago)
+
+time_threshold <- Sys.time() - 30 * 24 * 60 * 60  # 30 days in seconds
+
+# List all log files in the directory
+log_files <- list.files(log_dir, full.names = TRUE)
+
+# Get file information for each file
+files_info <- file.info(log_files)
+
+# Identify files where the modification time is older than the threshold
+old_files <- rownames(files_info)[files_info$mtime < time_threshold]
+
+# Remove the old log files
+if (length(old_files) > 0) {
+  file.remove(old_files)
+}
+
 theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc.
 
 #options(warn = 2)
 #options(shiny.trace = TRUE)
 
-AIRHome <- here()
-setwd(AIRHome)
 set.seed(123)
 
 ## Also tell the R graphics device so axis labels use it too
@@ -384,28 +440,6 @@ fix_knowledge <- function(df){
 }
 
 # change color of nodes in graph
-# change_node_color <- function(dot_code, node, color) {
-#   for (i in 1:length(node)) {
-#     # Create the node definition with the color
-#     node_definition <- paste0("\"", node[i], "\" [style=filled, fillcolor=", color, "];")
-#     
-#     # Append the new node definition to the beginning of the DOT code
-#     dot_code <- sub("digraph g \\{", paste0("digraph g {\r\n  ", node_definition), dot_code)
-#   }
-#   
-#   return(dot_code)
-# }
-# 
-# change_node_color <- function(dot_code, node, color) {
-#   # Create all node definitions as a single string with a single newline separator
-#   node_definitions <- paste0("\"", node, "\" [style=filled, fillcolor=", color, "];", collapse = "\n  ")
-#   
-#   # Replace once, inserting all node definitions
-#   dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definitions), dot_code)
-#   
-#   return(dot_code)
-# }
-
 change_node_color <- function(dot_code, node, color) {
   # Remove any accidental extra quotes from the color string
   color <- trimws(gsub("['\"]", "", color))
@@ -416,8 +450,9 @@ change_node_color <- function(dot_code, node, color) {
 }
 
 AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
-  # headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
-  # cat(headers_string, "\n")
+  headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
+  log_debug(headers_string)
+  
 
   MC_passing_cpdag_already_found <- FALSE
   best_cpdag_seen_so_far <- NULL
@@ -442,7 +477,7 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
       # Validate and apply knowledge tiers
       if (!is.null(knowledge) && nrow(knowledge) > 0) {
         if (!all(c("level", "variable") %in% colnames(knowledge))) {
-          warning("Knowledge file is missing required columns 'level' and 'variable'; skipping tier assignment.")
+          log_debug("Knowledge file is missing required columns 'level' and 'variable'; skipping tier assignment.")
         } else {
           # Add knowledge to specific tiers
           for (j in seq_len(nrow(knowledge))) {
@@ -453,11 +488,11 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
               tryCatch({
                 ts$add_to_tier(level, variable)
               }, error = function(e) {
-                warning(sprintf("Failed to add variable '%s' to tier %s: %s", 
+                log_debug(sprintf("Failed to add variable '%s' to tier %s: %s", 
                                 as.character(variable), as.character(level), conditionMessage(e)))
               })
             } else {
-              warning(sprintf("Invalid knowledge row at index %d: level=%s, variable=%s",
+              log_debug(sprintf("Invalid knowledge row at index %d: level=%s, variable=%s",
                               j, deparse(level), deparse(variable)))
             }
           }
@@ -478,13 +513,13 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
       cpdag_graph_when_PD_is_1 <- g2
 
       result_line <- tryCatch({
-        # sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f", pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges, ret$num_tests_ind, ret$num_tests_dep)
+        sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f", pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges, ret$num_tests_ind, ret$num_tests_dep)
       }, error = function(e) {
         "<incomplete>"
       })
 
       if (!is.null(ret) && is.list(ret) && !is.null(ret$ad_ind) && ret$ad_ind > 0.1) {
-        # cat(result_line, "\n")
+        log_debug(result_line)
 
         if (!MC_passing_cpdag_already_found || (num_edges < best_cpdag_seen_so_far_num_edges)) {
           best_cpdag_seen_so_far <- g2
@@ -502,7 +537,7 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
       }
 
     }, error = function(e) {
-      warning(sprintf("Failed iteration for PD=%.1f: %s", pd, conditionMessage(e)))
+      log_debug(sprintf("Failed iteration for PD=%.1f: %s", pd, conditionMessage(e)))
     })
   }
 
@@ -517,37 +552,37 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
     ))
   }
 
-  # cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
-  # cat(headers_string, "\n")
-  # cat(best_cpdag_seen_so_far_params, "\n")
+  log_debug("The best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:")
+  log_debug(headers_string)
+  log_debug(best_cpdag_seen_so_far_params)
 
   graph <- if (!is.null(best_cpdag_seen_so_far)) {
     # A valid CPDAG passed Markov Check
     best_cpdag_seen_so_far
   } else {
     # Nothing passed, but fallback to something rather than crashing
-    warning("Falling back to cpdag at PD=1.0, as no unif > 0.1 CPDAG was found")
+    log_debug("Falling back to cpdag at PD=1.0, as no unif > 0.1 CPDAG was found")
     cpdag_graph_when_PD_is_1
   }
 
   graph_str <- tryCatch(
     .jcall(graph, "Ljava/lang/String;", "toString"),
     error = function(e) {
-      warning(sprintf("Failed to convert graph to string: %s", conditionMessage(e)))
+      log_debug(sprintf("Failed to convert graph to string: %s", conditionMessage(e)))
       NULL
     }
   )
 
   if (!is.null(graphtxt_buffer)) {
     if (is.null(graph_str) || !nzchar(graph_str)) {
-      warning("graph_str is NULL or empty, not updating graphtxt_buffer.")
+      log_debug("graph_str is NULL or empty, not updating graphtxt_buffer.")
       graphtxt_buffer(NULL)
     } else {
       graphtxt_buffer(
         tryCatch(
           gsub("(?s)Graph Attributes:.*", "", graph_str, perl = TRUE),
           error = function(e) {
-            warning(sprintf("Regex failed on graph_str: %s", conditionMessage(e)))
+            log_debug(sprintf("Regex failed on graph_str: %s", conditionMessage(e)))
             graph_str  # fallback to raw string
           }
         )
@@ -568,13 +603,14 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   NEAR_RESPONSE = 2
   
   
-  # cat("Identification parameters: \n")
-  # cat("    maximum number of adjustment sets = ", MAX_NUM_SETS, "\n")  
-  # cat("    maximum distance from target endpoint (TREATMENT or RESPONSE) = ", MAX_DISTANCE_FROM_POINT, "\n")  
-  # cat("    maximum path length = ", MAX_PATH_LENGTH, "\n")  
+  log_debug("Identification parameters:")
+  log_debug("maximum number of adjustment sets = {p}", p = MAX_NUM_SETS)
+  log_debug("maximum distance from target endpoint (TREATMENT or RESPONSE) = {p}", p = MAX_DISTANCE_FROM_POINT)
+  log_debug("maximum path length = {p}", p = MAX_PATH_LENGTH)
   
   if (MC_passing_cpdag_already_found == TRUE) {
-    # cat("Searching for adjustment set(s) on the *** Treatment *** side:\n")
+    log_debug("Searching for adjustment set(s) on the *** Treatment *** side:")
+
     # Z1
     adj_sets_treatment = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
                                                 MAX_NUM_SETS,
@@ -582,9 +618,9 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 NEAR_TREATMENT,
                                                 MAX_PATH_LENGTH)
     
-    # ts$print_adjustment_sets(adj_sets_treatment)
+    ts$print_adjustment_sets(adj_sets_treatment)
     
-    # cat("Searching for adjustment sets on the *** Response *** side:\n")
+    log_debug("Searching for adjustment sets on the *** Response *** side:")
     # Z2
     adj_sets_response  = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
                                                 MAX_NUM_SETS,
@@ -592,7 +628,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 NEAR_RESPONSE,
                                                 MAX_PATH_LENGTH)
     
-    # ts$print_adjustment_sets(adj_sets_response)
+    ts$print_adjustment_sets(adj_sets_response)
   } 
   
   ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
@@ -604,9 +640,9 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
   near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
   
-  # cat("Total number of adjustment sets encountered (ignoring duplicates) = ", length(union_of_two_lists), "\n")
-  # cat("Size of Treatment - Response adjustment sets = ", length(near_treatment_not_near_response), "\n")
-  # cat("Size of Response - Treatment adjustment sets = ", length(near_response_not_near_treatment), "\n")
+  log_debug("Total number of adjustment sets encountered (ignoring duplicates) = {msg}", msg = length(union_of_two_lists))
+  log_debug("Size of Treatment - Response adjustment sets = {msg}", msg = length(near_treatment_not_near_response))
+  log_debug("Size of Response - Treatment adjustment sets = {msg}", msg = length(near_response_not_near_treatment))
   
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
@@ -616,8 +652,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     #   set of parents of the treatment variable, which can be empty, but that's still
     #   a valid adjustment set.) There are multiple solutions here, but get the end-user
     #   involved.
-    cat("*** No adjustment set found. Either: ")
-    cat("Revise knowledge (see AIR job aid) so search result has no undirected edges. ***\n")
+    log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges.")
     flag_no_adjustment_set_found = TRUE    
   } else if (length(union_of_two_lists)==1) {
     # Only one adjustment set is found altogether, and so we set the corresponding flag:
@@ -626,15 +661,15 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     return_second_adj_set = union_of_two_lists[[1]]  # same adjustment set
   } else {
     # We have at least two distinct adjustment sets; we prefer ones only from each side if practical, so, test alternatives first.
-    # cat("At least two adjustment sets found. \n")
+    log_debug("At least two adjustment sets found.")
     
     # if no adjustment set found near response that was not already near treatment:
     if (length(near_response_not_near_treatment) == 0) {
-      # cat("In this case, there is no adjustment set near response that is not also near treatment.\n")
+      log_debug("In this case, there is no adjustment set near response that is not also near treatment.")
       return_first_adj_set  = adj_sets_treatment[[1]]
       return_second_adj_set = adj_sets_treatment[[2]]
     } else if (length(near_treatment_not_near_response) == 0) {
-      # cat("In this case, there is no adjustment set near treatment that is not also near response.\n")
+      log_debug("In this case, there is no adjustment set near treatment that is not also near response.")
       return_first_adj_set  = adj_sets_response[[1]]
       return_second_adj_set = adj_sets_response[[2]]
     } else {
@@ -642,17 +677,17 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
       #   This is the ideal case to obtain greater diversity of adjustment sets, which 
       #   is also why we might want to set max_num_sets higher.
       #   Return two distinct adjustment sets, one from each side.
-      cat("In this case, we have found at least one adjustment set near treatment but not near response; and vice versa.\n")
+      log_debug("In this case, we have found at least one adjustment set near treatment but not near response; and vice versa.")
       return_first_adj_set  = near_treatment_not_near_response[[1]]
       return_second_adj_set = near_response_not_near_treatment[[1]]
     }
   }
   
-  # cat("Summary of results: \n")
-  # cat("First adjustment set to return: ", return_first_adj_set, "\n")
-  # cat("Second adjustment set to return: ", return_second_adj_set, "\n")
-  # cat("Flag status for no adjustment set found: ", flag_no_adjustment_set_found, "\n")
-  # cat("Flag status for only one adjustment set found: ", flag_only_one_adjustment_set_found, "\n")
+  log_debug("Summary of results:")
+  log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
+  log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
+  log_debug("Flag status for no adjustment set found: {msg}", msg = flag_no_adjustment_set_found)
+  log_debug("Flag status for only one adjustment set found: {msg}", msg = flag_only_one_adjustment_set_found)
   
   ### return the two adjustment sets plus the two flags instead.
   return(list(return_first_adj_set, return_second_adj_set))
@@ -668,14 +703,11 @@ runSuperLearner <- function(settings,
                             tv_threshold,
                             ov_threshold,
                             log_file){ 
-  cat(paste0(Sys.time(), " - ","Started superlearner with ",
-             paste(c(settings, AIRHome, tv_threshold, ov_threshold), collapse = ", ")), "\n", 
-      file = log_file, 
-      append = TRUE)
+  log_debug("Started super-learner with {line}", line = paste(c(settings, AIRHome, tv_threshold, ov_threshold), collapse = ', '))
   Z_level <- settings$Z_level
   doc_title <- settings$doc_title
   
-  cat("Reading in data\n", file = log_file, append = TRUE)
+  log_debug("Reading in data")
   confounders <- as.character(strsplit(x = settings$confounders, split = " ")[[1]])
   treatment <- as.character(settings$varName)
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
@@ -690,10 +722,7 @@ runSuperLearner <- function(settings,
   ##   outcome; leaving it as factor triggers the warning you saw)
   ## ────────────────────────────────────────────────────────────────
   if (is.factor(df[[outcome]])) {
-    warning(sprintf(
-      "Outcome %s is a factor – coercing to numeric {0,1}.",
-      outcome
-    ), call. = FALSE)
+    log_debug(sprintf("Outcome %s is a factor – coercing to numeric {0,1}.", outcome))
 
     ## factor levels are usually 1 / 2 after the binarisation above,
     ## so subtract 1 to make them {0,1}
@@ -704,7 +733,7 @@ runSuperLearner <- function(settings,
   ##### Define Superlearner -------------------
   # sl3_list_learners("binomial") 
   
-  cat("Building learner list\n", file = log_file, append = TRUE)
+  log_debug("Building learner list")
   lrnr_mean <- sl3::make_learner(sl3::Lrnr_mean)
   lrnr_glm <- sl3::make_learner(sl3::Lrnr_glm)
   lrnr_hal <- sl3::make_learner(sl3::Lrnr_hal9001)
@@ -764,18 +793,17 @@ runSuperLearner <- function(settings,
   ##### RUN TMLE3 -------------------------------
   set.seed(123)
   ### this is where the parallel is breaking
-  cat("Starting TMLE\n", file = log_file, append = TRUE)
+  log_debug("Starting TMLE")
   tryCatch({
     tmle_fit_ <- tmle3::tmle3(tmle_spec = ate_spec,
                  data = df,
                  node_list = nodes_,
                  learner_list = learner_list)
   }, error = function(e) {
-    cat(sprintf("Error in tmle3 call: %s\n", conditionMessage(e)), 
-        file = log_file, append = TRUE)
+    log_debug("Error in tmle3 call: {msg}", msg = conditionMessage(e))
     stop(e)
   })
-  cat("Pulling out TMLE scores\n", file = log_file, append = TRUE)
+  log_debug("Pulling out TMLE scores")
   tmle_task <- ate_spec$make_tmle_task(df, nodes_)
   
   initial_likelihood <- ate_spec$make_initial_likelihood(
@@ -852,7 +880,7 @@ runSuperLearner <- function(settings,
   # get likelihoods from object
   cf_likelihood_values0 <- cf_likelihood0$get_likelihoods(tmle_task, "A")
   # We see that the likelihood values for the A node are all either 0 or 1, as would be expected from an indicator likelihood function. In addition, the likelihood values for the non-intervention nodes have not changed.
-  cat("Building Output\n", file = log_file, append = TRUE)
+  log_debug("Building Output")
   ## output individual row values
   # df_out <- df[,c(nodes_$A, nodes_$Y, nodes_$W)]
   df_out <- df |> select(nodes_$A, nodes_$Y, nodes_$W)
@@ -867,7 +895,7 @@ runSuperLearner <- function(settings,
   df_out$counterfactual_1 <- cf_likelihood_values1
   df_out$g_fit_pred <- g_fit$predict() 
   df_out$Q_fit_pred <- Q_fit$predict()
-  cat("Finished SuperLearner – returning results\n", file = log_file, append = TRUE)
+  log_debug("Finished SuperLearner – returning results")
 
   # -------- FINAL RETURN (nothing after this executes) ------------
   list(
@@ -884,12 +912,10 @@ processResults <- function(settings,
                            model_ate,
                            log_file,
                            move_results = FALSE) {
-  log_msg <- function(...) {
-    cat(paste0(Sys.time(), " - ", ...), "\n", file = log_file, append = TRUE)
-  }
+  log_debug("Started processResults()")
+  log_debug("Settings: {line}",
+    line = paste(c(settings, AIRHome, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
 
-  log_msg("Started processResults()")
-  log_msg("Settings:", paste(c(settings, AIRHome, tv_threshold, ov_threshold, model_yn, model_ate), collapse = ", "))
 
   treatment <- as.character(settings$varName)
   outcome <- as.character(df_vars[df_vars$var == "OV", ]$val)
@@ -921,10 +947,10 @@ processResults <- function(settings,
   xtest_0 <- mutate(x_test, !!treatment := 0)
   xtest_1 <- mutate(x_test, !!treatment := 1)
 
-  log_msg("Data loaded and split.")
+  log_info("Data loaded and split.")
 
   if (model_yn == "No") {
-    log_msg("Running new ML models")
+    log_info("Running new ML models")
 
     ## --- helper: a “safe” GLM that gracefully falls back to lm() -------------
     safe_glm <- function(formula, data, ...) {
@@ -935,17 +961,11 @@ processResults <- function(settings,
           )
         },
         warning = function(w) {
-          log_msg(sprintf(
-            "⚠️  glm(): %s – falling back to linear regression.", 
-            conditionMessage(w)
-          ))
+          log_info(sprintf("⚠️  glm(): %s – falling back to linear regression.", conditionMessage(w)))
           lm(formula, data = data)              # fall back → numeric preds
         },
         error = function(e) {
-          log_msg(sprintf(
-            "❌  glm() failed: %s – using lm() instead.", 
-            conditionMessage(e)
-          ))
+          log_info(sprintf("❌  glm() failed: %s – using lm() instead.", conditionMessage(e)))
           lm(formula, data = data)
         }
       )
@@ -966,10 +986,7 @@ processResults <- function(settings,
           )
         },
         warning = function(w) {
-          log_msg(sprintf(
-            "⚠️  rpart(): %s – continuing with produced tree.", 
-            conditionMessage(w)
-          ))
+          log_info(sprintf("⚠️  rpart(): %s – continuing with produced tree.", conditionMessage(w)))
           invokeRestart("muffleWarning")        # keep going
         }
       )
@@ -991,10 +1008,7 @@ processResults <- function(settings,
           )
         },
         warning = function(w) {
-          log_msg(sprintf(
-            "⚠️  svm(): %s – continuing with produced model.",
-            conditionMessage(w)
-          ))
+          log_info(sprintf("⚠️  svm(): %s – continuing with produced model.", conditionMessage(w)))
           invokeRestart("muffleWarning")
         }
       )
@@ -1065,7 +1079,7 @@ processResults <- function(settings,
                                              covariates = covariates))
     sl_ate <- mean(pred_sl1) - mean(pred_sl0)
 
-    log_msg("Model training complete")
+    log_info("Model training complete")
 
     ## five learners → PICK ONE that represents “the classifier”
     ate_df_all <- data.frame(
@@ -1082,11 +1096,11 @@ processResults <- function(settings,
     ml_buffer(ate_df_ref)       # now identical semantics to options 1 & 2
 
   } else {
-    log_msg(sprintf("Using existing model config: %s", model_yn))
+    log_info(sprintf("Using existing model config: %s", model_yn))
 
     if (model_yn == "Yes") {
       if (is.null(model_in)) {
-        log_msg("⚠️  No model file was supplied – skipping custom-model ATE.")
+        log_info("⚠️  No model file was supplied – skipping custom-model ATE.")
         return(invisible(NULL))            # bail out, nothing downstream to do
       }
   
@@ -1131,7 +1145,7 @@ processResults <- function(settings,
                   "z2_Mean","z2_LCI","z2_UCI")],
         ~ all(is.na(.x))
       )) {
-    log_msg("❌ All TMLE calls returned NA — nothing to summarise.")
+    log_info("❌ All TMLE calls returned NA — nothing to summarise.")
     shiny::showNotification(
       "All adjustment-set learners failed – no ATEs to display.",
       type = "error", duration = 8
@@ -1151,7 +1165,7 @@ processResults <- function(settings,
       dplyr::across(-c(Group, Treatment), ~ as.numeric(unlist(.x)))
     )
   
-  log_msg(
+  log_info(
     "results snapshot >>>\n",
     paste(
       utils::capture.output({
@@ -1204,7 +1218,7 @@ processResults <- function(settings,
 
   ## ── NEW: extra guard & verbose logging ──────────────────────────────
   if (!"Treatment" %in% names(final_results)) {
-    log_msg("⚠️  Treatment column absent – creating it from settings$varName.")
+    log_info("⚠️  Treatment column absent – creating it from settings$varName.")
     final_results <- dplyr::mutate(final_results,
                                    Treatment = settings$varName)
   } else {
@@ -1223,7 +1237,7 @@ processResults <- function(settings,
   }
 
   # log a concise snapshot for post-mortem debugging
-  log_msg(
+  log_info(
     "final_results snapshot →\n",
     paste(
       utils::capture.output({
@@ -1256,7 +1270,7 @@ processResults <- function(settings,
   results_out_buffer(combined_row)
   assign("results_detailed", final_results, envir = .GlobalEnv)   # <<- optional
   
-  log_msg("Results processed and stored.")
+  log_info("Results processed and stored.")
 }
 
 ## Create four simple methods to help parse a line
@@ -1761,14 +1775,6 @@ if (!dir.exists(paste0(AIRHome, "/input/"))) {
   dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
 }
 
-if (!dir.exists(paste0(AIRHome, "/plots/"))) {
-  dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
-}
-
-if (!dir.exists(paste0(AIRHome, "/logs/"))) {
-  dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
-}
-
 if (Sys.info()["sysname"] == "Linux") {
   # --- BEGIN INLINE: scripts/tetrad_utils.R ---
 # ----- Utility Functions -----
@@ -1805,7 +1811,7 @@ visualize_graph <- function(graph) {
       dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph)
       grViz(dot)
     } else {
-      cat("No graph generated. Please check the BOSS execution.\n")
+      log_debug("No graph generated. Please check the BOSS execution.")
     }
   }
 }
@@ -1841,7 +1847,7 @@ TetradSearch <- setRefClass(
     # @param data A data frame containing the dataset to be analyzed.
     # @return A TetradSearch object.
     initialize = function(data) {
-      # cat("Initializing TetradSearch object...\n")
+      log_debug("Initializing TetradSearch object...")
       
       if (!is.data.frame(data)) {
         stop("Data must be a data.frame")
@@ -1849,19 +1855,19 @@ TetradSearch <- setRefClass(
       
       .self$data <- data
       .self$sample_size <- nrow(data)
-      # cat("Data frame dimensions:", dim(data), "\n")
-      # cat("Sample size set to:", .self$sample_size, "\n")
+      log_debug("Data frame dimensions: {msg}", msg = dim(data))
+      log_debug("Sample size set to: {msg}", msg = .self$sample_size)
       
       .self$data_model <- .self$data_frame_to_tetrad_dataset(data)
       .self$data_model <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
-      # cat("Tetrad DataSet created.\n")
+      log_debug("Tetrad DataSet created.")
       
       .self$params <- .jnew("edu.cmu.tetrad.util.Parameters")
       
       .self$knowledge <- .jnew("edu/cmu/tetrad/data/Knowledge")
-      # cat("Knowledge instance created.\n")
-      # cat("TetradSearch object initialized successfully.\n")
+      log_debug("Knowledge instance created.")
+      log_debug("TetradSearch object initialized successfully.")
     },
     
     # Make sure the score object is initialized
@@ -1903,14 +1909,14 @@ TetradSearch <- setRefClass(
     # @param tier The tier to which the variable should be added.
     # @param var_name The name of the variable to add.
     add_to_tier = function(tier, var_name) {
-      # cat("Adding variable", var_name, "to tier", tier, "...\n")
+      log_debug("Adding variable {var_name} to tier {tier}...", var_name = var_name, tier = tier)
       tryCatch({
         tier <- as.integer(tier)
         var_name <- as.character(var_name)
         .jcall(.self$knowledge, "V", "addToTier", tier, var_name)
-        # cat("Variable", var_name, "added to tier", tier, ".\n")
+        log_debug("Variable {var_name} added to tier {tier}", var_name = var_name, tier = tier)
       }, error = function(e) {
-        cat("Error adding variable to tier:", e$message, "\n")
+        log_debug("Error adding variable to tier: {msg}", msg = e$message)
       })
     },
     
@@ -1928,7 +1934,7 @@ TetradSearch <- setRefClass(
       .self$.setParamDouble("penaltyDiscount", penalty_discount)
       .self$score <- .jnew("edu.cmu.tetrad.algcomparison.score.SemBicScore")
       .self$score <- .jcast(.self$score, "edu.cmu.tetrad.algcomparison.score.ScoreWrapper")
-      # cat("SemBicScore object created with penalty discount set.\n")
+      log_debug("SemBicScore object created with penalty discount set.")
     },
     
     # Set the test to Fisher Z
@@ -1944,7 +1950,7 @@ TetradSearch <- setRefClass(
         .self$test <- .jcast(.self$test, "edu.cmu.tetrad.algcomparison.independence.IndependenceWrapper")
       }
       
-      # cat("Fisher Z object created with alpha set.\n")
+      log_debug("Fisher Z object created with alpha set.")
     },
     
     # --- Internal parameter helpers ---
@@ -1964,7 +1970,7 @@ TetradSearch <- setRefClass(
     # @param output_cpdag TRUE if a CPDAG should be output, FALSE if a DAG should be output.
     # @return The estimated graph.
     run_boss = function(num_starts = 1, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
-      # cat("Running BOSS algorithm...\n")
+      log_debug("Running BOSS algorithm...")
       
       .self$.setParam("useBes", use_bes)
       .self$.setParamInt("numStarts", num_starts)
@@ -1980,7 +1986,7 @@ TetradSearch <- setRefClass(
       graph <<- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
       .self$graph <- graph
       
-      # cat("BOSS search completed.\n")
+      log_debug("BOSS search completed.")
     },
 
     get_java = function() {
@@ -1989,11 +1995,12 @@ TetradSearch <- setRefClass(
     
     # This method prints the structure of the graph estimated by the most recent algorithm call.
     print_graph = function() {
-      # cat("Attempting to print the graph...\n")
+      log_debug("Attempting to print the graph...")
       if (is.null(.self$graph)) {
-        cat("No graph generated yet. Please run an algorithm first.\n")
+        log_debug("No graph generated yet. Please run an algorithm first.")
       } else {
-        # cat("Graph structure:\n", .self$graph$toString(), "\n")
+        log_debug("Graph structure:")
+        log_debug("{msg}", msg = .self$graph)
       }
       invisible(.self$graph)
     },
@@ -2027,7 +2034,7 @@ TetradSearch <- setRefClass(
     # list if source == target or there is no amenable path from source to target.
     get_adjustment_sets = function(graph, source, target, max_num_sets = 10, max_distance_from_point = 5,
                                    near_which_endpoint = 1, max_path_length = 20) {
-      # cat("Getting adjustment sets for:", source, "->", target, "\n")
+      log_debug("Getting adjustment sets for: {source} -> {target}", source = source, target = target)
       
       # Look up Node objects by name
       source_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", source)
@@ -2052,7 +2059,7 @@ TetradSearch <- setRefClass(
       
       
       size <- .jcall(sets_list, "I", "size")
-      # cat("Number of adjustment sets:", size, "\n")
+      log_debug("Number of adjustment sets: {size}", size = size)
       
       # Convert Java List<Set<Node>> to R list of character vectors
       size <- .jcall(sets_list, "I", "size")
@@ -2069,17 +2076,21 @@ TetradSearch <- setRefClass(
     
     print_adjustment_sets = function(adjustment_sets) {
       if (length(adjustment_sets) == 0) {
-        # cat("No adjustment sets found.\n")
+        log_debug("No adjustment sets found.")
         return()
       }
       
       for (i in seq_along(adjustment_sets)) {
         set <- adjustment_sets[[i]]
-        # cat(sprintf("Adjustment set %d: ", i))
+      
+        # headline
+        log_debug("Adjustment set {i}:", i = i)
+      
         if (length(set) == 0) {
-          cat("(Adjustment set is empty.)\n")
+          log_debug("Adjustment set is empty.")
         } else {
-          # cat(paste(set, collapse = ", "), "\n")
+          # collapse first, then log
+          log_debug(paste(set, collapse = ", "))
         }
       }
     },
@@ -2099,7 +2110,7 @@ TetradSearch <- setRefClass(
     # @return Marov checker statistics as a named list.
     markov_check = function(graph, percent_resample = 1, condition_set_type = "ORDERED_LOCAL_MARKOV",
                             find_smallest_subset = FALSE, parallelized = TRUE, effective_sample_size = -1) {
-      # cat("Running Markov check...\n")
+      log_debug("Running Markov check...")
       
       if (is.null(.self$mc_test)) {
         stop("A test for the Markov Checker has not been set. Please call a `use_*` method with `use_for_mc = TRUE`.")
@@ -2228,13 +2239,6 @@ TetradSearch <- setRefClass(
     dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
   }
   
-  if (!dir.exists(paste0(AIRHome, "/plots/"))) {
-    dir.create(paste0(AIRHome, "/plots/"), recursive = TRUE)
-  }
-  
-  if (!dir.exists(paste0(AIRHome, "/logs/"))) {
-    dir.create(paste0(AIRHome, "/logs/"), recursive = TRUE)
-  }
   # Setup Java and Tetrad
   ## if running on local machine, uncomment out the next line
   # setup_tetrad_environment()
@@ -2248,26 +2252,6 @@ TetradSearch <- setRefClass(
   # print(paste("Java version:", java_version))
 } 
 
-## create a log file, then remove any logs over 30 days old
-log_file <- paste0("logs/", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"), "_error_log.txt")
-cat("Begin Log\n", file = log_file, append = FALSE)
-# Define the log directory and calculate the time threshold (7 days ago)
-log_dir <- "logs"
-time_threshold <- Sys.time() - 30 * 24 * 60 * 60  # 30 days in seconds
-
-# List all log files in the directory
-log_files <- list.files(log_dir, full.names = TRUE)
-
-# Get file information for each file
-files_info <- file.info(log_files)
-
-# Identify files where the modification time is older than the threshold
-old_files <- rownames(files_info)[files_info$mtime < time_threshold]
-
-# Remove the old log files
-if (length(old_files) > 0) {
-  file.remove(old_files)
-}
 ```
 
 # Docs
@@ -2345,12 +2329,7 @@ model_in <- reactive({
   ## use the original filename to preserve the extension
   ext <- tolower(tools::file_ext(input$model_in$name))
 
-  cat(sprintf("%s - Upload received: %s → %s  (ext = %s)\n",
-              Sys.time(),
-              input$model_in$name,
-              input$model_in$datapath,
-              ext),
-      file = log_file, append = TRUE)
+  log_debug("Upload received: {b} → {c}  (ext = {d})", b=input$model_in$name, c=input$model_in$datapath, d=ext)
   tryCatch({
 
     mdl <- switch(
@@ -2399,10 +2378,10 @@ model_in <- reactive({
            "Loaded object does not appear to have a usable predict() method.")
     )
 
-    cat(sprintf("%s - Model loaded (%s): %s\n", Sys.time(), ext, input$model_in$name), file = log_file, append = TRUE)
+    log_debug("Model loaded ({a}): {b}", a=ext, b=input$model_in$name)
     mdl
   }, error = function(e) {
-    cat(sprintf("%s - Error reading model: %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
+    log_debug("Error reading model: {a}", a=conditionMessage(e))
     NULL
   })
 })
@@ -2410,12 +2389,12 @@ model_in <- reactive({
 df <- reactive({
   tryCatch({
     df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
-    cat(sprintf("%s - Read in data file: %s\n", Sys.time(), input$file1$datapath), file = log_file, append = TRUE)
+    log_debug("Read in data file: {msg}", msg = input$file1$datapath)
     continuous_columns <- c(1, ncol(df))
     df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
     df
   }, error = function(e) {
-    cat(sprintf("%s - Error reading data file: %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
+    log_debug("Error reading data file: {msg}", msg = conditionMessage(e))
     NULL
   })
 })
@@ -2424,7 +2403,7 @@ knowledge <- reactive({
   req(input$file2)
   tryCatch({
     path2 <- input$file2$datapath
-    cat(sprintf("%s - Read in knowledge file: %s\n", Sys.time(), path2), file = log_file, append = TRUE)
+    log_debug("Read in knowledge file: {p}", p = path2)
 
     ext <- tolower(tools::file_ext(path2))
     knowledge_in <- switch(ext,
@@ -2444,7 +2423,7 @@ knowledge <- reactive({
     file_check(TRUE)
     fixed
   }, error = function(e) {
-    cat(sprintf("%s - Error in knowledge(): %s\n", Sys.time(), conditionMessage(e)), file = log_file, append = TRUE)
+    log_debug("Error in knowledge(): {msg}", msg = conditionMessage(e))
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "Upload Failed",
@@ -2508,7 +2487,7 @@ observeEvent(input$disconnect, {
   tryCatch({
     session$close()
   }, error = function(e) {
-    cat(sprintf("Error in disconnect observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
+    log_debug("Error in disconnect observer: {msg}", msg =conditionMessage(e))
   })
 })
 
@@ -2517,9 +2496,9 @@ observeEvent(input$file2, {
   tryCatch({
     result <- knowledge()
     # Optionally log result
-    # cat(str(result), file = log_file, append = TRUE)
+    log_debug("{line}", line = paste(capture.output(str(result)), collapse = "\n"))
   }, error = function(e) {
-    cat(sprintf("Error in file2 observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
+    log_debug("Error in file2 observer: {msg}", msg = conditionMessage(e))
   })
 })
 
@@ -2542,7 +2521,7 @@ observeEvent(input$buildButton, {
     graphtxt <- tryCatch(
       gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
       error = function(e) {
-        warning(sprintf("Regex error on graph string: %s", conditionMessage(e)))
+        log_debug("Regex error on graph string: {msg}", msg = conditionMessage(e))
         graphtxt_raw  # fallback to raw if regex fails
       }
     )
@@ -2559,7 +2538,7 @@ observeEvent(input$buildButton, {
 
     output$blankGraph <- renderGrViz({
       req(graph_complete(), rv$dot)
-      cat("Graph Built\n", file = log_file, append = TRUE)
+      log_debug("Graph Built.")
       grViz(rv$dot)
     })
 
@@ -2581,7 +2560,7 @@ observeEvent(input$buildButton, {
     }, error = function(inner) {
       paste0("Unknown error in buildButton observer: ", capture.output(str(e)), collapse = "\n")
     })
-    cat(err_summary, file = log_file, append = TRUE)
+    log_debug(err_summary)
   })
 })
 
@@ -2616,11 +2595,11 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
   assign("Zvars", Zvars_loc, envir = .GlobalEnv)
 
   ## ---------- 2. logging (unchanged) ---------------------------------------
-  cat("Graph Updated\n", file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar), file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar), file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected X threshold: %s\n", Sys.time(), input$tv_threshold), file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected Y threshold: %s\n", Sys.time(), input$ov_threshold), file = log_file, append = TRUE)
+  log_debug("Graph Updated.")
+  log_debug("Selected X variable: {msg}", msg = input$xvar)
+  log_debug("Selected Y variable: {msg}", msg = input$yvar)
+  log_debug("Selected X threshold: {msg}", msg = input$tv_threshold)
+  log_debug("Selected Y threshold: {msg}", msg = input$ov_threshold)
 
   ## ---------- 3. re-render the graph ---------------------------------------
   output$blankGraph <- renderGrViz({
@@ -2628,13 +2607,13 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
     grViz( highlighted_graph() )   # highlighted_graph() already reacts
   })
 })
-  
+
 observeEvent(input$goButton, {
   tryCatch({
     print(ls(pattern = "df", envir = .GlobalEnv))
 
-    cat(paste0(Sys.time(), " - Selected model_exist: ", input$model_exist, "\n"), file = log_file, append = TRUE)
-    cat(paste0(Sys.time(), " - Selected ate_in: ", input$ate_in, "\n"), file = log_file, append = TRUE)
+    log_debug("Selected model_exist: {msg}", msg = input$model_exist)
+    log_debug("Selected ate_in: {msg}", msg = input$ate_in)
 
     withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
       incProgress(0.1, message = "Calculating Adjustment Sets", detail = "Creating Compute Environment")
@@ -2653,7 +2632,7 @@ observeEvent(input$goButton, {
         stringsAsFactors = FALSE
       ))
 
-      cat("Calculating Adjustment Sets\n", file = log_file, append = TRUE)
+      log_debug("Calculating Adjustment Sets")
 
       tryCatch({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
@@ -2714,7 +2693,7 @@ observeEvent(input$goButton, {
                             ov_threshold_val,
                             log_file),
             error = function(e) {
-              cat(sprintf("SuperLearner: Error i=%s, j=%s: %s", i, j, conditionMessage(e)), file = log_file, sep = "\n", append = TRUE)
+              log_debug("SuperLearner: Error i={i}, j={j}: {msg}", msg = conditionMessage(e), i = i, j = j)
               NULL
             }
           )
@@ -2756,14 +2735,14 @@ observeEvent(input$goButton, {
                          model_ate     = input$ate_in,
                          log_file      = log_file)
         }, error = function(e) {
-          cat(sprintf("processResults() failed: %s", conditionMessage(e)), file = log_file, append = TRUE)
+          log_debug("processResults() failed: {msg}", msg = conditionMessage(e))
         })
 
         incProgress(0.2, message = "Processing Results")
-        cat("Successfully closed parallel cluster\n", file = log_file, append = TRUE)
+        log_debug("Successfully closed parallel cluster")
 
       }, error = function(e) {
-        cat(sprintf("Fatal error during ATE estimation: %s", conditionMessage(e)), file = log_file, append = TRUE)
+        log_debug("Fatal error during ATE estimation: {msg}", msg = conditionMessage(e))
       })
 
       calc_complete(TRUE)
@@ -2786,7 +2765,7 @@ observeEvent(input$goButton, {
     })
 
   }, error = function(e) {
-    cat(paste0(Sys.time(), " - Top-level observeEvent(goButton) failure: ", conditionMessage(e), "\n"), file = log_file, append = TRUE)
+    log_debug("Top-level observeEvent(goButton) failure: {msg}", msg = conditionMessage(e))
   })
 })
 

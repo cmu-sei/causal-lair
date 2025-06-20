@@ -27,5 +27,12 @@
 
 IP=$(ip route get 1 | awk '{print $7}')
 
-quarto preview /workspace/airtool.qmd --port 4173 --host $IP
+echo ""
+echo "**********************************************************"
+echo "* You can find the AIR Tool at http://$IP:4173/ *"
+echo "**********************************************************"
+echo ""
+# This makes quarto completely silent on the console. If you want the noisier version, use the command below.
+quarto preview /workspace/airtool.qmd --server --quiet --port 4173 --host $IP
+# quarto preview /workspace/airtool.qmd --port 4173 --host $IP
 

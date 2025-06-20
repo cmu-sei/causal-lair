@@ -222,6 +222,7 @@
 
         rWithPkgs = pkgs.rWrapper.override {
           packages = [
+            pkgs.rPackages.logger
             pkgs.rPackages.udunits2      # libudunits2-dev
             pkgs.rPackages.AIPW
             pkgs.rPackages.devtools
