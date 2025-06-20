@@ -61,7 +61,7 @@ sudo apt-get install -y ./quarto-1.5.57-linux-amd64.deb
 
 
 #########################################################
-### next, navigate to directory where AIRTool_v2.qmd lives
+### next, navigate to directory where airtool.qmd lives
 #########################################################
 
 
@@ -81,6 +81,6 @@ sudo Rscript scripts/install_dependencies.R
 #########################################################
 
 # this will need to go in a bash script to be run
-# quarto preview AIRTool_v2.qmd --server
+# quarto preview airtool.qmd --server
 
 #########################################################

@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
 #| echo: false
 #| include: false
 
-#suppressMessages({
+suppressMessages({
   library(AIPW)
   library(base64enc)
   library(DiagrammeR)
@@ -162,12 +162,13 @@ document.addEventListener("DOMContentLoaded", () => {
   library(tmle3)
   library(xgboost)
   library(xml2)
-#})
+})
 
 # --- session-wide defaults --------------------------------------------------
 theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc.
 
 #options(warn = 2)
+#options(shiny.trace = TRUE)
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -193,8 +194,6 @@ combined_buffer <- reactiveVal(data.frame())   # exactly 1 row (ribbon plot)
 
 # create a shared reactiveValues object to pass variables around
 rv$dot <- NULL  # define once in app init
-
-options(shiny.trace = TRUE)
 
 # --- BEGIN INLINE: scripts/AIR_functions.R ---
 getLocalTags <- function() {
@@ -417,8 +416,8 @@ change_node_color <- function(dot_code, node, color) {
 }
 
 AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
-  headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
-  cat(headers_string, "\n")
+  # headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
+  # cat(headers_string, "\n")
 
   MC_passing_cpdag_already_found <- FALSE
   best_cpdag_seen_so_far <- NULL
@@ -479,17 +478,13 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
       cpdag_graph_when_PD_is_1 <- g2
 
       result_line <- tryCatch({
-        sprintf(
-          "%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f",
-          pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges,
-          ret$num_tests_ind, ret$num_tests_dep
-        )
+        # sprintf("%.1f\t%.4f  \t%.4f   \t%.4f  \t%.2f  \t%.0f  \t%.0f  \t\t%.0f", pd, ret$frac_dep_ind, ret$frac_dep_dep, ret$ad_ind, bic, num_edges, ret$num_tests_ind, ret$num_tests_dep)
       }, error = function(e) {
         "<incomplete>"
       })
 
       if (!is.null(ret) && is.list(ret) && !is.null(ret$ad_ind) && ret$ad_ind > 0.1) {
-        cat(result_line, "\n")
+        # cat(result_line, "\n")
 
         if (!MC_passing_cpdag_already_found || (num_edges < best_cpdag_seen_so_far_num_edges)) {
           best_cpdag_seen_so_far <- g2
@@ -522,9 +517,9 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
     ))
   }
 
-  cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
-  cat(headers_string, "\n")
-  cat(best_cpdag_seen_so_far_params, "\n")
+  # cat("\nThe best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:\n")
+  # cat(headers_string, "\n")
+  # cat(best_cpdag_seen_so_far_params, "\n")
 
   graph <- if (!is.null(best_cpdag_seen_so_far)) {
     # A valid CPDAG passed Markov Check
@@ -573,13 +568,13 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   NEAR_RESPONSE = 2
   
   
-  cat("Identification parameters: \n")
-  cat("    maximum number of adjustment sets = ", MAX_NUM_SETS, "\n")  
-  cat("    maximum distance from target endpoint (TREATMENT or RESPONSE) = ", MAX_DISTANCE_FROM_POINT, "\n")  
-  cat("    maximum path length = ", MAX_PATH_LENGTH, "\n")  
+  # cat("Identification parameters: \n")
+  # cat("    maximum number of adjustment sets = ", MAX_NUM_SETS, "\n")  
+  # cat("    maximum distance from target endpoint (TREATMENT or RESPONSE) = ", MAX_DISTANCE_FROM_POINT, "\n")  
+  # cat("    maximum path length = ", MAX_PATH_LENGTH, "\n")  
   
   if (MC_passing_cpdag_already_found == TRUE) {
-    cat("Searching for adjustment set(s) on the *** Treatment *** side:\n")
+    # cat("Searching for adjustment set(s) on the *** Treatment *** side:\n")
     # Z1
     adj_sets_treatment = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
                                                 MAX_NUM_SETS,
@@ -587,9 +582,9 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 NEAR_TREATMENT,
                                                 MAX_PATH_LENGTH)
     
-    ts$print_adjustment_sets(adj_sets_treatment)
+    # ts$print_adjustment_sets(adj_sets_treatment)
     
-    cat("Searching for adjustment sets on the *** Response *** side:\n")
+    # cat("Searching for adjustment sets on the *** Response *** side:\n")
     # Z2
     adj_sets_response  = ts$get_adjustment_sets(best_cpdag_seen_so_far, TREATMENT_NAME, RESPONSE_NAME,
                                                 MAX_NUM_SETS,
@@ -597,7 +592,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 NEAR_RESPONSE,
                                                 MAX_PATH_LENGTH)
     
-    ts$print_adjustment_sets(adj_sets_response)
+    # ts$print_adjustment_sets(adj_sets_response)
   } 
   
   ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
@@ -609,9 +604,9 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
   near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
   
-  cat("Total number of adjustment sets encountered (ignoring duplicates) = ", length(union_of_two_lists), "\n")
-  cat("Size of Treatment - Response adjustment sets = ", length(near_treatment_not_near_response), "\n")
-  cat("Size of Response - Treatment adjustment sets = ", length(near_response_not_near_treatment), "\n")
+  # cat("Total number of adjustment sets encountered (ignoring duplicates) = ", length(union_of_two_lists), "\n")
+  # cat("Size of Treatment - Response adjustment sets = ", length(near_treatment_not_near_response), "\n")
+  # cat("Size of Response - Treatment adjustment sets = ", length(near_response_not_near_treatment), "\n")
   
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
@@ -631,15 +626,15 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     return_second_adj_set = union_of_two_lists[[1]]  # same adjustment set
   } else {
     # We have at least two distinct adjustment sets; we prefer ones only from each side if practical, so, test alternatives first.
-    cat("At least two adjustment sets found. \n")
+    # cat("At least two adjustment sets found. \n")
     
     # if no adjustment set found near response that was not already near treatment:
     if (length(near_response_not_near_treatment) == 0) {
-      cat("In this case, there is no adjustment set near response that is not also near treatment.\n")
+      # cat("In this case, there is no adjustment set near response that is not also near treatment.\n")
       return_first_adj_set  = adj_sets_treatment[[1]]
       return_second_adj_set = adj_sets_treatment[[2]]
     } else if (length(near_treatment_not_near_response) == 0) {
-      cat("In this case, there is no adjustment set near treatment that is not also near response.\n")
+      # cat("In this case, there is no adjustment set near treatment that is not also near response.\n")
       return_first_adj_set  = adj_sets_response[[1]]
       return_second_adj_set = adj_sets_response[[2]]
     } else {
@@ -653,11 +648,11 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     }
   }
   
-  cat("Summary of results: \n")
-  cat("First adjustment set to return: ", return_first_adj_set, "\n")
-  cat("Second adjustment set to return: ", return_second_adj_set, "\n")
-  cat("Flag status for no adjustment set found: ", flag_no_adjustment_set_found, "\n")
-  cat("Flag status for only one adjustment set found: ", flag_only_one_adjustment_set_found, "\n")
+  # cat("Summary of results: \n")
+  # cat("First adjustment set to return: ", return_first_adj_set, "\n")
+  # cat("Second adjustment set to return: ", return_second_adj_set, "\n")
+  # cat("Flag status for no adjustment set found: ", flag_no_adjustment_set_found, "\n")
+  # cat("Flag status for only one adjustment set found: ", flag_only_one_adjustment_set_found, "\n")
   
   ### return the two adjustment sets plus the two flags instead.
   return(list(return_first_adj_set, return_second_adj_set))
@@ -1785,32 +1780,6 @@ if (TETRAD_PATH == "") {
   stop("The TETRAD_PATH environment variable is not set. Please set it to the path of the Tetrad jar.")
 }
 
-# Function to create the variable list (ArrayList<Node>)
-#' Create variable list for Covariance Matrix
-#'
-#' This function creates an ArrayList of Nodes from the data frame's column names
-#' to be used in the Covariance Matrix.
-#'
-#' @param data The data frame containing the variables.
-#' @return A Java List of Nodes.
-create_variables <- function(data) {
-  #cat("Creating variable list from data...\n")
-  
-  vars <- .jnew("java/util/ArrayList")
-  
-  for (name in colnames(data)) {
-    #cat("Adding variable:", name, "to the list.\n")
-    variable <- .jnew("edu/cmu/tetrad/data/ContinuousVariable", name)
-    node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
-    .jcall(vars, "Z", "add", .jcast(node, "java/lang/Object"))
-  }
-  
-  vars <- .jcast(vars, "java/util/List")
-  #cat("Variable list creation complete. Number of variables added:", length(vars), "\n")
-  
-  return(vars)
-}
-
 # ----- Initialize Java and Check Version -----
 initialize_java <- function() {
   
@@ -1872,7 +1841,7 @@ TetradSearch <- setRefClass(
     # @param data A data frame containing the dataset to be analyzed.
     # @return A TetradSearch object.
     initialize = function(data) {
-      cat("Initializing TetradSearch object...\n")
+      # cat("Initializing TetradSearch object...\n")
       
       if (!is.data.frame(data)) {
         stop("Data must be a data.frame")
@@ -1880,19 +1849,19 @@ TetradSearch <- setRefClass(
       
       .self$data <- data
       .self$sample_size <- nrow(data)
-      cat("Data frame dimensions:", dim(data), "\n")
-      cat("Sample size set to:", .self$sample_size, "\n")
+      # cat("Data frame dimensions:", dim(data), "\n")
+      # cat("Sample size set to:", .self$sample_size, "\n")
       
       .self$data_model <- .self$data_frame_to_tetrad_dataset(data)
       .self$data_model <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
-      cat("Tetrad DataSet created.\n")
+      # cat("Tetrad DataSet created.\n")
       
       .self$params <- .jnew("edu.cmu.tetrad.util.Parameters")
       
       .self$knowledge <- .jnew("edu/cmu/tetrad/data/Knowledge")
-      cat("Knowledge instance created.\n")
-      cat("TetradSearch object initialized successfully.\n")
+      # cat("Knowledge instance created.\n")
+      # cat("TetradSearch object initialized successfully.\n")
     },
     
     # Make sure the score object is initialized
@@ -1934,12 +1903,12 @@ TetradSearch <- setRefClass(
     # @param tier The tier to which the variable should be added.
     # @param var_name The name of the variable to add.
     add_to_tier = function(tier, var_name) {
-      cat("Adding variable", var_name, "to tier", tier, "...\n")
+      # cat("Adding variable", var_name, "to tier", tier, "...\n")
       tryCatch({
         tier <- as.integer(tier)
         var_name <- as.character(var_name)
         .jcall(.self$knowledge, "V", "addToTier", tier, var_name)
-        cat("Variable", var_name, "added to tier", tier, ".\n")
+        # cat("Variable", var_name, "added to tier", tier, ".\n")
       }, error = function(e) {
         cat("Error adding variable to tier:", e$message, "\n")
       })
@@ -1959,7 +1928,7 @@ TetradSearch <- setRefClass(
       .self$.setParamDouble("penaltyDiscount", penalty_discount)
       .self$score <- .jnew("edu.cmu.tetrad.algcomparison.score.SemBicScore")
       .self$score <- .jcast(.self$score, "edu.cmu.tetrad.algcomparison.score.ScoreWrapper")
-      cat("SemBicScore object created with penalty discount set.\n")
+      # cat("SemBicScore object created with penalty discount set.\n")
     },
     
     # Set the test to Fisher Z
@@ -1975,7 +1944,7 @@ TetradSearch <- setRefClass(
         .self$test <- .jcast(.self$test, "edu.cmu.tetrad.algcomparison.independence.IndependenceWrapper")
       }
       
-      cat("Fisher Z object created with alpha set.\n")
+      # cat("Fisher Z object created with alpha set.\n")
     },
     
     # --- Internal parameter helpers ---
@@ -1995,7 +1964,7 @@ TetradSearch <- setRefClass(
     # @param output_cpdag TRUE if a CPDAG should be output, FALSE if a DAG should be output.
     # @return The estimated graph.
     run_boss = function(num_starts = 1, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
-      cat("Running BOSS algorithm...\n")
+      # cat("Running BOSS algorithm...\n")
       
       .self$.setParam("useBes", use_bes)
       .self$.setParamInt("numStarts", num_starts)
@@ -2011,7 +1980,7 @@ TetradSearch <- setRefClass(
       graph <<- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
       .self$graph <- graph
       
-      cat("BOSS search completed.\n")
+      # cat("BOSS search completed.\n")
     },
 
     get_java = function() {
@@ -2020,11 +1989,11 @@ TetradSearch <- setRefClass(
     
     # This method prints the structure of the graph estimated by the most recent algorithm call.
     print_graph = function() {
-      cat("Attempting to print the graph...\n")
+      # cat("Attempting to print the graph...\n")
       if (is.null(.self$graph)) {
         cat("No graph generated yet. Please run an algorithm first.\n")
       } else {
-        cat("Graph structure:\n", .self$graph$toString(), "\n")
+        # cat("Graph structure:\n", .self$graph$toString(), "\n")
       }
       invisible(.self$graph)
     },
@@ -2058,7 +2027,7 @@ TetradSearch <- setRefClass(
     # list if source == target or there is no amenable path from source to target.
     get_adjustment_sets = function(graph, source, target, max_num_sets = 10, max_distance_from_point = 5,
                                    near_which_endpoint = 1, max_path_length = 20) {
-      cat("Getting adjustment sets for:", source, "->", target, "\n")
+      # cat("Getting adjustment sets for:", source, "->", target, "\n")
       
       # Look up Node objects by name
       source_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", source)
@@ -2083,7 +2052,7 @@ TetradSearch <- setRefClass(
       
       
       size <- .jcall(sets_list, "I", "size")
-      cat("Number of adjustment sets:", size, "\n")
+      # cat("Number of adjustment sets:", size, "\n")
       
       # Convert Java List<Set<Node>> to R list of character vectors
       size <- .jcall(sets_list, "I", "size")
@@ -2100,17 +2069,17 @@ TetradSearch <- setRefClass(
     
     print_adjustment_sets = function(adjustment_sets) {
       if (length(adjustment_sets) == 0) {
-        cat("No adjustment sets found.\n")
+        # cat("No adjustment sets found.\n")
         return()
       }
       
       for (i in seq_along(adjustment_sets)) {
         set <- adjustment_sets[[i]]
-        cat(sprintf("Adjustment set %d: ", i))
+        # cat(sprintf("Adjustment set %d: ", i))
         if (length(set) == 0) {
-          cat("(empty set)\n")
+          cat("(Adjustment set is empty.)\n")
         } else {
-          cat(paste(set, collapse = ", "), "\n")
+          # cat(paste(set, collapse = ", "), "\n")
         }
       }
     },
@@ -2130,7 +2099,7 @@ TetradSearch <- setRefClass(
     # @return Marov checker statistics as a named list.
     markov_check = function(graph, percent_resample = 1, condition_set_type = "ORDERED_LOCAL_MARKOV",
                             find_smallest_subset = FALSE, parallelized = TRUE, effective_sample_size = -1) {
-      cat("Running Markov check...\n")
+      # cat("Running Markov check...\n")
       
       if (is.null(.self$mc_test)) {
         stop("A test for the Markov Checker has not been set. Please call a `use_*` method with `use_for_mc = TRUE`.")
@@ -2648,14 +2617,10 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
 
   ## ---------- 2. logging (unchanged) ---------------------------------------
   cat("Graph Updated\n", file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar),
-      file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar),
-      file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected X threshold: %s\n", Sys.time(), input$tv_threshold),
-      file = log_file, append = TRUE)
-  cat(sprintf("%s - Selected Y threshold: %s\n", Sys.time(), input$ov_threshold),
-      file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar), file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar), file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected X threshold: %s\n", Sys.time(), input$tv_threshold), file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected Y threshold: %s\n", Sys.time(), input$ov_threshold), file = log_file, append = TRUE)
 
   ## ---------- 3. re-render the graph ---------------------------------------
   output$blankGraph <- renderGrViz({
@@ -2749,9 +2714,7 @@ observeEvent(input$goButton, {
                             ov_threshold_val,
                             log_file),
             error = function(e) {
-              cat(sprintf("SuperLearner: Error i=%s, j=%s: %s",
-                          i, j, conditionMessage(e)),
-                  file = log_file, sep = "\n", append = TRUE)
+              cat(sprintf("SuperLearner: Error i=%s, j=%s: %s", i, j, conditionMessage(e)), file = log_file, sep = "\n", append = TRUE)
               NULL
             }
           )
@@ -2793,8 +2756,7 @@ observeEvent(input$goButton, {
                          model_ate     = input$ate_in,
                          log_file      = log_file)
         }, error = function(e) {
-          cat(sprintf("processResults() failed: %s", conditionMessage(e)),
-              file = log_file, append = TRUE)
+          cat(sprintf("processResults() failed: %s", conditionMessage(e)), file = log_file, append = TRUE)
         })
 
         incProgress(0.2, message = "Processing Results")
@@ -2824,8 +2786,7 @@ observeEvent(input$goButton, {
     })
 
   }, error = function(e) {
-    cat(paste0(Sys.time(), " - Top-level observeEvent(goButton) failure: ", conditionMessage(e), "\n"),
-        file = log_file, append = TRUE)
+    cat(paste0(Sys.time(), " - Top-level observeEvent(goButton) failure: ", conditionMessage(e), "\n"), file = log_file, append = TRUE)
   })
 })
 
@@ -3245,11 +3206,11 @@ output$download_report <- downloadHandler(
       )
         
       # ── render report ──────────────────────────────────────────────────────
-      file.copy("scripts/AIRReport.qmd", file.path(tmpdir, "AIRReport.qmd"))
+      file.copy("report.qmd", file.path(tmpdir, "report.qmd"))
   
       withr::with_dir(tmpdir, {
         quarto::quarto_render(
-          input         = "AIRReport.qmd",
+          input         = "report.qmd",
           output_format = "pdf",
           output_file   = "AIRReport.pdf",
           execute_params = list(

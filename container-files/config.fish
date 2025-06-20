@@ -244,7 +244,7 @@ function cleanup_garbage
     rm -v logs/*.txt 2>/dev/null
 
     # Delete AIRTool HTML output and asset spam
-    rm -vrf AIRTool_v2.2.html AIRTool_v2.2_files 2>/dev/null
+    rm -vrf airtool.html airtool_files 2>/dev/null
 
     # Delete all Quarto build/cache/output files
     rm -vrf .quarto 2>/dev/null
