@@ -24,6 +24,86 @@ server: shiny
     color: green;
     font-weight: bold;
   }
+
+  /* FILE-INPUT */
+  
+  /* Browse button base look  (unchanged colour) */
+  .shiny-input-container .btn-file{
+    background:#1976d2 !important;
+    color:#fff        !important;
+    border:0          !important;
+    border-radius:4px !important;
+    box-shadow:none   !important;
+    padding:8px 16px;
+    text-transform:uppercase;
+    transition:box-shadow .2s cubic-bezier(.4,0,.2,1);
+  }
+  
+  /* Hover / focus — add the same elevation you see on other buttons */
+  .shiny-input-container .btn-file:hover,
+  .shiny-input-container .btn-file:focus{
+    background:#1976d2 !important;           /* stay blue            */
+    box-shadow:0 4px 6px rgba(0,0,0,.25);     /* subtle, matches rest */
+    outline:0;
+  }
+  
+  /* Active click (tiny dip) */
+  .shiny-input-container .btn-file:active{
+    background:#1565c0 !important;
+    box-shadow:0 2px 4px rgba(0,0,0,.25);
+  }
+  
+  /* Progress bar wrapper — push down & fill width */
+  .shiny-input-container .shiny-file-input-progress{
+    display:block;
+    width:100%;
+    margin:10px 0 0 0;                       /* 10 px top margin fixes overlap */
+  }
+  
+  /* Progress bar track & fill */
+  .shiny-input-container .progress{
+    height:8px;                               /* less “squished”     */
+    margin:0;
+    border-radius:4px;
+  }
+  .shiny-input-container .progress-bar{
+    background:#1976d2;
+    border-radius:4px;
+  }
+
+  /* progress bar separation */
+  /* The bar itself (not the wrapper) needs the margin */
+  .progress.shiny-file-input-progress {
+    margin-top: 10px;            /* pushes bar below Browse button */
+  }
+  
+  /* let the shadow show through */
+  .shiny-input-container .btn-file {
+    overflow: visible !important;  /* un-clip shadow                     */
+  }
+  
+  /* optional: trim the corner radius a bit more */
+  .shiny-input-container .btn-file,
+  .progress.shiny-file-input-progress {
+    border-radius: 2px !important; /* crisper corners                    */
+  }
+  
+  /* for Browse buttons & progress bar */
+  .shiny-input-container .btn-file          { box-shadow:none; }            /* reset */
+  .shiny-input-container .btn-file:hover,
+  .shiny-input-container .btn-file:focus    { box-shadow:0 4px 8px rgba(0,0,0,.30)!important; }
+  
+  .progress.shiny-file-input-progress,
+  .progress.shiny-file-input-progress .progress-bar{
+    height:12px;
+    border-radius:4px;
+    background:#1976d2;
+    background-image:none!important;        /* kill default stripes/dots */
+  }
+  
+  /* optional tighter corners */
+  .shiny-input-container .btn-file          { border-radius:2px; }
+
 </style>
 
 <style> .main-container { max-width: unset; } </style>
@@ -87,7 +167,7 @@ document.addEventListener("DOMContentLoaded", () => {
 # --- session-wide defaults --------------------------------------------------
 theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc.
 
-options(warn = 2)
+#options(warn = 2)
 
 AIRHome <- here()
 setwd(AIRHome)
@@ -587,13 +667,14 @@ scale_ <- function(x){
   (x - mean(x, na.rm = TRUE)) / sd(x, na.rm = TRUE)
 }
 
-runSuperLearner <- function(settings, AIRHome,
+runSuperLearner <- function(settings,
+                            AIRHome,
                             data_df,
-                            tv_dir, tv_threshold,
-                            ov_dir, ov_threshold,
+                            tv_threshold,
+                            ov_threshold,
                             log_file){ 
   cat(paste0(Sys.time(), " - ","Started superlearner with ",
-             paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold), collapse = ", ")), "\n", 
+             paste(c(settings, AIRHome, tv_threshold, ov_threshold), collapse = ", ")), "\n", 
       file = log_file, 
       append = TRUE)
   Z_level <- settings$Z_level
@@ -605,28 +686,8 @@ runSuperLearner <- function(settings, AIRHome,
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
 
   df <- data_df
-  if (tv_dir == ">") {
-    df[[treatment]] <- ifelse(df[[treatment]] > tv_threshold, 1, 0)
-  } else if (tv_dir == ">=") {
-    df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  } else if (tv_dir == "<") {
-    df[[treatment]] <- ifelse(df[[treatment]] < tv_threshold, 1, 0)
-  } else if (tv_dir == "<=") {
-    df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)
-  } else if (tv_dir == "=") {
-    df[[treatment]] <- ifelse(df[[treatment]] == tv_threshold, 1, 0)
-  } 
-  if (ov_dir == ">") {
-    df[[outcome]] <- ifelse(df[[outcome]] > ov_threshold, 1, 0)
-  } else if (ov_dir == ">=") {
-    df[[outcome]] <- ifelse(df[[outcome]] >= ov_threshold, 1, 0)
-  } else if (ov_dir == "<") {
-    df[[outcome]] <- ifelse(df[[outcome]] < ov_threshold, 1, 0)
-  } else if (ov_dir == "<=") {
-    df[[outcome]] <- ifelse(df[[outcome]] <= ov_threshold, 1, 0)
-  } else if (ov_dir == "=") {
-    df[[outcome]] <- ifelse(df[[outcome]] == ov_threshold, 1, 0)
-  } 
+  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
+  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
 
   ## ────────────────────────────────────────────────────────────────
   ##  Coerce the *outcome* to numeric if it’s still a factor
@@ -820,13 +881,20 @@ runSuperLearner <- function(settings, AIRHome,
   )
 }
 
-processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_in, model_yn, model_ate, log_file, move_results = FALSE) {
+processResults <- function(settings,
+                           AIRHome,
+                           tv_threshold,
+                           ov_threshold,
+                           model_in, model_yn,
+                           model_ate,
+                           log_file,
+                           move_results = FALSE) {
   log_msg <- function(...) {
     cat(paste0(Sys.time(), " - ", ...), "\n", file = log_file, append = TRUE)
   }
 
   log_msg("Started processResults()")
-  log_msg("Settings:", paste(c(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_threshold, model_yn, model_ate), collapse = ", "))
+  log_msg("Settings:", paste(c(settings, AIRHome, tv_threshold, ov_threshold, model_yn, model_ate), collapse = ", "))
 
   treatment <- as.character(settings$varName)
   outcome <- as.character(df_vars[df_vars$var == "OV", ]$val)
@@ -837,17 +905,8 @@ processResults <- function(settings, AIRHome, tv_dir, tv_threshold, ov_dir, ov_t
   set.seed(123)
 
   # Bin conversion logic
-  binarize_var <- function(df, var, dir, threshold) {
-    if (dir == ">") df[[var]] <- ifelse(df[[var]] > threshold, 1, 0)
-    else if (dir == ">=") df[[var]] <- ifelse(df[[var]] >= threshold, 1, 0)
-    else if (dir == "<") df[[var]] <- ifelse(df[[var]] < threshold, 1, 0)
-    else if (dir == "<=") df[[var]] <- ifelse(df[[var]] <= threshold, 1, 0)
-    else if (dir == "=") df[[var]] <- ifelse(df[[var]] == threshold, 1, 0)
-    return(df)
-  }
-
-  df <- binarize_var(df, treatment, tv_dir, tv_threshold)
-  df <- binarize_var(df, outcome, ov_dir, ov_threshold)
+  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
+  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
 
   # Split into train/test
   test_size <- floor(0.3 * nrow(df))
@@ -1536,138 +1595,125 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
   return(result_text)
 }
 
-get_histogram_x <- function(df, xvar, tv_dir, tv_threshold) {
-  data <- df[[xvar]]
-  
-  # Ensure the selected variable is numeric
-  # validate(
-  #   need(is.numeric(data), "Selected variable must be numeric.")
-  # )
-  
-  # Define treatment condition based on operator and threshold
-  if (tv_dir == ">") {
-    treated <- data > tv_threshold
-    treated_label <- paste0("Treated (>", tv_threshold, ")")
-    untreated_label <- paste0("Untreated (≤ ", tv_threshold, ")")
-  } else if (tv_dir == "<") {
-    treated <- data < tv_threshold
-    treated_label <- paste0("Treated (<", tv_threshold, ")")
-    untreated_label <- paste0("Untreated (≥ ", tv_threshold, ")")
-  } else if (tv_dir == ">=") {
-    treated <- data >= tv_threshold
-    treated_label <- paste0("Treated (>=", tv_threshold, ")")
-    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
-  } else if (tv_dir == "<=") {
-    treated <- data < tv_threshold
-    treated_label <- paste0("Treated (<=", tv_threshold, ")")
-    untreated_label <- paste0("Untreated (> ", tv_threshold, ")")
-  } else if (tv_dir == "=") {
-    treated <- data == tv_threshold
-    treated_label <- paste0("Treated (= ", tv_threshold, ")")
-    untreated_label <- "Untreated (≠)"
-  }
-  
-  # Create a dataframe for plotting
+# ──────────────────────────────────────────────────────────────
+#  Histogram for the experimental (X) variable
+# ──────────────────────────────────────────────────────────────
+get_histogram_x <- function(df, xvar, threshold) {
+
+  v       <- df[[xvar]]
+  treated <- v >= threshold                    # single comparison rule
+
   plot_df <- data.frame(
-    x = data,
-    Treatment = ifelse(treated, "Treated", "Untreated")
+    x         = v,
+    Treatment = factor(ifelse(treated, "Treated", "Untreated"),
+                       levels = c("Untreated", "Treated"))   # lock legend order
   )
-  
-  # Define colors
-  colors <- c("Treated" = "#5D9AFF", "Untreated" = "#EAE1D7")
-  
-  # Generate the histogram
-  ggplot(plot_df, aes(x = x, fill = Treatment, color = Treatment)) +
+
+  colors <- c(Treated   = "#5D9AFF",
+              Untreated = "#EAE1D7")
+
+  untreated_label <- paste0("Untreated (< ", signif(threshold, 4), ")")
+  treated_label   <- paste0("Treated (≥ ",  signif(threshold, 4), ")")
+
+  bw <- diff(range(v, na.rm = TRUE)) / 30
+  if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1        # <- arrow fix
+
+  ggplot(plot_df, aes(x = x, fill = Treatment, colour = Treatment)) +
     geom_rug(sides = "b") +
-    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
-    scale_fill_manual(values = colors, labels = c(untreated_label, treated_label)) +
-    scale_color_manual(values = colors, labels = c(untreated_label, treated_label)) +
-    geom_vline(xintercept = tv_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
-    labs(
-      title = paste("Distribution of ", xvar),
-      x = NULL,
-      # y = "Count",
-      fill = "Treatment Status"
-    ) +
-    guides(color = "none") +  
-    theme_minimal() + 
-    theme(text = element_text(color = "#666666", face = "bold"),
-          panel.background = element_rect(fill = "transparent", color = NA),
-          plot.background  = element_rect(fill = "transparent", color = NA),
-          legend.position = "bottom",
-          legend.direction = "horizontal") 
+    geom_histogram(binwidth = bw, colour = "black") +
+    geom_vline(xintercept = threshold,
+               colour = "grey20", linetype = "dashed", linewidth = 1) +
+    scale_fill_manual(values = colors,
+                      breaks = c("Untreated", "Treated"),
+                      labels = c(untreated_label, treated_label)) +
+    scale_colour_manual(values = colors,
+                        breaks = c("Untreated", "Treated"),
+                        labels = NULL) +
+    labs(title = paste("Distribution of", xvar),
+         x = NULL, fill = NULL) +
+    guides(colour = "none") +
+    theme_minimal(base_size = 10) +
+    theme(text             = element_text(colour = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", colour = NA),
+          plot.background  = element_rect(fill = "transparent", colour = NA),
+          legend.position  = "bottom",
+          legend.direction = "horizontal")
 }
 
-get_histogram_y <- function(df, yvar, ov_dir, ov_threshold) {
-  data <- df[[yvar]]
-  
-  # Ensure the selected variable is numeric
-  # validate(
-  #   need(is.numeric(data), "Selected variable must be numeric.")
-  # )
-  
-  # Define treatment condition based on operator and threshold
-  if (ov_dir == ">") {
-    success <- data > ov_threshold
-    success_label <- paste0("Success (>", ov_threshold, ")")
-    fail_label <- paste0("Fail (≤ ", ov_threshold, ")")
-  } else if (ov_dir == "<") {
-    success <- data < ov_threshold
-    success_label <- paste0("Success (<", ov_threshold, ")")
-    fail_label <- paste0("Fail (≥ ", ov_threshold, ")")
-  } else if (ov_dir == ">=") {
-    success <- data >= ov_threshold
-    success_label <- paste0("Success (>=", ov_threshold, ")")
-    fail_label <- paste0("Fail (> ", ov_threshold, ")")
-  } else if (ov_dir == "<=") {
-    success <- data < ov_threshold
-    success_label <- paste0("Success (<=", ov_threshold, ")")
-    fail_label <- paste0("Fail (> ", ov_threshold, ")")
-  } else if (ov_dir == "=") {
-    success <- data == ov_threshold
-    success_label <- paste0("Success (= ", ov_threshold, ")")
-    fail_label <- "Fail (≠)"
-  }
-  
-  # Create a dataframe for plotting
+# ──────────────────────────────────────────────────────────────
+#  Histogram for the outcome (Y) variable
+# ──────────────────────────────────────────────────────────────
+get_histogram_y <- function(df, yvar, threshold) {
+
+  v       <- df[[yvar]]
+  success <- v >= threshold
+
   plot_df <- data.frame(
-    x = data,
-    success = ifelse(success, "Success", "Fail")
+    x      = v,
+    Result = factor(ifelse(success, "Success", "Fail"),
+                    levels = c("Fail", "Success"))
   )
-  
-  # Define colors
-  colors <- c("Success" = "#5D9AFF", "Fail" = "#EAE1D7")
-  # Generate the histogram
-  
-  ggplot(plot_df, aes(x = x, fill = success, color = success)) +
+
+  colors <- c(Success = "#5D9AFF",
+              Fail    = "#EAE1D7")
+
+  fail_label    <- paste0("Fail (< ",  signif(threshold, 4), ")")
+  success_label <- paste0("Success (≥ ", signif(threshold, 4), ")")
+
+  bw <- diff(range(v, na.rm = TRUE)) / 30
+  if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1
+
+  ggplot(plot_df, aes(x = x, fill = Result, colour = Result)) +
     geom_rug(sides = "b") +
-    geom_histogram(binwidth = (max(data) - min(data)) / 30, color = "black") +#, alpha = 0.7) +
-    scale_fill_manual(values = colors, labels = c(fail_label, success_label)) +
-    scale_color_manual(values = colors, labels = c(fail_label, success_label)) +
-    geom_vline(xintercept = ov_threshold, color = "gray20", linetype = "dashed", linewidth = 1) +
-    labs(
-      title = paste("Distribution of ", yvar),
-      x = NULL,
-      # y = "Count",
-      fill = "Treatment Status"
-    ) +
-    guides(color = "none") +  
-    theme_minimal() + 
-    theme(text = element_text(color = "#666666", face = "bold"),
-          panel.background = element_rect(fill = "transparent", color = NA),
-          plot.background  = element_rect(fill = "transparent", color = NA),
-          legend.position = "bottom",
-          legend.direction = "horizontal") 
+    geom_histogram(binwidth = bw, colour = "black") +
+    geom_vline(xintercept = threshold,
+               colour = "grey20", linetype = "dashed", linewidth = 1) +
+    scale_fill_manual(values = colors,
+                      breaks = c("Fail", "Success"),
+                      labels = c(fail_label, success_label)) +
+    scale_colour_manual(values = colors,
+                        breaks = c("Fail", "Success"),
+                        labels = NULL) +
+    labs(title = paste("Distribution of", yvar),
+         x = NULL, fill = NULL) +
+    guides(colour = "none") +
+    theme_minimal(base_size = 10) +
+    theme(text             = element_text(colour = "#666666", face = "bold"),
+          panel.background = element_rect(fill = "transparent", colour = NA),
+          plot.background  = element_rect(fill = "transparent", colour = NA),
+          legend.position  = "bottom",
+          legend.direction = "horizontal")
 }
 
-get_updated_graph <- function(dot, graph_update, xvar, yvar, Zvars) { 
-  if (graph_update) {
-    dot <- change_node_color(dot, xvar, "'#FFC107'")
-    dot <- change_node_color(dot, yvar, "'#FFC107'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1",]$Z, "'#9394A2'")
-    dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2",]$Z, "'#D4C7C7'")
+get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
+
+  # 1 ── split DOT file into individual lines ------------------------------
+  lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
+
+  # helper to write a fresh node-declaration line
+  make_decl <- function(node, colour) {
+    sprintf('  "%s" [style=filled, fillcolor="%s"];', node, colour)
   }
-  return(dot)
+
+  # 2 ── build the highlight lists -----------------------------------------
+  nodes <- list(
+    "#FFC107" = c(xvar, yvar),                       # treatment & outcome
+    "#9394A2" = Zvars$Z[Zvars$grp == "Z1"],
+    "#D4C7C7" = Zvars$Z[Zvars$grp == "Z2"]
+  )
+
+  # 3 ── drop any existing declarations of those nodes ---------------------
+  pat <- sprintf('^\\s*"(%s)"\\s+\\[', paste(unlist(nodes), collapse = "|"))
+  lines <- lines[!grepl(pat, lines)]
+
+  # 4 ── insert new declarations right after “digraph g {” -----------------
+  insert_at <- 2L                               # line index to insert after
+  new_lines <- unlist(Map(make_decl, nodes, names(nodes)))
+  lines <- append(lines, new_lines, after = insert_at - 1L)
+
+  # 5 ── stitch everything back together and return ------------------------
+  dot_out <- paste(lines, collapse = "\n")
+  return(dot_out)
 }
 
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
@@ -1917,8 +1963,7 @@ TetradSearch <- setRefClass(
     },
     
     # Set the test to Fisher Z
-    #
-    # @param alpha The significance cutoff.
+    # # @param alpha The significance cutoff.
     use_fisher_z = function(alpha = 0.01, use_for_mc = FALSE) {
       .self$.setParamDouble("alpha", alpha)
       
@@ -2272,29 +2317,24 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 ##  {.sidebar}
 
 ```{r sidebar}
-h4("Step 1: Upload your data")
-fileInput("file1", "", accept = ".csv")
 br()
+h5("Step 1- Upload data file:")
+fileInput("file1", "", accept = ".csv")
 uiOutput('step2')
 uiOutput('ui_file2')
-br()
 uiOutput('ui_buildButton')
-br()
 uiOutput('step3')
 uiOutput('xvar')
 uiOutput('ui_threshold_x')
-br()
 uiOutput('yvar')
 uiOutput('ui_threshold_y')
-br()
-uiOutput('ui_updateButton')
 uiOutput('step4')
 uiOutput('ui_model_exist')
 uiOutput('ui_model_upload')
 uiOutput('ui_ate_upload')
 uiOutput('ui_goButton')
+br()
 uiOutput('ui_dl_btn')
-
 ```
 
 ## Column {width = "40%"}
@@ -2320,7 +2360,9 @@ uiOutput('second_column_content')
 # --- Reactive value containers --- #
 calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
-graph_update <- reactiveVal(FALSE)
+graph_ready <- reactive({
+  nzchar(input$xvar) && nzchar(input$yvar)
+})
 file_check <- reactiveVal(FALSE)
 
 
@@ -2445,6 +2487,43 @@ knowledge <- reactive({
   })
 })
 
+vars_ready <- reactive({
+  nzchar(input$xvar) && nzchar(input$yvar)
+})
+
+## ───────────────────────────────────────────────────────────
+## 1. highlighted_graph  – always returns a dot *with* fills
+##    whenever x / y / Z change
+## ───────────────────────────────────────────────────────────
+highlighted_graph <- reactive({
+  req(graph_complete())                # we *do* need the cpdag
+
+  dot <- .jcall(
+    "edu/cmu/tetrad/graph/GraphSaveLoadUtils",
+    "Ljava/lang/String;",
+    "graphToDot",
+    rv$best_cpdag_seen_so_far
+  )
+
+  ## — colour the experimental variable if one is chosen
+  if (!is.null(input$xvar) && nzchar(input$xvar))
+    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+
+  ## — colour the outcome variable if one is chosen
+  if (!is.null(input$yvar) && nzchar(input$yvar))
+    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+
+  ## — colour adjustment sets only when they exist
+  if (exists("Zvars", inherits = FALSE) && nrow(Zvars)) {
+    if (any(Zvars$grp == "Z1"))
+      dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1", "Z"], "'#9394A2'")
+    if (any(Zvars$grp == "Z2"))
+      dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2", "Z"], "'#D4C7C7'")
+  }
+
+  dot
+})
+
 ### event observations ----------------------------------------------------------------
 options(shiny.error = function() {
   tb <- traceback()  # Capture the call stack
@@ -2537,76 +2616,51 @@ observeEvent(input$buildButton, {
   })
 })
 
-observeEvent(input$updateButton, {
-  tryCatch({
+observeEvent( vars_ready(), ignoreInit = TRUE, {
+  ## only run after the second selector is filled in
+  req(vars_ready())
 
-    ## inside the observer / reactive that updates the variable choices
-    df_vars <- data.frame(
-      var = c("TV", "OV"),
-      val = c(input$xvar, input$yvar),   # <- current selections
-      stringsAsFactors = FALSE
-    )
+  ## ---------- 1. maintain the global helpers -------------------------------
+  df_vars <- data.frame(
+    var = c("TV", "OV"),
+    val = c(input$xvar, input$yvar),
+    stringsAsFactors = FALSE
+  )
+  assign("df_vars", df_vars, envir = .GlobalEnv)
 
-    ## make it available everywhere that still relies on the global
-    assign("df_vars", df_vars, envir = .GlobalEnv)
+  ### adjustment-set calculation (unchanged) ---------------------------------
+  adj_list <- AIR_getAdjSets(
+    rv$ts,
+    input$xvar,
+    input$yvar,
+    rv$MC_passing_cpdag_already_found,
+    rv$best_cpdag_seen_so_far
+  )
 
-    if (Sys.info()["sysname"] != "Linux") {
-      stop("Non-Linux platforms are not supported without in-memory graph. File fallback removed.")
-    }
+  Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
+  Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
 
-    adj_list <- AIR_getAdjSets(
-      rv$ts,
-      input$xvar,
-      input$yvar,
-      rv$MC_passing_cpdag_already_found,
-      rv$best_cpdag_seen_so_far
-    )
+  Zvars_loc <- rbind(
+    data.frame(name = input$xvar, grp = "Z1", Z = Z1),
+    data.frame(name = input$xvar, grp = "Z2", Z = Z2)
+  )
+  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
 
-    Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]]), perl = TRUE), ", ")[[1]]
-    Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]]), perl = TRUE), ", ")[[1]]
+  ## ---------- 2. logging (unchanged) ---------------------------------------
+  cat("Graph Updated\n", file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar),
+      file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar),
+      file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected X threshold: %s\n", Sys.time(), input$tv_threshold),
+      file = log_file, append = TRUE)
+  cat(sprintf("%s - Selected Y threshold: %s\n", Sys.time(), input$ov_threshold),
+      file = log_file, append = TRUE)
 
-    Zvars_loc <- rbind(
-      data.frame(name = input$xvar, grp = "Z1", Z = Z1, stringsAsFactors = FALSE),
-      data.frame(name = input$xvar, grp = "Z2", Z = Z2, stringsAsFactors = FALSE)
-    )
-    assign("Zvars", Zvars_loc, envir = .GlobalEnv)
-
-    cat("Graph Updated\n", file = log_file, append = TRUE)
-
-    if (graph_update()) {
-      sendSweetAlert(
-        session = shiny::getDefaultReactiveDomain(),
-        title = "Causal Graph Updated",
-        text = NULL,
-        type = "success",
-        btn_labels = "Continue",
-        btn_colors = "#3085d6",
-        closeOnClickOutside = TRUE,
-        showCloseButton = FALSE
-      )
-    }
-
-    graph_update(TRUE)
-
-    output$blankGraph <- renderGrViz({
-      req(graph_complete())
-      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", rv$best_cpdag_seen_so_far)
-      if (graph_update()) {
-        dot <- change_node_color(dot, input$xvar, "'#FFC107'")
-        dot <- change_node_color(dot, input$yvar, "'#FFC107'")
-        dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1", ]$Z, "'#9394A2'")
-        dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2", ]$Z, "'#D4C7C7'")
-      }
-      grViz(dot)
-    })
-
-    cat(sprintf("%s - Selected X variable: %s\n", Sys.time(), input$xvar), file = log_file, append = TRUE)
-    cat(sprintf("%s - Selected Y variable: %s\n", Sys.time(), input$yvar), file = log_file, append = TRUE)
-    cat(sprintf("%s - Selected X threshold: %s %s\n", Sys.time(), input$tv_dir, input$tv_threshold), file = log_file, append = TRUE)
-    cat(sprintf("%s - Selected Y threshold: %s %s\n", Sys.time(), input$ov_dir, input$ov_threshold), file = log_file, append = TRUE)
-
-  }, error = function(e) {
-    cat(sprintf("Error in updateButton observer: %s\n", conditionMessage(e)), file = log_file, append = TRUE)
+  ## ---------- 3. re-render the graph ---------------------------------------
+  output$blankGraph <- renderGrViz({
+    req(graph_complete())
+    grViz( highlighted_graph() )   # highlighted_graph() already reacts
   })
 })
   
@@ -2638,9 +2692,7 @@ observeEvent(input$goButton, {
 
       tryCatch({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
-        tv_dir_val <- input$tv_dir
         tv_threshold_val <- input$tv_threshold
-        ov_dir_val <- input$ov_dir
         ov_threshold_val <- input$ov_threshold
 
         n_cores <- min(nrow(combos), parallel::detectCores() - 1L)
@@ -2691,10 +2743,10 @@ observeEvent(input$goButton, {
 
           res <- tryCatch(
             runSuperLearner(settings,
-                            graph_snapshot,   # was  rv$dot
-                            df_snapshot,      # <-- new arg (next step)
-                            tv_dir_val, tv_threshold_val,
-                            ov_dir_val, ov_threshold_val,
+                            graph_snapshot,
+                            df_snapshot,
+                            tv_threshold_val,
+                            ov_threshold_val,
                             log_file),
             error = function(e) {
               cat(sprintf("SuperLearner: Error i=%s, j=%s: %s",
@@ -2733,9 +2785,7 @@ observeEvent(input$goButton, {
         
           processResults(settings_stub,
                          AIRHome       = graph_snapshot,
-                         tv_dir        = tv_dir_val,
                          tv_threshold  = tv_threshold_val,
-                         ov_dir        = ov_dir_val,
                          ov_threshold  = ov_threshold_val,
                          model_in      = if (identical(input$model_exist, "Yes"))
                                             model_in() else NULL,
@@ -2823,7 +2873,7 @@ output$ui_dl_btn <- renderUI({
   req(calc_complete())
   downloadBttn(
               outputId = "download_report",
-              style = "jelly",
+              style = "material-flat",
               color = "primary"
             )
 })
@@ -2832,7 +2882,7 @@ output$step3 = renderUI({
   req(graph_complete())
   tagList(
     hr(),
-    h4("Step 2: Select your variables of interest:")
+    h5("Step 2- Select variables:")
   )
 })
 
@@ -2856,75 +2906,67 @@ output$yvar = renderUI({
   # yvar = "images_acquired"
 })
 
-output$ui_threshold_x = renderUI({
+nice_step <- function(span) {
+  # span = max - min
+  if (span <= 0 || is.na(span) || is.infinite(span)) return(1)
+
+  # one order of magnitude below span, rounded to 1 sig-fig
+  signif(span / 10, 1)
+}
+
+split_threshold <- function(v, candidate) {
+  # If candidate would give all-same class, nudge half a bin
+  too_low  <- sum(v >= candidate) == 0
+  too_high <- sum(v <  candidate) == 0
+
+  if (too_low)  candidate <- candidate + .Machine$double.eps
+  if (too_high) candidate <- candidate - .Machine$double.eps
+
+  candidate
+}
+
+make_threshold_ui <- function(id, vec) {
+  rng   <- range(vec, na.rm = TRUE)
+  step  <- nice_step(diff(rng))
+
+  raw   <- round(mean(rng, na.rm = TRUE) / step) * step
+  safe  <- split_threshold(vec, raw)          # nudge if all-same split
+
+  numericInput(id, NULL,
+               value = safe,
+               step  = step,
+               width = "90px")
+}
+
+output$ui_threshold_x <- renderUI({
   req(input$xvar)
-  slider_range <- c(min(df()[[input$xvar]]), max(df()[[input$xvar]]))
-  slider_step <- (slider_range[2] - slider_range[1]) / 10
-   # Use Flexbox for inline alignment
+
+  tagList(
     tags$div(
-      style = "display: flex; align-items: center; flex-wrap: wrap;",
-      
-      # Part 1: Variable Selection
-      tags$span(""),
-      tags$span("is considered treated when it is "),
-      
-      # Part 2: Operator Selection
-      tags$div(
-        style = "margin-right: 5px;",
-        selectInput("tv_dir", NULL, 
-                    choices = c(">", ">=", "<", "<=", "="), 
-                    width = "60px")
-        ),
-      # Part 3: Threshold Input
-      tags$div(
-        style = "margin-right: 5px;",
-        numericInput("tv_threshold", NULL, 
-                     value = mean(slider_range), 
-                     step = slider_step,
-                     width = "80px")
-        )
+      style = "display:flex;align-items:center;flex-wrap:wrap;",
+      tags$span(paste(input$xvar,
+                      "is considered treated when it is ≥")),
+      make_threshold_ui("tv_threshold", df()[[input$xvar]])
     )
-  
-    # tv_dir = "<="
-    # tv_threshold = 0
+  )
 })
 
-output$ui_threshold_y = renderUI({
+output$ui_threshold_y <- renderUI({
   req(input$yvar)
-  slider_range <- c(min(df()[[input$yvar]]), max(df()[[input$yvar]]))
-  slider_step <- (slider_range[2] - slider_range[1]) / 10
-   # Use Flexbox for inline alignment
+
+  tagList(
     tags$div(
-      style = "display: flex; align-items: center; flex-wrap: wrap;",
-      
-      # Part 1: Variable Selection
-      tags$span(""),
-      tags$span("is considered a success when it is "),
-      
-      # Part 2: Operator Selection
-      tags$div(
-        style = "margin-right: 5px;",
-        selectInput("ov_dir", NULL, 
-                    choices = c(">", ">=", "<", "<=", "="), 
-                    width = "60px")
-        ),
-      # Part 3: Threshold Input
-      tags$div(
-        style = "margin-right: 5px;",
-        numericInput("ov_threshold", NULL, 
-                     value = mean(slider_range), 
-                     step = slider_step,
-                     width = "80px")
-        )
+      style = "display:flex;align-items:center;flex-wrap:wrap;",
+      tags$span(paste(input$yvar,
+                      "is considered success when it is ≥")),
+      make_threshold_ui("ov_threshold", df()[[input$yvar]])
     )
-  
-    # ov_dir = "<="
-    # ov_threshold = 0
+  )
 })
 
 output$step2 = renderUI({
   req(input$file1)
-  h4("Upload knowledge file:")
+  h5("Upload knowledge file:")
 })
 
 output$ui_file2 = renderUI({
@@ -2932,37 +2974,35 @@ output$ui_file2 = renderUI({
   fileInput("file2", "", accept = ".csv")
 })
 output$histogram_x <- renderPlot({
-  req(input$xvar, input$tv_dir, input$tv_threshold)
-    
-  p <- get_histogram_x(df(), input$xvar, input$tv_dir, input$tv_threshold)
+  req(input$xvar, input$tv_threshold)
+  p <- get_histogram_x(df(), input$xvar, input$tv_threshold)
   p
   }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
-    req(input$yvar, input$ov_dir, input$ov_threshold)
-  p <- get_histogram_y(df(), input$yvar, input$ov_dir, input$ov_threshold)
+    req(input$yvar, input$ov_threshold)
+  p <- get_histogram_y(df(), input$yvar, input$ov_threshold)
   p
   }, bg = "transparent")
 
-output$ui_model_exist = renderUI({
-  req(graph_update())
-  radioGroupButtons(
-    inputId = "model_exist",
-    label = "Do you have an existing model?",
-    choiceNames = c("Yes: I can upload it", "Yes: I can provide an ATE", "No: Do it all for me"),
-    choiceValues = c("Yes", "ATE", "No"), 
+output$ui_model_exist <- renderUI({
+  req(graph_ready())
+
+  selectInput(
+    inputId  = "model_exist",
+    label    = "Do you have an existing model?",
+    choices  = c(
+      "Yes: I can upload it"      = "Yes",
+      "Yes: I can provide an ATE" = "ATE",
+      "No: Do it all for me"      = "No"
+    ),
     selected = "ATE",
-    individual = TRUE,
-    checkIcon = list(
-      yes = tags$i(class = "fa fa-circle", 
-                   style = "color: steelblue"),
-      no = tags$i(class = "fa fa-circle-o", 
-                  style = "color: steelblue"))
+    width    = "100%"          # stretches full column width
   )
 })
 
 output$ui_ate_upload = renderUI({
-  req(graph_update())
+  req(graph_ready())
   req(input$model_exist)
   if (input$model_exist == "ATE") {
     numericInput("ate_in", label = "ATE: ", value = 0, min = -1, max = 1, step = 0.1)
@@ -2981,10 +3021,10 @@ output$ui_model_upload = renderUI({
 })
 
 output$step4 = renderUI({
-  req(graph_update())
+  req(graph_ready())
   tagList(
     hr(),
-    h4("Step 3: Tell us about your model:")
+    h5("Step 3- About the model:")
   )
 })
 
@@ -3053,11 +3093,11 @@ output$ui_figurecaption = renderUI({
 })
 
 output$ui_goButton = renderUI({
-  req(graph_update())
+  req(graph_ready())
   actionBttn(
     inputId = "goButton",
     label = "Calculate Results",
-    style = "jelly", 
+    style = "material-flat", 
     color = "primary"
   )
 })
@@ -3067,17 +3107,7 @@ output$ui_buildButton = renderUI({
   actionBttn(
     inputId = "buildButton",
     label = "Build Graph",
-    style = "jelly", 
-    color = "primary"
-    )
-})
-
-output$ui_updateButton = renderUI({
-  req(input$yvar)
-  actionBttn(
-    inputId = "updateButton",
-    label = "Update Graph",
-    style = "jelly",
+    style = "material-flat", 
     color = "primary"
     )
 })
@@ -3138,13 +3168,13 @@ output$download_report <- downloadHandler(
         xvar          = input$xvar,
         yvar          = input$yvar,
         df            = df(),
-        tv_dir        = input$tv_dir,
         tv_threshold  = input$tv_threshold,
-        ov_dir        = input$ov_dir,
         ov_threshold  = input$ov_threshold,
         Zvars         = Zvars,
-        graph_update  = graph_update()
+        graph_update  = graph_ready()
       ))
+
+      graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
 
       ## --- rebuild the little helper table *locally* ------------------
       df_vars <- data.frame(
@@ -3156,7 +3186,6 @@ output$download_report <- downloadHandler(
       figure_cap   <- get_figure_caption(AIRHome, df_vars)
       result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars)
 
-      graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
   
       # -----------------------------------------------------------------
       # 1) ggplot → PDF  (histograms, ribbon)
@@ -3181,11 +3210,11 @@ output$download_report <- downloadHandler(
   
       # ── generate images ────────────────────────────────────────────────────
       save_plot_pdf(
-        get_histogram_x(vals$df, vals$xvar, vals$tv_dir, vals$tv_threshold),
+        get_histogram_x(vals$df, vals$xvar, vals$tv_threshold),
         file.path(tmpdir, "xhist.pdf")
       )
       save_plot_pdf(
-        get_histogram_y(vals$df, vals$yvar, vals$ov_dir, vals$ov_threshold),
+        get_histogram_y(vals$df, vals$yvar, vals$ov_threshold),
         file.path(tmpdir, "yhist.pdf")
       )
       save_plot_pdf(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.pdf"))
@@ -3198,9 +3227,11 @@ output$download_report <- downloadHandler(
       # ---- updated ribbon / final graph PNGs ------------------------------------
       save_dot_to_pdf(
         DiagrammeR::grViz(                       # << wrap the DOT string
-          get_updated_graph(graph_snapshot,
-                            vals$graph_update,
-                            vals$xvar, vals$yvar, vals$Zvars)
+          get_updated_graph(
+                            graph_snapshot,
+                            vals$xvar,
+                            vals$yvar,
+                            vals$Zvars)
         ),
         file.path(tmpdir, "updatedgraph.pdf")
       )
