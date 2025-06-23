@@ -248,6 +248,7 @@
             pkgs.rPackages.rsvg
             pkgs.rPackages.sets
             pkgs.rPackages.shiny
+            pkgs.rPackages.shinyjs
             pkgs.rPackages.shinyWidgets
             pkgs.rPackages.tidyr
             pkgs.rPackages.xgboost

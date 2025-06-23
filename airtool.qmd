@@ -157,6 +157,7 @@ suppressMessages({
   library(scales)
   library(sets)
   library(shiny)
+  library(shinyjs)
   library(shinyWidgets)
   library(sl3)
   library(tidyr)
@@ -175,7 +176,7 @@ dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
 
 log_file <- file.path(
   log_dir,
-  sprintf("%s_error_log.txt", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
+  sprintf("%s.log", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
 )
 
 init_logging <- function(file) {
@@ -233,6 +234,11 @@ set.seed(123)
 ## Also tell the R graphics device so axis labels use it too
 grDevices::png(type = "cairo")            # ensure Pango/Cairo backend
 par(family = "DejaVu Sans")               # default plotting family
+```
+
+```{r session-setup}
+#| context: server
+#| echo: false
 
 # --- Buffers --- #
 results_buffer <- reactiveVal(data.frame())
@@ -242,6 +248,7 @@ superlearner_output_buffer <- reactiveVal(list())
 graphtxt_buffer <- reactiveVal(NULL)
 dotfile_buffer <- reactiveVal(NULL)
 rv <- reactiveValues()
+locked <- reactiveVal(FALSE)
 
 # ── NEW: keep TMLE rows, ML rows, and the 1-row summary apart ────────────────
 tmle_buffer     <- reactiveVal(data.frame())   # 1 row per adjustment set
@@ -2254,6 +2261,10 @@ TetradSearch <- setRefClass(
 
 ```
 
+```{r shinyjs-init, context="ui", echo=FALSE}
+useShinyjs()
+```
+
 # Docs
 
 ```{r info-tab, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
@@ -2272,8 +2283,7 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 ```{r sidebar}
 br()
 h5("Step 1- Upload data file:")
-fileInput("file1", "", accept = ".csv")
-uiOutput('step2')
+uiOutput("ui_file1")
 uiOutput('ui_file2')
 uiOutput('ui_buildButton')
 uiOutput('step3')
@@ -2610,6 +2620,8 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
 
 observeEvent(input$goButton, {
   tryCatch({
+    locked(TRUE)
+
     print(ls(pattern = "df", envir = .GlobalEnv))
 
     log_debug("Selected model_exist: {msg}", msg = input$model_exist)
@@ -2827,31 +2839,69 @@ output$step3 = renderUI({
 })
 
 output$xvar = renderUI({
-  req(graph_complete())  
-  selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
-              selected = ""
-              )
-
-  # xvar = "scenario_main_base"
-  # xvar = "humidity"
+  req(graph_complete())
+  selected_val <- if (locked()) isolate(input$xvar) else ""
+  tagList(
+    selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
+                selected = selected_val),
+    if (locked()) tags$script(HTML("
+      var xvarDisableTries = 0;
+      var disableXVar = setInterval(function() {
+        var $sel = $('#xvar');
+        var $inp = $('#xvar-selectized');
+        if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
+          $sel.prop('disabled', true);
+          $inp.prop('disabled', true);
+          $inp.parent().css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableXVar);
+        }
+        xvarDisableTries++;
+        if (xvarDisableTries > 10) clearInterval(disableXVar);
+      }, 100);
+    "))
+  )
 })
 
 output$yvar = renderUI({
-  req(input$xvar)  
-  x_desc <- get_X_descendents(input$xvar, AIRHome)
-  choices <- setdiff(x_desc, input$xvar)
-  selectInput('yvar', 'Outcome (Y) variable:', c("",choices), 
-              selected = ""
-              )
-  # yvar = "images_acquired"
+  req(input$xvar)
+  choices <- setdiff(get_X_descendents(input$xvar, AIRHome), input$xvar)
+  selected_val <- if (locked()) isolate(input$yvar) else ""
+  tagList(
+    selectInput('yvar', 'Outcome (Y) variable:', c("", choices),
+                selected = selected_val),
+    if (locked()) tags$script(HTML("
+      var yvarDisableTries = 0;
+      var disableYVar = setInterval(function() {
+        var $sel = $('#yvar');
+        var $inp = $('#yvar-selectized');
+        if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
+          $sel.prop('disabled', true);
+          $inp.prop('disabled', true);
+          $inp.parent().css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableYVar);
+        }
+        yvarDisableTries++;
+        if (yvarDisableTries > 10) clearInterval(disableYVar);
+      }, 100);
+    "))
+  )
 })
 
-nice_step <- function(span) {
-  # span = max - min
+fine_step <- function(vec, n_bins = 30) {
+  rng <- range(vec, na.rm = TRUE)
+  span <- rng[2] - rng[1]
   if (span <= 0 || is.na(span) || is.infinite(span)) return(1)
+  # Step = half a bin width
+  step <- span / (2 * n_bins)
+  signif(step, 1)
+}
 
-  # one order of magnitude below span, rounded to 1 sig-fig
-  signif(span / 10, 1)
+ # vec = df()[[input$xvar]], step = fine_step(vec)
+default_split <- function(vec) {
+  rng <- range(vec, na.rm = TRUE)
+  step <- fine_step(vec)
+  raw  <- round(mean(rng, na.rm = TRUE) / step) * step
+  split_threshold(vec, raw)
 }
 
 split_threshold <- function(v, candidate) {
@@ -2865,10 +2915,10 @@ split_threshold <- function(v, candidate) {
   candidate
 }
 
-make_threshold_ui <- function(id, vec) {
+make_threshold_ui <- function(id, vec, n_bins = 30) {
   rng   <- range(vec, na.rm = TRUE)
-  step  <- nice_step(diff(rng))
-
+  step  <- fine_step(vec, n_bins)
+  # Default threshold is mean of the range, snapped to a valid step
   raw   <- round(mean(rng, na.rm = TRUE) / step) * step
   safe  <- split_threshold(vec, raw)          # nudge if all-same split
 
@@ -2880,39 +2930,87 @@ make_threshold_ui <- function(id, vec) {
 
 output$ui_threshold_x <- renderUI({
   req(input$xvar)
-
+  vec <- df()[[input$xvar]]
+  val <- if (locked()) isolate(input$tv_threshold) else default_split(vec)
+  step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(input$xvar,
-                      "is considered treated when it is ≥")),
-      make_threshold_ui("tv_threshold", df()[[input$xvar]])
-    )
+      tags$span(paste(input$xvar, "is considered treated when it is ≥")),
+      numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
+    ),
+    if (locked()) tags$script(HTML("
+      var tvDisableTries = 0;
+      var disableTv = setInterval(function() {
+        var $el = $('#tv_threshold');
+        if ($el.length) {
+          $el.prop('disabled', true);
+          $el.css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableTv);
+        }
+        tvDisableTries++;
+        if (tvDisableTries > 10) clearInterval(disableTv);
+      }, 100);
+    "))
   )
 })
 
 output$ui_threshold_y <- renderUI({
   req(input$yvar)
-
+  vec <- df()[[input$yvar]]
+  val <- if (locked()) isolate(input$ov_threshold) else default_split(vec)
+  step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(input$yvar,
-                      "is considered success when it is ≥")),
-      make_threshold_ui("ov_threshold", df()[[input$yvar]])
-    )
+      tags$span(paste(input$yvar, "is considered success when it is ≥")),
+      numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
+    ),
+    if (locked()) tags$script(HTML("
+      var ovDisableTries = 0;
+      var disableOv = setInterval(function() {
+        var $el = $('#ov_threshold');
+        if ($el.length) {
+          $el.prop('disabled', true);
+          $el.css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableOv);
+        }
+        ovDisableTries++;
+        if (ovDisableTries > 10) clearInterval(disableOv);
+      }, 100);
+    "))
   )
 })
 
-output$step2 = renderUI({
-  req(input$file1)
-  h5("Upload knowledge file:")
+output$ui_file1 <- renderUI({
+  if (!locked()) {
+    # Show fileInput before locking
+    fileInput("file1", "Upload data file:", accept = ".csv")
+  } else {
+    # Show locked/greyed label after "Conduct Experiment"
+    fname <- if (!is.null(input$file1)) input$file1$name else "<none selected>"
+    tags$div(
+      style = "margin-bottom: 10px; color: #aaa; font-style: italic;",
+      tags$span(icon("file"), "Uploaded data file: "),
+      tags$b(fname)
+    )
+  }
 })
 
-output$ui_file2 = renderUI({
-  req(input$file1)
-  fileInput("file2", "", accept = ".csv")
+output$ui_file2 <- renderUI({
+  req(input$file1)  # Only show after file1 is uploaded
+  if (!locked()) {
+    fileInput("file2", "Upload knowledge file:", accept = ".csv")
+  } else {
+    fname <- if (!is.null(input$file2)) input$file2$name else "<none selected>"
+    tags$div(
+      style = "margin-bottom: 10px; color: #aaa; font-style: italic;",
+      tags$span(icon("file"), "Knowledge file: "),
+      tags$b(fname)
+    )
+  }
 })
+
 output$histogram_x <- renderPlot({
   req(input$xvar, input$tv_threshold)
   p <- get_histogram_x(df(), input$xvar, input$tv_threshold)
@@ -2927,17 +3025,34 @@ output$histogram_y <- renderPlot({
 
 output$ui_model_exist <- renderUI({
   req(graph_ready())
-
-  selectInput(
-    inputId  = "model_exist",
-    label    = "Do you have an existing model?",
-    choices  = c(
-      "Yes: I can upload it"      = "Yes",
-      "Yes: I can provide an ATE" = "ATE",
-      "No: Do it all for me"      = "No"
+  selected_val <- if (locked()) isolate(input$model_exist) else "ATE"
+  tagList(
+    selectInput(
+      inputId  = "model_exist",
+      label    = "Do you have an existing model?",
+      choices  = c(
+        "Yes: I can upload it"      = "Yes",
+        "Yes: I can provide an ATE" = "ATE",
+        "No: Do it all for me"      = "No"
+      ),
+      selected = selected_val,
+      width    = "100%"
     ),
-    selected = "ATE",
-    width    = "100%"          # stretches full column width
+    if (locked()) tags$script(HTML("
+      var modelExistDisableTries = 0;
+      var disableModelExist = setInterval(function() {
+        var $sel = $('#model_exist');
+        var $inp = $('#model_exist-selectized');
+        if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
+          $sel.prop('disabled', true);
+          $inp.prop('disabled', true);
+          $inp.parent().css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableModelExist);
+        }
+        modelExistDisableTries++;
+        if (modelExistDisableTries > 10) clearInterval(disableModelExist);
+      }, 100);
+    "))
   )
 })
 
@@ -2945,19 +3060,42 @@ output$ui_ate_upload = renderUI({
   req(graph_ready())
   req(input$model_exist)
   if (input$model_exist == "ATE") {
-    numericInput("ate_in", label = "ATE: ", value = 0, min = -1, max = 1, step = 0.1)
-    # model_exist <- "ATE"
-    # ate_in <- 0
-  } else (return(NULL))
-  
+    val <- if (locked()) isolate(input$ate_in) else 0
+    if (locked()) {
+      # After calculation: show value as static text
+      tags$div(
+        style = "color: #999; font-style: italic; margin-top: 0.5em;",
+        paste("ATE provided:", val)
+      )
+    } else {
+      numericInput("ate_in", label = "ATE: ", value = val, min = -1, max = 1, step = 0.1)
+    }
+  } else {
+    return(NULL)
+  }
 })
 
 output$ui_model_upload = renderUI({
   req(input$model_exist)
   if (input$model_exist == "Yes") {
-    fileInput("model_in", "", 
-              accept = c(".rds", ".rda", ".model"))
-  } else (return(NULL))
+    if (locked()) {
+      # After calculation: show label, not file picker
+      file_label <- if (!is.null(input$model_in)) {
+        paste0("Uploaded model: ", input$model_in$name)
+      } else {
+        "No model file selected."
+      }
+      tags$div(
+        style = "color: #999; font-style: italic; margin-top: 0.5em;",
+        file_label
+      )
+    } else {
+      # Before calculation: show actual fileInput
+      fileInput("model_in", "Upload model file", accept = c(".rds", ".rda", ".model"))
+    }
+  } else {
+    return(NULL)
+  }
 })
 
 output$step4 = renderUI({
@@ -3034,22 +3172,52 @@ output$ui_figurecaption = renderUI({
 
 output$ui_goButton = renderUI({
   req(graph_ready())
-  actionBttn(
-    inputId = "goButton",
-    label = "Calculate Results",
-    style = "material-flat", 
-    color = "primary"
+  tagList(
+    actionBttn(
+      inputId = "goButton",
+      label = "Conduct Experiment",
+      style = "material-flat", 
+      color = "primary"
+    ),
+    if (locked()) tags$script(HTML("
+      var tries = 0;
+      var disableGoButton = setInterval(function() {
+        var $inp = $('#goButton');
+        if ($inp.length) {
+          $inp.prop('disabled', true);
+          $inp.css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableGoButton);
+        }
+        tries++;
+        if (tries > 10) clearInterval(disableGoButton);
+      }, 100);
+    "))
   )
 })
 
 output$ui_buildButton = renderUI({
   req(file_check())
-  actionBttn(
-    inputId = "buildButton",
-    label = "Build Graph",
-    style = "material-flat", 
-    color = "primary"
-    )
+  tagList(
+    actionBttn(
+      inputId = "buildButton",
+      label = "Build Graph",
+      style = "material-flat", 
+      color = "primary"
+    ),
+    if (locked()) tags$script(HTML("
+      var tries = 0;
+      var disableBuildButton = setInterval(function() {
+        var $inp = $('#buildButton');
+        if ($inp.length) {
+          $inp.prop('disabled', true);
+          $inp.css({'pointer-events':'none', 'opacity':0.5});
+          clearInterval(disableBuildButton);
+        }
+        tries++;
+        if (tries > 10) clearInterval(disableBuildButton);
+      }, 100);
+    "))
+  )
 })
 
 output$figurecaption = renderUI({

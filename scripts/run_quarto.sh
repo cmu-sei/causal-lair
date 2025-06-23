@@ -35,4 +35,3 @@ echo ""
 # This makes quarto completely silent on the console. If you want the noisier version, use the command below.
 quarto preview /workspace/airtool.qmd --server --quiet --port 4173 --host $IP
 # quarto preview /workspace/airtool.qmd --port 4173 --host $IP
-
