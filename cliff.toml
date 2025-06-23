@@ -1,0 +1,31 @@
+[changelog]
+header = "# Changelog"
+body = """
+## [{{ version | default(value="Unreleased") }}]
+
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+{% for commit in commits %}
+- {{ commit.body | default(value=commit.message) | replace(from="\n", to="\n  ") }}
+{% endfor %}
+{% endfor %}
+"""
+trim = false
+postprocessors = []
+
+[git]
+tag_pattern = "v?[0-9].*"
+commit_preprocessors = []
+conventional_commits = false
+
+[commit_types]
+feat = { group = "Features" }
+fix = { group = "Fixes" }
+refactor = { group = "Refactoring" }
+perf = { group = "Performance" }
+test = { group = "Testing" }
+chore = { group = "Other" }
+docs = { group = "Docs" }
+style = { group = "Style" }
+ci = { group = "CI" }
+default = { group = "Misc" }
