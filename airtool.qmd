@@ -166,67 +166,94 @@ suppressMessages({
   library(xml2)
 })
 
-# --- session-wide defaults --------------------------------------------------
-
-AIRHome  <- here::here()
+## ── session-wide defaults ───────────────────────────────────────────────
+AIRHome <- here::here()
 setwd(AIRHome)
 
 log_dir  <- file.path(AIRHome, "logs")
 dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
 
-log_file <- file.path(
-  log_dir,
-  sprintf("%s.log", format(Sys.time(), "%Y-%m-%d_%H-%M-%S"))
-)
-
-init_logging <- function(file) {
-  logger::log_appender(logger::appender_file(file))
-  logger::log_layout(logger::layout_glue_colors)  # pretty colours in console
-  logger::log_threshold(level = "DEBUG")
+# ── guard: run heavy log setup only once per R-session ───────────────────
+if (exists(".airtool_log_init", envir = .GlobalEnv)) {
+  log_file <- get(".airtool_log_file", envir = .GlobalEnv)
+} else {
+  log_file <- file.path(
+    log_dir,
+    strftime(Sys.time(), "%Y-%m-%d_%H-%M-%S"),
+    "airtool.log"
+  )
+  dir.create(dirname(log_file), recursive = TRUE, showWarnings = FALSE)
+  assign(".airtool_log_init", TRUE,      .GlobalEnv)
+  assign(".airtool_log_file", log_file,  .GlobalEnv)
 }
 
-init_logging(log_file)
+## ── 1. logger setup  ----------------------------------------------------
+logger::log_threshold("DEBUG")
+layout_plain <- function(level, msg, namespace, .logcall, .topcall, .topenv) {
+  sprintf("%s [%s] %s", level, format(Sys.time(), "%Y-%m-%d %H:%M:%S"), as.character(msg))
+}
+logger::log_layout(layout_plain)
+logger::log_appender(logger::appender_file(log_file))
 
-# convenience shortcuts -------------------------------------------------
-log_debug <- function(...) logger::log_debug(...)
-log_info  <- function(...) logger::log_info(...)
-log_warn  <- function(...) logger::log_warn(...)
-log_error <- function(...) logger::log_error(...)
-
-# 🔑  make the helpers globally visible
-for (f in c("log_debug","log_info","log_warn","log_error"))
-  assign(f, get(f, inherits = FALSE), envir = .GlobalEnv)
-
+for (nm in c("debug", "info", "warn", "error")) {
+  f <- get(paste0("log_", nm), envir = asNamespace("logger"))
+  assign(paste0("log_", nm), f, .GlobalEnv)
+}
 log_info("AIR Tool startup – log initialised.")
 
-# send all console output from this point on to the log file
-log_con <- file(log_file, open = "a")
-sink(log_con) # stdout
-sink(log_con, type = "message") # stderr / messages / warnings
-
-on.exit({
-  sink(type = "message")    # restore when the session ends
-  sink()
-  close(log_con)
-}, add = TRUE)
-
-# Define the log directory and calculate the time threshold (30 days ago)
-
-time_threshold <- Sys.time() - 30 * 24 * 60 * 60  # 30 days in seconds
-
-# List all log files in the directory
-log_files <- list.files(log_dir, full.names = TRUE)
-
-# Get file information for each file
-files_info <- file.info(log_files)
-
-# Identify files where the modification time is older than the threshold
-old_files <- rownames(files_info)[files_info$mtime < time_threshold]
-
-# Remove the old log files
-if (length(old_files) > 0) {
-  file.remove(old_files)
+## ── 2. Logging connections: anchor in globalenv! ------------------------
+if (!exists(".airtool_log_con", envir = .GlobalEnv)) {
+  log_con <- file(log_file, open = "a")
+  assign(".airtool_log_con", log_con, .GlobalEnv)
+} else {
+  log_con <- get(".airtool_log_con", envir = .GlobalEnv)
 }
+
+## Quarto/knitr needs stdout for a while; only divert messages
+sink(log_con, append = TRUE, type = "message")
+
+## ── 3. Clean-up: only close what we opened, and ONLY at process end -----
+.on_session_end <- function(...) {
+  # Remove all sinks attached to this connection
+  if (sink.number(type = "message") > 0)
+    sink(type = "message")
+  if (exists(".airtool_log_con", envir = .GlobalEnv)) {
+    con <- get(".airtool_log_con", .GlobalEnv)
+    if (isOpen(con)) close(con)
+    rm(".airtool_log_con", envir = .GlobalEnv)
+  }
+}
+
+reg.finalizer(.GlobalEnv, .on_session_end, onexit = TRUE)
+if ("shiny" %in% loadedNamespaces()) {
+  shiny::onStop(.on_session_end)
+} else {
+  setHook(packageEvent("shiny", "onLoad"),
+          function(...) shiny::onStop(.on_session_end),
+          action = "append")
+}
+
+## --- JVM streams, stack trace, log pruning as before ---
+redirect_java_streams <- function(target) {
+  fos <- rJava::.jnew("java/io/FileOutputStream", target, TRUE)
+  os  <- rJava::.jcast(fos, "java/io/OutputStream")
+  ps  <- rJava::.jnew("java/io/PrintStream", os)
+  rJava::.jcall("java/lang/System", "V", "setOut", ps)
+  rJava::.jcall("java/lang/System", "V", "setErr", ps)
+}
+
+options(
+  shiny.fullstacktrace = TRUE,
+  error = function() {
+    logger::log_error(paste(capture.output(traceback(20L)), collapse = "\n"))
+    invokeRestart("abort")
+  }
+)
+
+time_threshold <- Sys.time() - 30 * 24 * 60 * 60
+old_logs <- list.files(log_dir, full.names = TRUE, recursive = TRUE)
+old_logs <- old_logs[file.info(old_logs)$mtime < time_threshold]
+if (length(old_logs)) file.remove(old_logs)
 
 theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc.
 
@@ -295,6 +322,8 @@ get_tetrad_path <- function() {
 assign("get_tetrad_path", get_tetrad_path, envir = .GlobalEnv)
 
 initialize_java()
+
+redirect_java_streams(log_file)
 
 # ── one-stop Java ⇢ DOT helper ───────────────────────────────────────
 graph_to_dot <- function(graph) {
