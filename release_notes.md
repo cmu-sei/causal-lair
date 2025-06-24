@@ -156,6 +156,44 @@
   - Made script/run_quarto.sh silent by default (remove distractions from console)
   - Renamed the log file to reflect new loggin infrastructure (not all logs are error logs)
 
+Make AIR Tool robust + debuggable
+
+* Logging
+  • export log_* helpers to .GlobalEnv
+  • enable shiny.fullstacktrace + custom shiny.error handler
+
+* Java / Tetrad bootstrap
+  • add safe_jcall() – traps Java exceptions
+  • add get_tetrad_path() helper; use everywhere
+  • share safe_jcall + get_tetrad_path with parallel workers
+
+* Graph helpers
+  • new graph_to_dot() wrapper for all DOT generation
+  • escape DOT-unsafe chars in change_node_color()
+
+* DOT parsing fix
+  • rewrite is_edge_line(), split_line(), first_node(), second_node()
+    to parse quoted edges → Y-selector now shows descendants
+
+* Validation / guards
+  • tiny helpers: check_numeric(), check_column_exists(), safe_thresh()
+  • strict file-type/size checks for data, knowledge, model uploads
+  • reactive guards both_ready(), reachability checks
+
+* Parallel cluster
+  • clusterExport() now ships safe_jcall, log helpers, graph_to_dot,
+    get_tetrad_path → no more “TETRAD_PATH not found” in workers
+
+* Knowledge file
+  • expect columns level,variable (matches custom format)
+
+* UI polish
+  • X/Y selectors persist after lock; histogram/threshold wait for data
+
+* Cleanup
+  • remove duplicate initialize_java() blocks
+  • replace raw .jcall() with safe_jcall() across codebase
+
 ## [v0.5.1]
 
 ### <!-- 1 -->🐛 Bug Fixes

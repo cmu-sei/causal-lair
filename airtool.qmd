@@ -193,6 +193,10 @@ log_info  <- function(...) logger::log_info(...)
 log_warn  <- function(...) logger::log_warn(...)
 log_error <- function(...) logger::log_error(...)
 
+# 🔑  make the helpers globally visible
+for (f in c("log_debug","log_info","log_warn","log_error"))
+  assign(f, get(f, inherits = FALSE), envir = .GlobalEnv)
+
 log_info("AIR Tool startup – log initialised.")
 
 # send all console output from this point on to the log file
@@ -228,12 +232,88 @@ theme_set(ggplot2::theme_gray(base_family = "DejaVu Sans"))  # ggplot, grid, etc
 
 #options(warn = 2)
 #options(shiny.trace = TRUE)
+options(
+  shiny.fullstacktrace = TRUE,
+  shiny.error = function() {
+    cat("\n=== SHINY ERROR =========================================\n")
+    print(sys.calls())
+    cat("---------------------------------------------------------\n")
+    # re-throw so Shiny still shows the UI banner
+    geterrmessage()
+  }
+)
 
 set.seed(123)
 
 ## Also tell the R graphics device so axis labels use it too
 grDevices::png(type = "cairo")            # ensure Pango/Cairo backend
 par(family = "DejaVu Sans")               # default plotting family
+
+# Constants for Java JDK URLs
+TETRAD_PATH <- Sys.getenv("TETRAD_PATH")
+
+if (TETRAD_PATH == "") {
+  stop("The TETRAD_PATH environment variable is not set. Please set it to the path of the Tetrad jar.")
+}
+
+# ––– shield any .jcall from killing R –––––––––––––––––––––––––––––––––
+safe_jcall <- function(...) {
+  tryCatch(
+    .jcall(...),
+    Throwable = function(e) {
+      msg <- .jcall("java/lang/Throwable", "S", "toString", e)
+      log_debug("Java exception trapped: {msg}", msg = msg)
+      NULL                                   # propagate safe NULL
+    }
+  )
+}
+
+# make it visible to Reference-class methods & workers
+assign("safe_jcall", safe_jcall, envir = .GlobalEnv)
+
+# ----- Initialize Java and Check Version -----
+initialize_java <- function() {
+  
+  .jinit()
+  .jaddClassPath(get_tetrad_path())
+
+  java_version <- safe_jcall("java/lang/System", "S", "getProperty", "java.version")
+  print(paste("Java version:", java_version))
+}
+
+# ── helper: always return a usable TETRAD class-path ────────────────────
+get_tetrad_path <- function() {
+  if (exists("TETRAD_PATH", envir = .GlobalEnv) &&
+      nzchar(get("TETRAD_PATH", envir = .GlobalEnv))) {
+    return(get("TETRAD_PATH", envir = .GlobalEnv))
+  }
+  ## fall back to the environment variable if the symbol vanished
+  Sys.getenv("TETRAD_PATH", unset = "")
+}
+
+# make it visible everywhere
+assign("get_tetrad_path", get_tetrad_path, envir = .GlobalEnv)
+
+initialize_java()
+
+# ── one-stop Java ⇢ DOT helper ───────────────────────────────────────
+graph_to_dot <- function(graph) {
+  dot <- safe_jcall(
+    "edu/cmu/tetrad/graph/GraphSaveLoadUtils",
+    "Ljava/lang/String;",
+    "graphToDot",
+    graph
+  )
+
+  if (is.null(dot) || !nzchar(dot)) {
+    log_warn("graphToDot() returned empty result.")
+    return("")                          # harmless for grViz()
+  }
+  dot
+}
+
+# make it visible to Reference-class methods & parallel workers
+assign("graph_to_dot", graph_to_dot, envir = .GlobalEnv)
 ```
 
 ```{r session-setup}
@@ -412,6 +492,35 @@ disconnectMessage2 <- function() {
   )
 }
 
+# ── tiny validation helpers ──────────────────────────────────────────────
+check_numeric <- function(x, min = -Inf, max = Inf, id = "") {
+  shiny::validate(
+    shiny::need(is.numeric(x) && length(x) == 1 && is.finite(x),
+                sprintf("[%s] must be a single numeric value", id)),
+    shiny::need(x >= min && x <= max,
+                sprintf("[%s] must be between %g and %g", id, min, max))
+  )
+  x
+}
+
+check_column_exists <- function(df, col, id = "") {
+  shiny::validate(
+    shiny::need(!is.null(df),
+                sprintf("Data not loaded, can’t check %s yet", id)),
+    shiny::need(col %in% names(df),
+                sprintf("Column “%s” not found (%s)", col, id))
+  )
+  col
+}
+
+escape_dot <- function(x) gsub('[^\\w\\s]', '_', x, perl = TRUE)  # DOT-safe
+
+# keeps thresholds inside the data range and numeric
+safe_thresh <- function(val, vec, id) {
+  rng <- range(vec, na.rm = TRUE)
+  check_numeric(val, rng[1], rng[2], id)
+}
+
 fix_knowledge <- function(df){
   # Store original column names
   original_colnames <- colnames(df)
@@ -448,6 +557,7 @@ fix_knowledge <- function(df){
 
 # change color of nodes in graph
 change_node_color <- function(dot_code, node, color) {
+  node <- escape_dot(node)
   # Remove any accidental extra quotes from the color string
   color <- trimws(gsub("['\"]", "", color))
   node_definition <- paste0("\"", node, "\" [style=filled, fillcolor=\"", color, "\"];")
@@ -573,11 +683,7 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
   }
 
   graph_str <- tryCatch(
-    .jcall(graph, "Ljava/lang/String;", "toString"),
-    error = function(e) {
-      log_debug(sprintf("Failed to convert graph to string: %s", conditionMessage(e)))
-      NULL
-    }
+    graph_to_dot(graph)
   )
 
   if (!is.null(graphtxt_buffer)) {
@@ -1282,26 +1388,32 @@ processResults <- function(settings,
 
 ## Create four simple methods to help parse a line
 
-# Is the first character of a line a nonzero digit? If yes, then that line specifies an edge.
+# ── DOT-parsing helpers (quoted edges) ──────────────────────────────────
+# Examples of the lines we want to catch:
+#   "mission_urgency" -> "region_sensitivity";
+#   "A" -> "B";
+
+## 1. does this line specify an edge?  ───────────────────────────────────
 is_edge_line <- function(line) {
-  # regular expression
-  return(grepl("^[1-9]", line))
+  grepl('^\\s*"[^"]+"\\s*->\\s*"[^"]+"', line)
 }
 
-# Split a string of space-delimited substrings into a list of those substrings
+## 2. split the line into the two node names  ────────────────────────────
 split_line <- function(input_string) {
-  return(strsplit(input_string, " "))
+  # grab everything that is inside matching double quotes
+  unlist(regmatches(input_string,
+                    gregexpr('"([^"]+)"', input_string, perl = TRUE))) |>
+    gsub('"', '', x = _ , fixed = TRUE)          # strip the quotes
 }
 
-# Return the first node from a line specifying an edge (after the line number)
+## 3. first node (source)  ───────────────────────────────────────────────
 first_node <- function(line) {
-  line_components <- split_line(line)
-  return(line_components[[1]][2])
+  split_line(line)[1]
 }
-# Return the second node from a line specifying an edge (after the line number)
+
+## 4. second node (target) ───────────────────────────────────────────────
 second_node <- function(line) {
-  line_components <- split_line(line)
-  return(line_components[[1]][4])
+  split_line(line)[2]
 }
 
 ## The key methods defined here are descendants (and its dual: ancestors)
@@ -1324,7 +1436,11 @@ descendants <- function(node, children) {
 }
 
 get_X_descendents <- function(TV, graphtxt_buffer) {
-  lines <- strsplit(graphtxt_buffer(), "\n")[[1]]
+  buf <- graphtxt_buffer()
+  if (is.null(buf) || !nzchar(buf))           # <<< guard added
+    return(character(0))
+
+  lines <- strsplit(buf, "\n")[[1]]
   
   nodes <- set()
   for (line in lines) {
@@ -1353,7 +1469,6 @@ get_X_descendents <- function(TV, graphtxt_buffer) {
   }
   return(unlist(descendants(TV, children)))
 }
-
 
 get_ribbon_plot <- function(AIRHome) {
   dfr <- results_out_buffer()
@@ -1786,23 +1901,6 @@ if (Sys.info()["sysname"] == "Linux") {
   # --- BEGIN INLINE: scripts/tetrad_utils.R ---
 # ----- Utility Functions -----
 
-# Constants for Java JDK URLs
-TETRAD_PATH <- Sys.getenv("TETRAD_PATH")
-
-if (TETRAD_PATH == "") {
-  stop("The TETRAD_PATH environment variable is not set. Please set it to the path of the Tetrad jar.")
-}
-
-# ----- Initialize Java and Check Version -----
-initialize_java <- function() {
-  
-   .jinit()
-  .jaddClassPath(TETRAD_PATH)
-
-  java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
-  print(paste("Java version:", java_version))
-}
-
 # ----- Graph Visualization -----
 visualize_graph <- function(graph) {
   if (requireNamespace("rstudioapi", quietly = TRUE) && rstudioapi::isAvailable()) {
@@ -1815,7 +1913,7 @@ visualize_graph <- function(graph) {
   
   if (b) {
     if (!is.null(graph)) {
-      dot <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graph)
+      dot <- graph_to_dot(graph)
       grViz(dot)
     } else {
       log_debug("No graph generated. Please check the BOSS execution.")
@@ -1886,15 +1984,15 @@ TetradSearch <- setRefClass(
     },
     
     .setParam = function(key, value) {
-      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Boolean", value), "java/lang/Object"))
+      safe_jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Boolean", value), "java/lang/Object"))
     },
     
     .setParamInt = function(key, value) {
-      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Integer", as.integer(value)), "java/lang/Object"))
+      safe_jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Integer", as.integer(value)), "java/lang/Object"))
     },
     
     .set_knowledge = function() {
-      .jcall(.self$search, "V", "setKnowledge", .jcast(.self$knowledge, "edu.cmu.tetrad.data.Knowledge"))
+      safe_jcall(.self$search, "V", "setKnowledge", .jcast(.self$knowledge, "edu.cmu.tetrad.data.Knowledge"))
     },
     
     # Run the search algorithm, for the typical case
@@ -1920,7 +2018,7 @@ TetradSearch <- setRefClass(
       tryCatch({
         tier <- as.integer(tier)
         var_name <- as.character(var_name)
-        .jcall(.self$knowledge, "V", "addToTier", tier, var_name)
+        safe_jcall(.self$knowledge, "V", "addToTier", tier, var_name)
         log_debug("Variable {var_name} added to tier {tier}", var_name = var_name, tier = tier)
       }, error = function(e) {
         log_debug("Error adding variable to tier: {msg}", msg = e$message)
@@ -1963,7 +2061,7 @@ TetradSearch <- setRefClass(
     # --- Internal parameter helpers ---
     
     .setParamDouble = function(key, value) {
-      .jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Double", as.double(value)), "java/lang/Object"))
+      safe_jcall(.self$params, "V", "set", key, .jcast(.jnew("java/lang/Double", as.double(value)), "java/lang/Object"))
     },
     
     # Run the BOSS algorithm
@@ -1988,9 +2086,9 @@ TetradSearch <- setRefClass(
       dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
       boss <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Boss", .self$score)
-      .jcall(boss, "V", "setKnowledge", .self$knowledge)
+      safe_jcall(boss, "V", "setKnowledge", .self$knowledge)
       
-      graph <<- .jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
+      graph <<- safe_jcall(boss, "Ledu/cmu/tetrad/graph/Graph;", "search", dataModel, .self$params)
       .self$graph <- graph
       
       log_debug("BOSS search completed.")
@@ -2044,17 +2142,17 @@ TetradSearch <- setRefClass(
       log_debug("Getting adjustment sets for: {source} -> {target}", source = source, target = target)
       
       # Look up Node objects by name
-      source_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", source)
-      target_node <- .jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", target)
+      source_node <- safe_jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", source)
+      target_node <- safe_jcall(graph, "Ledu/cmu/tetrad/graph/Node;", "getNode", target)
       
       if (is.jnull(source_node)) stop(paste("Source node", source, "not found in the graph."))
       if (is.jnull(target_node)) stop(paste("Target node", target, "not found in the graph."))
       
       # Get Paths object from Graph
-      paths <- .jcall(graph, "Ledu/cmu/tetrad/graph/Paths;", "paths")
+      paths <- safe_jcall(graph, "Ledu/cmu/tetrad/graph/Paths;", "paths")
       
       # Java List<Set<Node>>
-      sets_list <- .jcall(paths,
+      sets_list <- safe_jcall(paths,
                           "Ljava/util/List;",
                           "adjustmentSets",
                           source_node,
@@ -2065,17 +2163,17 @@ TetradSearch <- setRefClass(
                           as.integer(max_path_length))
       
       
-      size <- .jcall(sets_list, "I", "size")
+      size <- safe_jcall(sets_list, "I", "size")
       log_debug("Number of adjustment sets: {size}", size = size)
       
       # Convert Java List<Set<Node>> to R list of character vectors
-      size <- .jcall(sets_list, "I", "size")
+      size <- safe_jcall(sets_list, "I", "size")
       result <- vector("list", size)
       
       for (i in seq_len(size)) {
-        jset <- .jcall(sets_list, "Ljava/lang/Object;", "get", as.integer(i - 1))
-        jarray <- .jcall(jset, "[Ljava/lang/Object;", "toArray")
-        result[[i]] <- sapply(jarray, function(n) .jcall(n, "S", "getName"))
+        jset <- safe_jcall(sets_list, "Ljava/lang/Object;", "get", as.integer(i - 1))
+        jarray <- safe_jcall(jset, "[Ljava/lang/Object;", "toArray")
+        result[[i]] <- sapply(jarray, function(n) safe_jcall(n, "S", "getName"))
       }
       
       return(result)
@@ -2129,40 +2227,40 @@ TetradSearch <- setRefClass(
       
       dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
-      test_ <- .jcall(.self$mc_test, "Ledu/cmu/tetrad/search/IndependenceTest;",
+      test_ <- safe_jcall(.self$mc_test, "Ledu/cmu/tetrad/search/IndependenceTest;",
                       "getTest", dataModel, .self$params)
       
       mc <- .jnew("edu.cmu.tetrad.search.MarkovCheck", graph, test_, condition_set_type_)
       
       # Configure it
-      .jcall(mc, "V", "setPercentResample", as.double(percent_resample))
-      .jcall(mc, "V", "setFindSmallestSubset", find_smallest_subset)
-      .jcall(mc, "V", "setParallelized", parallelized)
+      safe_jcall(mc, "V", "setPercentResample", as.double(percent_resample))
+      safe_jcall(mc, "V", "setFindSmallestSubset", find_smallest_subset)
+      safe_jcall(mc, "V", "setParallelized", parallelized)
       
       # Generate results
-      .jcall(mc, "V", "generateAllResults")
-      .self$mc_ind_results <- .jcall(mc, "Ljava/util/List;", "getResults", TRUE)
+      safe_jcall(mc, "V", "generateAllResults")
+      .self$mc_ind_results <- safe_jcall(mc, "Ljava/util/List;", "getResults", TRUE)
       
       # Set sample size if specified
       ### temporary fix ((mdk)) ??
       ### originally: if (sample_size != -1) {
       if(effective_sample_size != -1) {
         ### temporary fix ((mdk)) ??   
-        ### originally: .jcall(mc, "V", "setSampleSize", as.integer(sample_size))
-        .jcall(mc, "V", "setSampleSize", as.integer(effective_sample_size))
+        ### originally: safe_jcall(mc, "V", "setSampleSize", as.integer(sample_size))
+        safe_jcall(mc, "V", "setSampleSize", as.integer(effective_sample_size))
       }
       
       # Extract statistics
-      ad_ind <- .jcall(mc, "D", "getAndersonDarlingP", TRUE)
-      ad_dep <- .jcall(mc, "D", "getAndersonDarlingP", FALSE)
-      ks_ind <- .jcall(mc, "D", "getKsPValue", TRUE)
-      ks_dep <- .jcall(mc, "D", "getKsPValue", FALSE)
-      bin_indep <- .jcall(mc, "D", "getBinomialPValue", TRUE)
-      bin_dep <- .jcall(mc, "D", "getBinomialPValue", FALSE)
-      frac_dep_ind <- .jcall(mc, "D", "getFractionDependent", TRUE)
-      frac_dep_dep <- .jcall(mc, "D", "getFractionDependent", FALSE)
-      num_tests_ind <- .jcall(mc, "I", "getNumTests", TRUE)
-      num_tests_dep <- .jcall(mc, "I", "getNumTests", FALSE)
+      ad_ind <- safe_jcall(mc, "D", "getAndersonDarlingP", TRUE)
+      ad_dep <- safe_jcall(mc, "D", "getAndersonDarlingP", FALSE)
+      ks_ind <- safe_jcall(mc, "D", "getKsPValue", TRUE)
+      ks_dep <- safe_jcall(mc, "D", "getKsPValue", FALSE)
+      bin_indep <- safe_jcall(mc, "D", "getBinomialPValue", TRUE)
+      bin_dep <- safe_jcall(mc, "D", "getBinomialPValue", FALSE)
+      frac_dep_ind <- safe_jcall(mc, "D", "getFractionDependent", TRUE)
+      frac_dep_dep <- safe_jcall(mc, "D", "getFractionDependent", FALSE)
+      num_tests_ind <- safe_jcall(mc, "I", "getNumTests", TRUE)
+      num_tests_dep <- safe_jcall(mc, "I", "getNumTests", FALSE)
       
       # Return as a named list
       return(list(
@@ -2204,14 +2302,14 @@ TetradSearch <- setRefClass(
         if (is.numeric(col)) {
           variable <- .jnew("edu/cmu/tetrad/data/ContinuousVariable", name)
           node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
-          .jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
+          safe_jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
           cont_data[[j]] <- .jarray(as.numeric(col), dispatch = TRUE)
           disc_data[[j]] <- .jnull("[I")  # null int[] for discrete
         } else if (is.integer(col) || is.factor(col)) {
           num_categories <- length(unique(na.omit(col)))
           variable <- .jnew("edu/cmu/tetrad/data/DiscreteVariable", name, as.integer(num_categories))
           node <- .jcast(variable, "edu/cmu/tetrad/graph/Node")
-          .jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
+          safe_jcall(var_list, "Z", "add", .jcast(node, "java/lang/Object"))
           cont_data[[j]] <- .jnull("[D")  # null double[] for continuous
           disc_data[[j]] <- .jarray(as.integer(col), dispatch = TRUE)
         } else {
@@ -2224,7 +2322,7 @@ TetradSearch <- setRefClass(
       j_disc_data <- .jarray(disc_data, dispatch = TRUE)
       
       # Call static Java helper method
-      ds <- .jcall("edu.cmu.tetrad.util.DataSetHelper",
+      ds <- safe_jcall("edu.cmu.tetrad.util.DataSetHelper",
                    "Ledu/cmu/tetrad/data/DataSet;",
                    "fromR",
                    .jcast(var_list, "java.util.List"),
@@ -2245,18 +2343,6 @@ TetradSearch <- setRefClass(
   if (!dir.exists(paste0(AIRHome, "/input/"))) {
     dir.create(paste0(AIRHome, "/input/"), recursive = TRUE)
   }
-  
-  # Setup Java and Tetrad
-  ## if running on local machine, uncomment out the next line
-  # setup_tetrad_environment()
-  
-  Sys.unsetenv("_JAVA_OPTIONS")
-  .jinit()
-  # .jinit(parameters = "-verbose:class")
-  .jaddClassPath(TETRAD_PATH)
-  
-  java_version <- .jcall("java/lang/System", "S", "getProperty", "java.version")
-  # print(paste("Java version:", java_version))
 } 
 
 ```
@@ -2324,7 +2410,7 @@ uiOutput('second_column_content')
 calc_complete <- reactiveVal(FALSE)
 graph_complete <- reactiveVal(FALSE)
 graph_ready <- reactive({
-  nzchar(input$xvar) && nzchar(input$yvar)
+  vars_ready()
 })
 file_check <- reactiveVal(FALSE)
 
@@ -2335,6 +2421,15 @@ file_check <- reactiveVal(FALSE)
 ## ------------------------------------------------------------
 model_in <- reactive({
   req(input$model_in)
+
+  shiny::validate(
+    shiny::need(tools::file_ext(input$model_in$name) %in% c("rds","rda","RData"),
+                "Model must be .rds or .rda/.RData"),
+    shiny::need(file.size(input$model_in$datapath) < 100*1024^2,
+                "Model file too large (100 MB limit)")
+  )
+
+  log_debug("Upload received: {input$model_in$name}")
 
   ## use the original filename to preserve the extension
   ext <- tolower(tools::file_ext(input$model_in$name))
@@ -2383,9 +2478,12 @@ model_in <- reactive({
     )
 
     ## ------- basic sanity-check: does it respond to predict() ? ----------
-    validate(
-      need(is.function(tryCatch(predict(mdl, head(mtcars)), error = function(e) NULL)),
-           "Loaded object does not appear to have a usable predict() method.")
+    shiny::validate(
+                    shiny::need(is.function(tryCatch(predict(mdl, head(mtcars)), error = function(e) NULL)),
+           "Loaded object does not appear to have a usable predict() method."),
+                    shiny::need(is.numeric(tryCatch(predict(mdl, head(df() %||% mtcars)),
+                               error = function(e) NA)),
+           "Model must return numeric predictions.")
     )
 
     log_debug("Model loaded ({a}): {b}", a=ext, b=input$model_in$name)
@@ -2397,6 +2495,14 @@ model_in <- reactive({
 })
 
 df <- reactive({
+  req(input$file1)
+  shiny::validate(
+    shiny::need(tolower(tools::file_ext(input$file1$name)) == "csv",
+                "Data file must be .csv"),
+    shiny::need(file.size(input$file1$datapath) < 10*1024^2,
+                "CSV too large (10 MB limit)")
+  )
+
   tryCatch({
     df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
     log_debug("Read in data file: {msg}", msg = input$file1$datapath)
@@ -2411,6 +2517,14 @@ df <- reactive({
 
 knowledge <- reactive({
   req(input$file2)
+
+  shiny::validate(
+    shiny::need(tolower(tools::file_ext(input$file2$name)) %in% c("csv","xlsx"),
+                "Knowledge file must be .csv or .xlsx"),
+    shiny::need(file.size(input$file2$datapath) < 5*1024^2,
+                "Knowledge file too large (5 MB limit)")
+  )
+
   tryCatch({
     path2 <- input$file2$datapath
     log_debug("Read in knowledge file: {p}", p = path2)
@@ -2425,6 +2539,11 @@ knowledge <- reactive({
     )
 
     fixed <- fix_knowledge(knowledge_in)
+
+    shiny::validate(
+      shiny::need(all(c("level","variable") %in% names(fixed)),
+                  "Knowledge file must have ‘level’ and ‘variable’ columns")
+    )
 
     if (is.character(fixed)) {
       sendSweetAlert(...); return(NULL)
@@ -2449,27 +2568,52 @@ vars_ready <- reactive({
   nzchar(input$xvar) && nzchar(input$yvar)
 })
 
+x_ready   <- reactive({ nzchar(vars_sel()$x) })         # X chosen & valid
+y_ready   <- reactive({ nzchar(vars_sel()$y) })         # Y chosen & valid
+both_ready <- reactive({ x_ready() && y_ready() })      # X + Y ready
+
+tv_val <- reactive({
+  req(x_ready(), !is.null(input$tv_threshold))          # ← new guard
+  safe_thresh(input$tv_threshold,
+              df()[[vars_sel()$x]], "X threshold")
+})
+
+ov_val <- reactive({
+  req(y_ready(), !is.null(input$ov_threshold))          # ← new guard
+  safe_thresh(input$ov_threshold,
+              df()[[vars_sel()$y]], "Y threshold")
+})
+
+vars_sel <- reactive({
+  req(df())                           # data present
+
+  list(
+    x = if (!is.null(input$xvar) && nzchar(input$xvar))
+           check_column_exists(df(), input$xvar, "xvar")
+         else "",
+    y = if (!is.null(input$yvar) && nzchar(input$yvar))
+           check_column_exists(df(), input$yvar, "yvar")
+         else ""
+  )
+})
+
 ## ───────────────────────────────────────────────────────────
 ## 1. highlighted_graph  – always returns a dot *with* fills
 ##    whenever x / y / Z change
 ## ───────────────────────────────────────────────────────────
 highlighted_graph <- reactive({
   req(graph_complete())                # we *do* need the cpdag
+  req(both_ready())
 
-  dot <- .jcall(
-    "edu/cmu/tetrad/graph/GraphSaveLoadUtils",
-    "Ljava/lang/String;",
-    "graphToDot",
-    rv$best_cpdag_seen_so_far
-  )
+  dot <- graph_to_dot(rv$best_cpdag_seen_so_far)
 
   ## — colour the experimental variable if one is chosen
-  if (!is.null(input$xvar) && nzchar(input$xvar))
-    dot <- change_node_color(dot, input$xvar, "'#FFC107'")
+  if (!is.null(vars_sel()$x) && nzchar(vars_sel()$x))
+    dot <- change_node_color(dot, vars_sel()$x, "'#FFC107'")
 
   ## — colour the outcome variable if one is chosen
-  if (!is.null(input$yvar) && nzchar(input$yvar))
-    dot <- change_node_color(dot, input$yvar, "'#FFC107'")
+  if (!is.null(vars_sel()$y) && nzchar(vars_sel()$y))
+    dot <- change_node_color(dot, vars_sel()$y, "'#FFC107'")
 
   ## — colour adjustment sets only when they exist
   if (exists("Zvars", inherits = FALSE) && nrow(Zvars)) {
@@ -2522,7 +2666,7 @@ observeEvent(input$buildButton, {
 
     graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
 
-    graphtxt_raw <- .jcall(graphlist[[1]], "Ljava/lang/String;", "toString")
+    graphtxt_raw <- graph_to_dot(graphlist[[1]])
 
     if (is.null(graphtxt_raw) || !nzchar(graphtxt_raw)) {
       stop("Tetrad returned an empty graph string")
@@ -2540,7 +2684,7 @@ observeEvent(input$buildButton, {
     rv$MC_passing_cpdag_already_found <- graphlist[[3]]
     rv$best_cpdag_seen_so_far <- graphlist[[4]]
 
-    dot_raw <- .jcall("edu/cmu/tetrad/graph/GraphSaveLoadUtils", "Ljava/lang/String;", "graphToDot", graphlist[[1]])
+    dot_raw <- graph_to_dot(graphlist[[1]])
 
     rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
 
@@ -2575,13 +2719,21 @@ observeEvent(input$buildButton, {
 })
 
 observeEvent( vars_ready(), ignoreInit = TRUE, {
-  ## only run after the second selector is filled in
-  req(vars_ready())
+  req(both_ready())
+  req(graph_complete())
+
+  # ── NEW: Y must be reachable from X to keep Tetrad happy
+  shiny::validate(
+                  shiny::need(vars_sel()$x != vars_sel()$y,
+         "X and Y must be different columns"),
+                  shiny::need(vars_sel()$y %in% get_X_descendents(vars_sel()$x, graphtxt_buffer),
+         "Y must be a descendant of X")
+  )
 
   ## ---------- 1. maintain the global helpers -------------------------------
   df_vars <- data.frame(
     var = c("TV", "OV"),
-    val = c(input$xvar, input$yvar),
+    val = c(vars_sel()$x, vars_sel()$y),
     stringsAsFactors = FALSE
   )
   assign("df_vars", df_vars, envir = .GlobalEnv)
@@ -2589,8 +2741,8 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
   ### adjustment-set calculation (unchanged) ---------------------------------
   adj_list <- AIR_getAdjSets(
     rv$ts,
-    input$xvar,
-    input$yvar,
+    vars_sel()$x,
+    vars_sel()$y,
     rv$MC_passing_cpdag_already_found,
     rv$best_cpdag_seen_so_far
   )
@@ -2599,17 +2751,19 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
   Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
 
   Zvars_loc <- rbind(
-    data.frame(name = input$xvar, grp = "Z1", Z = Z1),
-    data.frame(name = input$xvar, grp = "Z2", Z = Z2)
+    data.frame(name = vars_sel()$x, grp = "Z1", Z = Z1),
+    data.frame(name = vars_sel()$x, grp = "Z2", Z = Z2)
   )
   assign("Zvars", Zvars_loc, envir = .GlobalEnv)
 
   ## ---------- 2. logging (unchanged) ---------------------------------------
   log_debug("Graph Updated.")
-  log_debug("Selected X variable: {msg}", msg = input$xvar)
-  log_debug("Selected Y variable: {msg}", msg = input$yvar)
-  log_debug("Selected X threshold: {msg}", msg = input$tv_threshold)
-  log_debug("Selected Y threshold: {msg}", msg = input$ov_threshold)
+  log_debug("Selected X variable: {msg}", msg = vars_sel()$x)
+  log_debug("Selected Y variable: {msg}", msg = vars_sel()$y)
+  if (!is.null(input$tv_threshold))
+    log_debug("Selected X threshold: {msg}", msg = tv_val())
+  if (!is.null(input$ov_threshold))
+    log_debug("Selected Y threshold: {msg}", msg = ov_val())
 
   ## ---------- 3. re-render the graph ---------------------------------------
   output$blankGraph <- renderGrViz({
@@ -2619,6 +2773,16 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
 })
 
 observeEvent(input$goButton, {
+  req(both_ready())
+  req(graph_complete())
+
+  shiny::validate(
+                  shiny::need(vars_sel()$x != vars_sel()$y,
+         "X and Y must be different columns"),
+                  shiny::need(vars_sel()$y %in% get_X_descendents(vars_sel()$x, graphtxt_buffer),
+         "Y must be a descendant of X")
+  )
+
   tryCatch({
     locked(TRUE)
 
@@ -2648,11 +2812,13 @@ observeEvent(input$goButton, {
 
       tryCatch({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
-        tv_threshold_val <- input$tv_threshold
-        ov_threshold_val <- input$ov_threshold
+        tv_threshold_val <- tv_val()
+        ov_threshold_val <- ov_val()
 
         n_cores <- min(nrow(combos), parallel::detectCores() - 1L)
         cluster <- makeCluster(n_cores)
+
+
         on.exit(stopCluster(cluster), add = TRUE)
 
         clusterEvalQ(cluster, {
@@ -2670,7 +2836,18 @@ observeEvent(input$goButton, {
 
         ## while we *explicitly* push the big lookup table once
         ## so every worker sees it
-        clusterExport(cluster, "df_vars", envir = .GlobalEnv)
+
+        # new – export both objects in one vector
+        parallel::clusterExport(
+          cluster,
+          c("df_vars",            # the lookup table
+            "safe_jcall",         # shielded .jcall
+            "log_debug", "log_info", # NEW
+            "log_warn",  "log_error",
+            "graph_to_dot",
+            "get_tetrad_path"),       #     (anything else the workers touch)
+          envir = .GlobalEnv
+        )
 
         registerDoParallel(cluster)
 
@@ -2733,7 +2910,7 @@ observeEvent(input$goButton, {
             doc_title  = "Combined",
             nfold      = 20,
             Z_level    = "Z?",
-            varName    = input$xvar,
+            varName    = vars_sel()$x,
             confounders = ""
           )
         
@@ -2760,7 +2937,7 @@ observeEvent(input$goButton, {
       calc_complete(TRUE)
 
       output$blankGraph <- renderGrViz({
-        dot <- get_final_graph(rv$dot, input$xvar, input$yvar, Zvars)
+        dot <- get_final_graph(rv$dot, vars_sel()$x, vars_sel()$y, Zvars)
         grViz(dot)
       })
 
@@ -2840,7 +3017,7 @@ output$step3 = renderUI({
 
 output$xvar = renderUI({
   req(graph_complete())
-  selected_val <- if (locked()) isolate(input$xvar) else ""
+  selected_val <- if (locked()) isolate(vars_sel()$x) else ""
   tagList(
     selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
                 selected = selected_val),
@@ -2863,9 +3040,23 @@ output$xvar = renderUI({
 })
 
 output$yvar = renderUI({
-  req(input$xvar)
-  choices <- setdiff(get_X_descendents(input$xvar, AIRHome), input$xvar)
-  selected_val <- if (locked()) isolate(input$yvar) else ""
+  req(x_ready())                 # need a valid X first
+  req(graph_complete())
+
+  shiny::validate(
+    shiny::need(length(get_X_descendents(vars_sel()$x, graphtxt_buffer)) > 0,
+                "Graph not ready yet – build the causal graph first")
+  )
+
+  xcol <- isolate(vars_sel()$x)  # freeze X so this block ignores Y changes
+
+  choices <- setdiff(get_X_descendents(xcol, graphtxt_buffer), xcol)
+
+  selected_val <- isolate(input$yvar)   # keep current Y, don’t depend on it
+
+  # ensure current choice stays in the list even if not a descendant
+  choices <- union(selected_val, choices)
+
   tagList(
     selectInput('yvar', 'Outcome (Y) variable:', c("", choices),
                 selected = selected_val),
@@ -2896,7 +3087,7 @@ fine_step <- function(vec, n_bins = 30) {
   signif(step, 1)
 }
 
- # vec = df()[[input$xvar]], step = fine_step(vec)
+ # vec = df()[[vars_sel()$x]], step = fine_step(vec)
 default_split <- function(vec) {
   rng <- range(vec, na.rm = TRUE)
   step <- fine_step(vec)
@@ -2929,14 +3120,15 @@ make_threshold_ui <- function(id, vec, n_bins = 30) {
 }
 
 output$ui_threshold_x <- renderUI({
-  req(input$xvar)
-  vec <- df()[[input$xvar]]
-  val <- if (locked()) isolate(input$tv_threshold) else default_split(vec)
+  req(vars_sel()$x)
+  vec <- df()[[vars_sel()$x]]
+  val <- if (locked() && !is.null(input$tv_threshold))
+           isolate(tv_val()) else default_split(vec)
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(input$xvar, "is considered treated when it is ≥")),
+      tags$span(paste(vars_sel()$x, "is considered treated when it is ≥")),
       numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
     ),
     if (locked()) tags$script(HTML("
@@ -2956,14 +3148,15 @@ output$ui_threshold_x <- renderUI({
 })
 
 output$ui_threshold_y <- renderUI({
-  req(input$yvar)
-  vec <- df()[[input$yvar]]
-  val <- if (locked()) isolate(input$ov_threshold) else default_split(vec)
+  req(vars_sel()$y)
+  vec <- df()[[vars_sel()$y]]
+  val <- if (locked() && !is.null(input$ov_threshold))
+           isolate(ov_val()) else default_split(vec)
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(input$yvar, "is considered success when it is ≥")),
+      tags$span(paste(vars_sel()$y, "is considered success when it is ≥")),
       numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
     ),
     if (locked()) tags$script(HTML("
@@ -3012,14 +3205,14 @@ output$ui_file2 <- renderUI({
 })
 
 output$histogram_x <- renderPlot({
-  req(input$xvar, input$tv_threshold)
-  p <- get_histogram_x(df(), input$xvar, input$tv_threshold)
+  req(vars_sel()$x, !is.null(input$tv_threshold))   # wait for slider
+  p <- get_histogram_x(df(), vars_sel()$x, tv_val())
   p
   }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
-    req(input$yvar, input$ov_threshold)
-  p <- get_histogram_y(df(), input$yvar, input$ov_threshold)
+  req(vars_sel()$y, !is.null(input$ov_threshold))   # wait for slider
+  p <- get_histogram_y(df(), vars_sel()$y, ov_val())
   p
   }, bg = "transparent")
 
@@ -3266,6 +3459,8 @@ save_dot_to_pdf <- function(gr,
 output$download_report <- downloadHandler(
   filename = function() paste0("AIRTool-Report_", Sys.Date(), ".pdf"),
   content = function(file) {
+    req(both_ready())
+
     tryCatch({
       tmpdir <- tempfile("airtool_report_")
       dir.create(tmpdir, recursive = TRUE)
@@ -3273,11 +3468,11 @@ output$download_report <- downloadHandler(
   
       # ── freeze reactive values ─────────────────────────────────────────────
       vals <- isolate(list(
-        xvar          = input$xvar,
-        yvar          = input$yvar,
+        xvar          = vars_sel()$x,
+        yvar          = vars_sel()$y,
         df            = df(),
-        tv_threshold  = input$tv_threshold,
-        ov_threshold  = input$ov_threshold,
+        tv_threshold  = tv_val(),
+        ov_threshold  = ov_val(),
         Zvars         = Zvars,
         graph_update  = graph_ready()
       ))
