@@ -1,0 +1,7 @@
+0,engine_rpm
+1,lub_oil_pressure
+1,fuel_pressure
+1,coolant_pressure
+1,lub_oil_temp
+1,coolant_temp
+2,engine_condition

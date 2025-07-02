@@ -1,0 +1,11 @@
+level,variable
+0,temp_c
+0,operational_mode
+1,rpm
+2,fuel_efficiency
+2,vibration_x
+2,vibration_y
+2,vibration_z
+2,torque
+2,power_output_kw
+3,fault_condition

@@ -1,0 +1,8 @@
+level,variable
+0,engine_rpm_WRONG
+1,lub_oil_pressure_WRONG
+1,fuel_pressure_WRONG
+1,coolant_pressure_WRONG
+1,lub_oil_temp_WRONG
+1,coolant_temp_WRONG
+2,engine_condition_WRONG
