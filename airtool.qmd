@@ -1683,11 +1683,11 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
       (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
     interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
   } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
-    interpretation <- "Classifier Predictions match Causally-Derived ATE estimates. Your Classifier is healthy!"
+    interpretation <- "Predictions match Causally-Derived ATE estimates. Your model is healthy!"
   } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
-    interpretation <- "Classifier Predictions do not match Causally-Derived ATE estimates. Your Classifier is to be considered unreliable. Consider looking into why this might be."
+    interpretation <- "Predictions do not match Causally-Derived ATE estimates. Your model is to be considered unreliable. Consider looking into why this might be."
   } else {
-    interpretation <- "Classifier Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
+    interpretation <- "Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
   }
   
   
@@ -1712,7 +1712,7 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
   effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
                               TRUE ~ "Unfortunately")
   
-  result_text <- paste0("Your classifier is ",
+  result_text <- paste0("Your model is ",
                         effect_estimation, 
                         " the effect that ", 
                         df_vars[1,][[2]], 
@@ -1734,7 +1734,7 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
                                   flagdir == "a positive" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% more likely to occur. "),
                                   TRUE ~ "unlikely to change. "),
                         effect_fortune,
-                        ", your classifier is producing ",
+                        ", your model is producing ",
                         case_when(inZ1 & inZ2 ~ "un",
                                   inZ1 | inZ2 ~ "potentially-",
                                   TRUE ~ ""),
@@ -3031,7 +3031,7 @@ output$ui_dl_btn <- renderUI({
   req(calc_complete())
   downloadBttn(
               outputId = "download_report",
-              style = "material-flat",
+              style = "simple",
               color = "primary"
             )
 })
@@ -3297,6 +3297,16 @@ output$ui_ate_upload = renderUI({
   }
 })
 
+
+observeEvent(input$ate_in, ignoreInit = TRUE, {
+  v <- input$ate_in
+  if (is.null(v) || is.na(v)) return()
+
+  v2 <- max(min(v, 1), -1)   # bounds
+  if (!identical(v, v2)) {
+    updateNumericInput(session, "ate_in", value = v2)
+  }
+})
 output$ui_model_upload = renderUI({
   req(input$model_exist)
   if (input$model_exist == "Yes") {
@@ -3397,8 +3407,8 @@ output$ui_goButton = renderUI({
   tagList(
     actionBttn(
       inputId = "goButton",
-      label = "Conduct Experiment",
-      style = "material-flat", 
+      label = "Analyze Data",
+      style = "simple", 
       color = "primary"
     ),
     if (locked()) tags$script(HTML("
@@ -3423,7 +3433,7 @@ output$ui_buildButton = renderUI({
     actionBttn(
       inputId = "buildButton",
       label = "Build Graph",
-      style = "material-flat", 
+      style = "simple", 
       color = "primary"
     ),
     if (locked()) tags$script(HTML("
@@ -3619,7 +3629,7 @@ output$download_report <- downloadHandler(
     -   [Yellow]{style="color: #FFC107; font-weight: bold;"}: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
     -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
     -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
-    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input classifier. Nodes will change from (dark/light) gray to red if the classifier ATE falls outside the 95% confidence interval for a given adjustment set.
+    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
 -   Histogram Colors
     -   [Blue]{style="color: #5D9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
     -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
