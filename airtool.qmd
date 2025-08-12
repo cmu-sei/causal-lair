@@ -595,6 +595,14 @@ change_node_color <- function(dot_code, node, color) {
   return(dot_code)
 }
 
+
+paint_nodes <- function(dot, nodes, col) {
+  nodes <- nodes[nzchar(nodes)]
+  for (n in nodes) {
+    dot <- change_node_color(dot, n, col)
+  }
+  dot
+}
 AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
   headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
   log_debug(headers_string)
@@ -1846,34 +1854,50 @@ get_histogram_y <- function(df, yvar, threshold) {
 }
 
 get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
-
-  # 1 ── split DOT file into individual lines ------------------------------
   lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
 
-  # helper to write a fresh node-declaration line
   make_decl <- function(node, colour) {
     sprintf('  "%s" [style=filled, fillcolor="%s"];', node, colour)
   }
 
-  # 2 ── build the highlight lists -----------------------------------------
-  nodes <- list(
-    "#FFC107" = c(xvar, yvar),                       # treatment & outcome
-    "#9394A2" = Zvars$Z[Zvars$grp == "Z1"],
-    "#D4C7C7" = Zvars$Z[Zvars$grp == "Z2"]
+  # ---- build lists safely ----
+  Z1 <- if (!is.null(Zvars)) Zvars$Z[Zvars$grp == "Z1"] else character(0)
+  Z2 <- if (!is.null(Zvars)) Zvars$Z[Zvars$grp == "Z2"] else character(0)
+
+  nodes_by_color <- list(
+    "#FFC107" = c(xvar, yvar),
+    "#9394A2" = Z1,
+    "#D4C7C7" = Z2
   )
 
-  # 3 ── drop any existing declarations of those nodes ---------------------
-  pat <- sprintf('^\\s*"(%s)"\\s+\\[', paste(unlist(nodes), collapse = "|"))
-  lines <- lines[!grepl(pat, lines)]
+  # flatten + clean
+  nodes_vec <- unique(na.omit(unlist(nodes_by_color)))
+  nodes_vec <- nodes_vec[nzchar(nodes_vec)]
+  if (!length(nodes_vec)) return(dot)
 
-  # 4 ── insert new declarations right after “digraph g {” -----------------
-  insert_at <- 2L                               # line index to insert after
-  new_lines <- unlist(Map(make_decl, nodes, names(nodes)))
-  lines <- append(lines, new_lines, after = insert_at - 1L)
+  # escape for regex
+  esc <- function(s) gsub("([][{}()+*^$|?.\\-])", "\\\\\\1", s)
+  pat <- sprintf('^\\s*"(%s)"\\s*\\[', paste(esc(nodes_vec), collapse = "|"))
 
-  # 5 ── stitch everything back together and return ------------------------
-  dot_out <- paste(lines, collapse = "\n")
-  return(dot_out)
+  # drop existing declarations for these nodes
+  keep <- !grepl(pat, lines, perl = TRUE)
+  lines <- lines[keep]
+
+  # synthesize new declarations
+  new_lines <- c(
+    if (nzchar(xvar)) sapply(xvar, make_decl, colour = "#FFC107"),
+    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#FFC107"),
+    if (length(Z1))   sapply(Z1,   make_decl, colour = "#9394A2"),
+    if (length(Z2))   sapply(Z2,   make_decl, colour = "#D4C7C7")
+  )
+
+  # insert after the digraph line (more robust than hard-coded 2L)
+  insert_at <- which(grepl("^\\s*digraph\\b", lines))[1]
+  if (is.na(insert_at)) insert_at <- 0L
+  lines <- append(lines, new_lines, after = insert_at)
+
+  dot <- paste(lines, collapse = "\n")
+ return(dot)
 }
 
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
@@ -1887,15 +1911,15 @@ get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) 
 
   # Ribbon plot flag logic to color additional nodes
   if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
-    dot <- change_node_color(dot, Z2, "'#FFC107'")
+    dot <- paint_nodes(dot, Z2, "'#FFC107'")
   } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
-    dot <- change_node_color(dot, Z1, "'#FFC107'")
+    dot <- paint_nodes(dot, Z1, "'#FFC107'")
   } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
-    dot <- change_node_color(dot, Z1, "'#C00000'")
-    dot <- change_node_color(dot, Z2, "'#C00000'")
+    dot <- paint_nodes(dot, Z1, "'#C00000'")
+    dot <- paint_nodes(dot, Z2, "'#C00000'")
   } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
-    dot <- change_node_color(dot, Z1, "'#C00000'")
-    dot <- change_node_color(dot, Z2, "'#C00000'")
+    dot <- paint_nodes(dot, Z1, "'#C00000'")
+    dot <- paint_nodes(dot, Z2, "'#C00000'")
   }
 
   return(dot)
@@ -2387,6 +2411,7 @@ useShinyjs()
 knitr::opts_knit$set(root.dir = AIRHome)
 knitr::opts_chunk$set(progress = FALSE)
 options(knitr.progress = FALSE)
+options(shiny.maxRequestSize = Inf)
 
 cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 ```
@@ -2636,6 +2661,11 @@ highlighted_graph <- reactive({
 
   dot <- graph_to_dot(rv$best_cpdag_seen_so_far)
 
+  Z <- if (!is.null(rv$Zvars)) rv$Zvars
+    else if (exists("Zvars", inherits = TRUE)) get("Zvars", inherits = TRUE)
+    else NULL
+
+  
   ## — colour the experimental variable if one is chosen
   if (!is.null(vars_sel()$x) && nzchar(vars_sel()$x))
     dot <- change_node_color(dot, vars_sel()$x, "'#FFC107'")
@@ -2644,13 +2674,11 @@ highlighted_graph <- reactive({
   if (!is.null(vars_sel()$y) && nzchar(vars_sel()$y))
     dot <- change_node_color(dot, vars_sel()$y, "'#FFC107'")
 
-  ## — colour adjustment sets only when they exist
-  if (exists("Zvars", inherits = FALSE) && nrow(Zvars)) {
-    if (any(Zvars$grp == "Z1"))
-      dot <- change_node_color(dot, Zvars[Zvars$grp == "Z1", "Z"], "'#9394A2'")
-    if (any(Zvars$grp == "Z2"))
-      dot <- change_node_color(dot, Zvars[Zvars$grp == "Z2", "Z"], "'#D4C7C7'")
-  }
+
+  if (!is.null(Z) && nrow(Z)) {
+      if (any(Z$grp == "Z1")) dot <- change_node_color(dot, Z[Z$grp == "Z1", "Z"], "'#9394A2'")
+      if (any(Z$grp == "Z2")) dot <- change_node_color(dot, Z[Z$grp == "Z2", "Z"], "'#D4C7C7'")
+  }  
 
   dot
 })
@@ -2688,6 +2716,9 @@ observeEvent(input$file2, {
 # Causal graph build button
 observeEvent(input$buildButton, {
   tryCatch({
+    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+      incProgress(0.2, message = "Generating cpDAG: ", detail = "Calling TETRAD API")
+
 
     if (Sys.info()["sysname"] != "Linux") {
       stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
@@ -2695,7 +2726,8 @@ observeEvent(input$buildButton, {
 
     graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
 
-    graphtxt_raw <- graph_to_dot(graphlist[[1]])
+ incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
+ graphtxt_raw <- graph_to_dot(graphlist[[1]])
 
     if (is.null(graphtxt_raw) || !nzchar(graphtxt_raw)) {
       stop("Tetrad returned an empty graph string")
@@ -2718,6 +2750,7 @@ observeEvent(input$buildButton, {
     rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
 
     graph_complete(TRUE)
+    })
 
     output$blankGraph <- renderGrViz({
       req(graph_complete(), rv$dot)
@@ -2747,7 +2780,7 @@ observeEvent(input$buildButton, {
   })
 })
 
-observeEvent( vars_ready(), ignoreInit = TRUE, {
+observeEvent( {input$xvar; input$yvar}, ignoreInit = TRUE, {
   req(both_ready())
   req(graph_complete())
 
@@ -2783,6 +2816,8 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
     data.frame(name = vars_sel()$x, grp = "Z1", Z = Z1),
     data.frame(name = vars_sel()$x, grp = "Z2", Z = Z2)
   )
+
+  rv$Zvars <- Zvars_loc
   assign("Zvars", Zvars_loc, envir = .GlobalEnv)
 
   ## ---------- 2. logging (unchanged) ---------------------------------------
@@ -2797,7 +2832,13 @@ observeEvent( vars_ready(), ignoreInit = TRUE, {
   ## ---------- 3. re-render the graph ---------------------------------------
   output$blankGraph <- renderGrViz({
     req(graph_complete())
-    grViz( highlighted_graph() )   # highlighted_graph() already reacts
+    #input$xvar; input$yvar
+    #highlighted_graph()
+    grViz(get_updated_graph(
+                            rv$dot,
+                            vars_sel()$x,
+                            vars_sel()$y,
+                            rv$Zvars))    # highlighted_graph() already reacts                       
   })
 })
 
@@ -2966,7 +3007,7 @@ observeEvent(input$goButton, {
       calc_complete(TRUE)
 
       output$blankGraph <- renderGrViz({
-        dot <- get_final_graph(rv$dot, vars_sel()$x, vars_sel()$y, Zvars)
+        dot <- get_final_graph(rv$dot, vars_sel()$x, vars_sel()$y, rv$Zvars)
         grViz(dot)
       })
 
@@ -3516,6 +3557,7 @@ output$download_report <- downloadHandler(
         graph_update  = graph_ready()
       ))
 
+      #highlighted_dot <- isolate(highlighted_graph())
       graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
 
       ## --- rebuild the little helper table *locally* ------------------
@@ -3566,9 +3608,11 @@ output$download_report <- downloadHandler(
         all(c("name", "grp", "Z") %in% names(vals$Zvars))
       )
 
+
       # ---- updated ribbon / final graph PNGs ------------------------------------
       save_dot_to_pdf(
         DiagrammeR::grViz(                       # << wrap the DOT string
+          #highlighted_dot
           get_updated_graph(
                             graph_snapshot,
                             vals$xvar,
