@@ -2832,8 +2832,21 @@ observeEvent(input$buildButton, {
 
  incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
  graphtxt_raw <- graph_to_dot(graphlist[[1]])
+ graphtxt_stripped <- gsub("(digraph g \\{)|\\}", "", graphtxt_raw)
 
-    if (is.null(graphtxt_raw) || !nzchar(graphtxt_raw)) {
+ log_debug("graphtxt_stripped: {msg}", msg = graphtxt_stripped)
+    if (is.null(trimws(graphtxt_stripped)) || !nzchar(trimws(graphtxt_stripped))) {
+      sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "Tetrad Returned an Empty Graph",
+      text = "Please review your data to ensure that a causal relationship exists in your data",
+      type = "warning",
+      btn_labels = "Continue",
+      btn_colors = "#3085d6",
+      closeOnClickOutside = TRUE,
+      showCloseButton = FALSE
+    )
+
       stop("Tetrad returned an empty graph string")
     }
 
@@ -2845,6 +2858,30 @@ observeEvent(input$buildButton, {
       }
     )
 
+
+count_components_from_dot <- function(dot) {
+  # pattern that matches either "quoted tokens" or bare A-Za-z0-9_ tokens
+  node_pat <- '(?:"[^"]+"|[A-Za-z0-9_]+)'
+  edge_pat <- paste0(node_pat, "[[:space:]]*(?:->|--)[[:space:]]*", node_pat)
+
+  # find A -> B or A -- B (allowing quotes); needs PCRE
+  edges <- unlist(regmatches(dot, gregexpr(edge_pat, dot, perl = TRUE)))
+  if (length(edges) == 0) return(0L)
+
+  # normalize "A -> B" / "A -- B" into "A B"
+  edges_norm <- gsub("[[:space:]]*(?:->|--)[[:space:]]*", " ", edges, perl = TRUE)
+
+  # split into pairs and drop the quotes around node names
+  edge_pairs <- do.call(rbind, strsplit(edges_norm, " "))
+  edge_pairs <- gsub('^"|"$', "", edge_pairs)  # remove surrounding quotes
+
+  # build graph directly from edgelist matrix
+  g <- igraph::graph_from_edgelist(edge_pairs, directed = TRUE)
+  igraph::components(igraph::as.undirected(g, mode = "collapse"))$no
+}
+    subgraphs <- count_components_from_dot(graphtxt)
+    log_debug("Number of subgraphs: {no}", no = subgraphs)
+
     rv$ts <- graphlist[[2]]
     rv$MC_passing_cpdag_already_found <- graphlist[[3]]
     rv$best_cpdag_seen_so_far <- graphlist[[4]]
@@ -2853,6 +2890,7 @@ observeEvent(input$buildButton, {
 
     rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
 
+    log_debug("Graph: {msg}", msg = rv$dot)
     graph_complete(TRUE)
     })
 
@@ -2863,16 +2901,30 @@ observeEvent(input$buildButton, {
       grViz(dot)
     })
 
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "Your Causal Graph is Ready",
-      text = NULL,
-      type = "success",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE
+   
+    if (subgraphs > 1){  
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Tetrad Returned Multiple Sub-graphs",
+        text = "The discovered graph has more than one disconnected component. This can happen when certain variables have no causal relationship with others, or when key mediators are missing. If you expected a single connected graph, consider whether important variables are absent, or whether some variables should be treated as non-causal.",
+        type = "warning",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE
+      )
+    } else {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Your Causal Graph is Ready",
+        text = NULL,
+        type = "success",
+        btn_labels = "Continue",
+        btn_colors = "#3085d6",
+        closeOnClickOutside = TRUE,
+        showCloseButton = FALSE
     )
+  }
 
   },
   error = function(e) {
@@ -3049,7 +3101,7 @@ shiny::validate({
             "safe_jcall",         # shielded .jcall
             "log_debug", "log_info", # NEW
             "log_warn",  "log_error",
-            "graph_to_dot",
+            "graph_to_graphtxtdot",
             "get_tetrad_path"),       #     (anything else the workers touch)
           envir = .GlobalEnv
         )

@@ -41,10 +41,14 @@ Once both files are uploaded and accepted, a new button "Build Graph" will appea
 <!-- ``` -->
 <!-- <img src="readme_md_files/image2.png" style="width:6.5in; height:2.8in;" alt="Description of image2"/> -->
 <!-- ![](readme_md_files/image2.png) -->
+
 The tool will now prompt users for additional information about the problem the classifier is attempting to solve. Most important is identifying both the experimental/treatment (x) and outcome (y) variables. Each variable definition will be pulled from the data file.
 
+ 
+
 <blockquote>
-  <p><strong>Note:</strong> In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
+  <p><strong>Note 1:</strong> X variables that have no inputs or no outputs cannot be selected in the tool. Similarly, Y variables that are not descendants of X can also not be selected.</p>
+  <p><strong>Note 2:</strong> In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
 </blockquote>
 
 Once the user has completed their definitions for the experimental/treatment (x) and outcome (y) variables, they may click the "Update Graph" button to proceed. Activating this button will run the causal identification algorithms in AIR, which will update the causal graph by highlighting: - Both x and y variables (in yellow) - Two separate adjustment sets: - Potential confounders that are parents of x and y (displayed in medium gray) - Potential confounders that are parents of x and intermediate variables and/or y (displayed in light gray)
