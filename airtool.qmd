@@ -1472,6 +1472,67 @@ descendants <- function(node, children) {
   return(checked_so_far)
 }
 
+ancestors <- function(node, children){
+  checked_so_far <- set()
+  seen_not_checked <- set(node)
+  while (!set_is_empty(seen_not_checked)) {
+    check_these <- seen_not_checked
+    for (n in check_these) {
+      for (m in parents[[n]]) {
+        if ( !(m %e% checked_so_far)) {
+          seen_not_checked <- seen_not_checked | set(m)
+        }
+      }
+      seen_not_checked <- seen_not_checked - set(n)
+      checked_so_far <- checked_so_far | set(n)
+    }
+  }
+  return(checked_so_far)}
+
+get_orphans <- function(graphtxt_buffer) {
+  buf <- graphtxt_buffer()
+  if (is.null(buf) || !nzchar(buf)) return(character(0))
+
+  lines <- strsplit(buf, "\n", fixed = TRUE)[[1]]
+  edge_flags <- vapply(lines, is_edge_line, logical(1))
+  edge_lines <- lines[edge_flags]
+
+  if (!length(edge_lines)) return(character(0))
+
+  parents  <- vapply(edge_lines, first_node,  character(1), USE.NAMES = FALSE)
+  children <- vapply(edge_lines, second_node, character(1), USE.NAMES = FALSE)
+
+  nodes <- unique(c(parents, children))
+
+  # in-degree via tabulation of "child" occurrences
+  indeg <- table(children)
+  has_parent <- names(indeg)
+
+  orphans <- setdiff(nodes, has_parent)
+  return(sort(orphans))
+} 
+
+get_spinsters <- function(graphtxt_buffer) {
+  buf <- graphtxt_buffer()
+  if (is.null(buf) || !nzchar(buf)) return(character(0))
+
+  lines <- strsplit(buf, "\n", fixed = TRUE)[[1]]
+  edge_flags <- vapply(lines, is_edge_line, logical(1))
+  edge_lines <- lines[edge_flags]
+  if (!length(edge_lines)) return(character(0))
+
+  parents  <- vapply(edge_lines, first_node,  character(1), USE.NAMES = FALSE)
+  children <- vapply(edge_lines, second_node, character(1), USE.NAMES = FALSE)
+
+  nodes <- unique(c(parents, children))
+
+  outdeg <- table(parents)           # how many times each node appears as a parent
+  has_child <- names(outdeg)
+
+  spinsters <- setdiff(nodes, has_child)  # nodes that never appear as a parent
+  sort(spinsters)
+}
+
 get_X_descendents <- function(TV, graphtxt_buffer) {
   buf <- graphtxt_buffer()
   if (is.null(buf) || !nzchar(buf))           # <<< guard added
@@ -1491,7 +1552,7 @@ get_X_descendents <- function(TV, graphtxt_buffer) {
     }
   }
 
-  ## Create children and parents dictionaries
+  ## Create children dictionaries
   children <- hash()
   for (n in nodes) {
     children_of_n <- set()
@@ -1505,6 +1566,44 @@ get_X_descendents <- function(TV, graphtxt_buffer) {
     children[[n]] <- children_of_n
   }
   return(unlist(descendants(TV, children)))
+}
+
+get_X_ancestors <- function(TV, graphtxt_buffer) {
+  buf <- graphtxt_buffer()
+  if (is.null(buf) || !nzchar(buf))           # <<< guard added
+    return(character(0))
+
+  lines <- strsplit(buf, "\n")[[1]]
+  
+  nodes <- set()
+  for (line in lines) {
+    if (is_edge_line(line)) {
+      if (!(first_node(line)  %e% nodes)) {
+        nodes <- nodes | set(first_node(line))
+      }
+      if (!(second_node(line) %e% nodes)) {
+        nodes <- nodes | set(second_node(line))
+      }
+    }
+  }
+
+  ## Create children dictionaries
+  children <- hash()
+  parents <- hash()
+  for (n in nodes) {
+    children_of_n <- set()
+    for (line in lines) {
+      if (is_edge_line(line)) {
+        if ((first_node(line)  == n) && (!(second_node(line) %e% children_of_n))) {
+          children_of_n <- children_of_n | set(second_node(line))
+          parents_of_n <- parents_of_n | set(first_node(line))
+        }
+      }
+    }
+    children[[n]] <- children_of_n
+    parents[[n]] <- parents_of_n
+  }
+  return(unlist(ancestors(TV, parents)))
 }
 
 get_ribbon_plot <- function(AIRHome) {
@@ -1897,6 +1996,8 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   lines <- append(lines, new_lines, after = insert_at)
 
   dot <- paste(lines, collapse = "\n")
+  dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Updated Causal graph\"]", 
+           dot, perl = TRUE)
  return(dot)
 }
 
@@ -1922,6 +2023,8 @@ get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) 
     dot <- paint_nodes(dot, Z2, "'#C00000'")
   }
 
+  dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Final Causal graph\"]", 
+           dot, perl = TRUE)
   return(dot)
 }
 
@@ -1967,6 +2070,7 @@ visualize_graph <- function(graph) {
   if (b) {
     if (!is.null(graph)) {
       dot <- graph_to_dot(graph)
+      dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Causal graph\"]", dot, perl = TRUE)
       grViz(dot)
     } else {
       log_debug("No graph generated. Please check the BOSS execution.")
@@ -2755,7 +2859,8 @@ observeEvent(input$buildButton, {
     output$blankGraph <- renderGrViz({
       req(graph_complete(), rv$dot)
       log_debug("Graph Built.")
-      grViz(rv$dot)
+      dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Causal graph\"]", rv$dot, perl = TRUE)
+      grViz(dot)
     })
 
     sendSweetAlert(
@@ -2784,15 +2889,30 @@ observeEvent( {input$xvar; input$yvar}, ignoreInit = TRUE, {
   req(both_ready())
   req(graph_complete())
 
-  # ── NEW: Y must be reachable from X to keep Tetrad happy
-  shiny::validate(
-                  shiny::need(vars_sel()$x != vars_sel()$y,
-         "X and Y must be different columns"),
-                  shiny::need(vars_sel()$y %in% get_X_descendents(vars_sel()$x, graphtxt_buffer),
-         "Y must be a descendant of X")
-  )
+# ── NEW: Y must be reachable from X to keep Tetrad happy
 
-  ## ---------- 1. maintain the global helpers -------------------------------
+shiny::validate({
+  v   <- vars_sel()
+  buf <- graphtxt_buffer()
+  orp <- get_orphans(graphtxt_buffer)
+
+  shiny::need(!is.null(v$x) && !is.null(v$y) && nzchar(v$x) && nzchar(v$y),
+              "Please select both X and Y")
+
+  # X and Y must differ
+  shiny::need(isTRUE(v$x != v$y),
+              "X must be a different column than Y")
+
+  # X must NOT be an orphan (i.e., must have at least one parent)
+  shiny::need(!(v$x %in% orp),
+              "X must have parents")
+
+  # Y must be a descendant of X
+  shiny::need(v$y %in% get_X_descendents(v$x, graphtxt_buffer),
+              "Y must be a descendant of X")
+})
+
+## ---------- 1. maintain the global helpers -------------------------------
   df_vars <- data.frame(
     var = c("TV", "OV"),
     val = c(vars_sel()$x, vars_sel()$y),
@@ -2846,14 +2966,29 @@ observeEvent(input$goButton, {
   req(both_ready())
   req(graph_complete())
 
-  shiny::validate(
-                  shiny::need(vars_sel()$x != vars_sel()$y,
-         "X and Y must be different columns"),
-                  shiny::need(vars_sel()$y %in% get_X_descendents(vars_sel()$x, graphtxt_buffer),
-         "Y must be a descendant of X")
-  )
 
-  tryCatch({
+shiny::validate({
+  v   <- vars_sel()
+  buf <- graphtxt_buffer()
+  orp <- get_orphans(graphtxt_buffer)
+
+  shiny::need(!is.null(v$x) && !is.null(v$y) && nzchar(v$x) && nzchar(v$y),
+              "Please select both X and Y")
+
+  # X and Y must differ
+  shiny::need(isTRUE(v$x != v$y),
+              "X must be a different column than Y")
+
+  # X must NOT be an orphan (i.e., must have at least one parent)
+  shiny::need(!(v$x %in% orp),
+              "X must have parents")
+
+  # Y must be a descendant of X
+  shiny::need(v$y %in% get_X_descendents(v$x, graphtxt_buffer),
+              "Y must be a descendant of X")
+})
+
+    tryCatch({
     locked(TRUE)
 
     print(ls(pattern = "df", envir = .GlobalEnv))
@@ -3085,68 +3220,106 @@ output$step3 = renderUI({
   )
 })
 
-output$xvar = renderUI({
-  req(graph_complete())
-  selected_val <- if (locked()) isolate(vars_sel()$x) else ""
+
+output$xvar <- renderUI({
+  req(graph_complete(), df())
+
+  # cache reactives
+  all_cols <- names(df())
+  orphans  <- get_orphans(graphtxt_buffer)
+  spinners <- get_spinsters(graphtxt_buffer)   # (aka spinsters)
+
+  # X must be in df, not an orphan, and not a spinster (must have at least one parent and one child)
+  choices <- setdiff(all_cols, union(orphans, spinners))
+  choices <- sort(unique(choices))
+
+  # selected value: keep prior if locked, else blank
+  selected_val <- if (isTRUE(locked())) isolate(vars_sel()$x) else ""
+
+  # normalize selected (must be in choices or "")
+  if (is.null(selected_val) || !(selected_val %in% choices)) {
+    selected_val <- ""
+  }
+
   tagList(
-    selectInput('xvar', 'Experimental (X) variable:', c("", names(df())),
-                selected = selected_val),
-    if (locked()) tags$script(HTML("
-      var xvarDisableTries = 0;
-      var disableXVar = setInterval(function() {
+    selectInput(
+      inputId = "xvar",
+      label   = "Experimental (X) variable:",
+      choices = c("", choices),
+      selected = selected_val
+    ),
+    if (isTRUE(locked())) tags$script(HTML("
+      var tries = 0;
+      var t = setInterval(function(){
         var $sel = $('#xvar');
         var $inp = $('#xvar-selectized');
         if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
           $sel.prop('disabled', true);
           $inp.prop('disabled', true);
-          $inp.parent().css({'pointer-events':'none', 'opacity':0.5});
-          clearInterval(disableXVar);
+          $inp.parent().css({'pointer-events':'none','opacity':0.5});
+          clearInterval(t);
         }
-        xvarDisableTries++;
-        if (xvarDisableTries > 10) clearInterval(disableXVar);
+        tries++;
+        if (tries > 10) clearInterval(t);
       }, 100);
     "))
   )
 })
 
-output$yvar = renderUI({
-  req(x_ready())                 # need a valid X first
-  req(graph_complete())
+output$yvar <- renderUI({
+  req(x_ready(), graph_complete(), df())
 
+  # freeze X for this render; don't re-run on Y changes
+  xcol <- isolate(vars_sel()$x)
+  req(!is.null(xcol), nzchar(xcol))
+
+  # compute descendants once
+  descs <- get_X_descendents(xcol, graphtxt_buffer)
+  descs <- setdiff(unique(descs), xcol)        # Y cannot be X
+  descs <- sort(descs)
+
+  # if graph isn't ready for X, show the validation message
   shiny::validate(
-    shiny::need(length(get_X_descendents(vars_sel()$x, graphtxt_buffer)) > 0,
+    shiny::need(length(descs) > 0,
                 "Graph not ready yet – build the causal graph first")
   )
 
-  xcol <- isolate(vars_sel()$x)  # freeze X so this block ignores Y changes
+  # keep current Y if present
+  selected_val <- isolate(input$yvar)
+  if (is.null(selected_val)) selected_val <- ""
 
-  choices <- setdiff(get_X_descendents(xcol, graphtxt_buffer), xcol)
-
-  selected_val <- isolate(input$yvar)   # keep current Y, don’t depend on it
-
-  # ensure current choice stays in the list even if not a descendant
-  choices <- union(selected_val, choices)
+  # ensure current Y remains in list if it's already chosen
+  if (nzchar(selected_val) && !(selected_val %in% descs)) {
+    choices <- c(selected_val, descs)
+  } else {
+    choices <- descs
+  }
 
   tagList(
-    selectInput('yvar', 'Outcome (Y) variable:', c("", choices),
-                selected = selected_val),
-    if (locked()) tags$script(HTML("
-      var yvarDisableTries = 0;
-      var disableYVar = setInterval(function() {
+    selectInput(
+      inputId = "yvar",
+      label   = "Outcome (Y) variable:",
+      choices = c("", choices),
+      selected = selected_val
+    ),
+    if (isTRUE(locked())) tags$script(HTML("
+      var tries = 0;
+      var t = setInterval(function(){
         var $sel = $('#yvar');
         var $inp = $('#yvar-selectized');
         if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
           $sel.prop('disabled', true);
           $inp.prop('disabled', true);
-          $inp.parent().css({'pointer-events':'none', 'opacity':0.5});
-          clearInterval(disableYVar);
+          $inp.parent().css({'pointer-events':'none','opacity':0.5});
+          clearInterval(t);
         }
-        yvarDisableTries++;
-        if (yvarDisableTries > 10) clearInterval(disableYVar);
+        tries++;
+        if (tries > 10) clearInterval(t);
       }, 100);
     "))
   )
 })
+
 
 fine_step <- function(vec, n_bins = 30) {
   rng <- range(vec, na.rm = TRUE)
