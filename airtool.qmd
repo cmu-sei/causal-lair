@@ -358,6 +358,7 @@ graphtxt_buffer <- reactiveVal(NULL)
 dotfile_buffer <- reactiveVal(NULL)
 rv <- reactiveValues()
 locked <- reactiveVal(FALSE)
+step1lock <- reactiveVal(FALSE)
 
 # ── NEW: keep TMLE rows, ML rows, and the 1-row summary apart ────────────────
 tmle_buffer     <- reactiveVal(data.frame())   # 1 row per adjustment set
@@ -3338,6 +3339,8 @@ output$xvar <- renderUI({
 output$yvar <- renderUI({
   req(x_ready(), graph_complete(), df())
 
+  step1lock(TRUE)
+
   # freeze X for this render; don't re-run on Y changes
   xcol <- isolate(vars_sel()$x)
   req(!is.null(xcol), nzchar(xcol))
@@ -3752,6 +3755,7 @@ output$ui_goButton = renderUI({
 
 output$ui_buildButton = renderUI({
   req(file_check())
+  if (isTRUE(step1lock())) return(invisible(NULL))
   tagList(
     actionBttn(
       inputId = "buildButton",
