@@ -1235,14 +1235,14 @@ processResults <- function(settings,
     ## five learners → PICK ONE that represents “the classifier”
     ate_df_all <- data.frame(
       algorithm = c("Logistic Regression", "Decision Tree", "Support Vector Machine",
-                    "Random Forest", "Stacked Super Learner"),
+                    "Random Forest", "Naive ML Models"),
       flag      = c(lm_ate, dt_ate, svm_ate, rf_ate, sl_ate),
       Treatment = outcome
     )
 
     ## keep only the stacked-SL row so we have ONE reference ATE
     ate_df_ref <- dplyr::filter(ate_df_all,
-                                algorithm == "Stacked Super Learner")
+                                algorithm == "Naive ML Models")
 
     ml_buffer(ate_df_ref)       # now identical semantics to options 1 & 2
 
@@ -2010,6 +2010,14 @@ get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) 
   # Extract Z1 and Z2 sets
   Z1 <- Zvars[Zvars$grp == "Z1", ]$Z
   Z2 <- Zvars[Zvars$grp == "Z2", ]$Z
+
+  log_debug("dfr$flag: {msg}", msg = dfr$flag)
+  log_debug("dfr$z1_ATE_UCI: {msg}", msg = dfr$z1_ATE_UCI)
+  log_debug("dfr$z2_ATE_UCI: {msg}", msg = dfr$z2_ATE_UCI)
+  log_debug("dfr$z1_ATE_LCI: {msg}", msg = dfr$z1_ATE_LCI)
+  log_debug("dfr$z2_ATE_LCI: {msg}", msg = dfr$z2_ATE_LCI)
+  log_debug("Z1: {msg}", msg = Z1)
+  log_debug("Z2: {msg}", msg = Z2)
 
   # Ribbon plot flag logic to color additional nodes
   if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
