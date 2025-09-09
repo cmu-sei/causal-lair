@@ -173,6 +173,7 @@ setwd(AIRHome)
 log_dir  <- file.path(AIRHome, "logs")
 dir.create(log_dir, recursive = TRUE, showWarnings = FALSE)
 
+
 # ── guard: run heavy log setup only once per R-session ───────────────────
 if (exists(".airtool_log_init", envir = .GlobalEnv)) {
   log_file <- get(".airtool_log_file", envir = .GlobalEnv)
@@ -1727,7 +1728,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
-                   # lineend = "round",
+                   lineend = "round",
                    position = position_nudge(x = 0)) +
 
                    # overlap (green) ribbon: max LCI → min UCI
@@ -1737,7 +1738,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#378855",
                    alpha = 1,
                    stat = "unique",
-                   # lineend = "round",
+                   lineend = "round",
                    position = position_nudge(x = 0)) +
     geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
     ## algorithm estimates
