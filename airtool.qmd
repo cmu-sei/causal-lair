@@ -1418,6 +1418,7 @@ processResults <- function(settings,
   #    • the detailed two-row frame (if you need it somewhere else)
   #    • the one-row “combined” frame the plots/text expect
   # ---------------------------------------------------------------------------
+  log_debug("results_out_buffer: {cr}", cr = jsonlite::toJSON(combined_row))
   results_out_buffer(combined_row)
   assign("results_detailed", final_results, envir = .GlobalEnv)   # <<- optional
   
@@ -1726,7 +1727,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
-                   lineend = "round",
+                   # lineend = "round",
                    position = position_nudge(x = 0)) +
 
                    # overlap (green) ribbon: max LCI → min UCI
@@ -1736,7 +1737,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#378855",
                    alpha = 1,
                    stat = "unique",
-                   lineend = "round",
+                   # lineend = "round",
                    position = position_nudge(x = 0)) +
     geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
     ## algorithm estimates
