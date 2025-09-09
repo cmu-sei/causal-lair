@@ -1679,7 +1679,7 @@ get_ribbon_plot <- function(AIRHome) {
              x = 1,  # Position on the right side within the black background (adjust based on x-axis limits)
              y = 1,  # Center vertically within the black background
              label = "+", 
-             hjust = -0.75, 
+             hjust = -0.35, 
              vjust = 0.4, 
              size = 5, 
              color = "white") +## algorithm estimates
