@@ -3101,7 +3101,7 @@ shiny::validate({
             "safe_jcall",         # shielded .jcall
             "log_debug", "log_info", # NEW
             "log_warn",  "log_error",
-            "graph_to_graphtxtdot",
+            "graph_to_dot",
             "get_tetrad_path"),       #     (anything else the workers touch)
           envir = .GlobalEnv
         )
@@ -3273,51 +3273,68 @@ output$step3 = renderUI({
 })
 
 
+
+# --- X -----------------------------------------------------------------------
 output$xvar <- renderUI({
   req(graph_complete(), df())
 
-  # cache reactives
+  # compute allowed X choices
   all_cols <- names(df())
   orphans  <- get_orphans(graphtxt_buffer)
-  spinners <- get_spinsters(graphtxt_buffer)   # (aka spinsters)
+  spinners <- get_spinsters(graphtxt_buffer)
+  base_choices <- sort(unique(setdiff(all_cols, union(orphans, spinners))))
 
-  # X must be in df, not an orphan, and not a spinster (must have at least one parent and one child)
-  choices <- setdiff(all_cols, union(orphans, spinners))
-  choices <- sort(unique(choices))
+  if (isTRUE(locked())) {
+    # Freeze to canonical X and expose ONLY that choice
+    selected_val <- isolate(vars_sel()$x)
+    if (is.null(selected_val)) selected_val <- ""
+    choices <- if (nzchar(selected_val)) selected_val else c("")
 
-  # selected value: keep prior if locked, else blank
-  selected_val <- if (isTRUE(locked())) isolate(vars_sel()$x) else ""
+    tagList(
+      selectInput(
+        inputId = "xvar",
+        label   = "Experimental (X) variable:",
+        choices = choices,          # no "" here when locked
+        selected = selected_val
+      ),
+      tags$script(HTML("
+        var tries = 0;
+        var t = setInterval(function(){
+          var $sel = $('#xvar');
+          var $inp = $('#xvar-selectized');
+          if ($sel.length && ($inp.length ? $inp.parent().hasClass('selectize-input') : true)) {
+            $sel.prop('disabled', true);
+            if ($inp.length) {
+              $inp.prop('disabled', true);
+              $inp.parent().css({'pointer-events':'none','opacity':0.5});
+            }
+            clearInterval(t);
+          }
+          if (++tries > 50) clearInterval(t);
+        }, 100);
+      "))
+    )
+  } else {
+    # Unlocked: keep prior input if present; allow it even if not in base_choices
+    selected_val <- isolate(input$xvar)
+    if (is.null(selected_val)) selected_val <- ""
+    choices <- if (nzchar(selected_val) && !(selected_val %in% base_choices)) {
+      c(selected_val, base_choices)
+    } else {
+      base_choices
+    }
+    if (!(selected_val %in% c("", choices))) selected_val <- ""
 
-  # normalize selected (must be in choices or "")
-  if (is.null(selected_val) || !(selected_val %in% choices)) {
-    selected_val <- ""
-  }
-
-  tagList(
     selectInput(
       inputId = "xvar",
       label   = "Experimental (X) variable:",
       choices = c("", choices),
       selected = selected_val
-    ),
-    if (isTRUE(locked())) tags$script(HTML("
-      var tries = 0;
-      var t = setInterval(function(){
-        var $sel = $('#xvar');
-        var $inp = $('#xvar-selectized');
-        if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
-          $sel.prop('disabled', true);
-          $inp.prop('disabled', true);
-          $inp.parent().css({'pointer-events':'none','opacity':0.5});
-          clearInterval(t);
-        }
-        tries++;
-        if (tries > 10) clearInterval(t);
-      }, 100);
-    "))
-  )
+    )
+  }
 })
 
+# --- Y -----------------------------------------------------------------------
 output$yvar <- renderUI({
   req(x_ready(), graph_complete(), df())
 
@@ -3325,53 +3342,93 @@ output$yvar <- renderUI({
   xcol <- isolate(vars_sel()$x)
   req(!is.null(xcol), nzchar(xcol))
 
-  # compute descendants once
+  # candidates for Y (descendants of X, not X)
   descs <- get_X_descendents(xcol, graphtxt_buffer)
-  descs <- setdiff(unique(descs), xcol)        # Y cannot be X
-  descs <- sort(descs)
+  descs <- sort(setdiff(unique(descs), xcol))
 
-  # if graph isn't ready for X, show the validation message
-  shiny::validate(
-    shiny::need(length(descs) > 0,
-                "Graph not ready yet – build the causal graph first")
-  )
-
-  # keep current Y if present
-  selected_val <- isolate(input$yvar)
-  if (is.null(selected_val)) selected_val <- ""
-
-  # ensure current Y remains in list if it's already chosen
-  if (nzchar(selected_val) && !(selected_val %in% descs)) {
-    choices <- c(selected_val, descs)
-  } else {
-    choices <- descs
+  if (!isTRUE(locked())) {
+    shiny::validate(
+      shiny::need(length(descs) > 0, "Graph not ready yet – build the causal graph first")
+    )
   }
 
-  tagList(
+  if (isTRUE(locked())) {
+    # Freeze to canonical Y and expose ONLY that choice
+    selected_val <- isolate(vars_sel()$y)
+    if (is.null(selected_val)) selected_val <- ""
+    choices <- if (nzchar(selected_val)) selected_val else c("")
+
+    tagList(
+      selectInput(
+        inputId = "yvar",
+        label   = "Outcome (Y) variable:",
+        choices = choices,          # no "" here when locked
+        selected = selected_val
+      ),
+      tags$script(HTML("
+        var tries = 0;
+        var t = setInterval(function(){
+          var $sel = $('#yvar');
+          var $inp = $('#yvar-selectized');
+          if ($sel.length && ($inp.length ? $inp.parent().hasClass('selectize-input') : true)) {
+            $sel.prop('disabled', true);
+            if ($inp.length) {
+              $inp.prop('disabled', true);
+              $inp.parent().css({'pointer-events':'none','opacity':0.5});
+            }
+            clearInterval(t);
+          }
+          if (++tries > 50) clearInterval(t);
+        }, 100);
+      "))
+    )
+  } else {
+    # Unlocked: keep prior input if present; allow it even if not in descs
+    selected_val <- isolate(input$yvar)
+    if (is.null(selected_val)) selected_val <- ""
+    choices <- if (nzchar(selected_val) && !(selected_val %in% descs)) {
+      c(selected_val, descs)
+    } else {
+      descs
+    }
+    if (!(selected_val %in% c("", choices))) selected_val <- ""
+
     selectInput(
       inputId = "yvar",
       label   = "Outcome (Y) variable:",
       choices = c("", choices),
       selected = selected_val
-    ),
-    if (isTRUE(locked())) tags$script(HTML("
-      var tries = 0;
-      var t = setInterval(function(){
-        var $sel = $('#yvar');
-        var $inp = $('#yvar-selectized');
-        if ($sel.length && $inp.length && $inp.parent().hasClass('selectize-input')) {
-          $sel.prop('disabled', true);
-          $inp.prop('disabled', true);
-          $inp.parent().css({'pointer-events':'none','opacity':0.5});
-          clearInterval(t);
-        }
-        tries++;
-        if (tries > 10) clearInterval(t);
-      }, 100);
-    "))
-  )
+    )
+  }
 })
 
+# ui: useShinyjs()
+#observeEvent(locked(), {
+#  session$onFlushed(function() {
+#    if (isTRUE(locked())) {
+#      shinyjs::disable("xvar"); shinyjs::disable("yvar")
+#      runjs("$('#xvar,#yvar').closest('.form-group').css('opacity',0.5)")
+#    } else {
+#      shinyjs::enable("xvar"); shinyjs::enable("yvar")
+#      runjs("$('#xvar,#yvar').closest('.form-group').css('opacity',1)")
+#    }
+#  }, once = FALSE)
+#}, ignoreInit = TRUE, priority = 1000)
+
+# Snap X/Y back if they change while locked
+#observeEvent(input$xvar, {
+#  if (isTRUE(locked())) {
+#    sel <- isolate(vars_sel()$x); if (is.null(sel)) sel <- ""
+#    isolate(updateSelectInput(session, "xvar", selected = sel))
+#  }
+#}, ignoreInit = TRUE, priority = 1000)
+
+observeEvent(input$yvar, {
+  if (isTRUE(locked())) {
+    sel <- isolate(vars_sel()$y); if (is.null(sel)) sel <- ""
+    isolate(updateSelectInput(session, "yvar", selected = sel))
+  }
+}, ignoreInit = TRUE, priority = 1000)
 
 fine_step <- function(vec, n_bins = 30) {
   rng <- range(vec, na.rm = TRUE)

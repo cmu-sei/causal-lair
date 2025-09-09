@@ -1,0 +1,85 @@
+Graph Nodes:
+EstSize_7;ActSize_7;ActEffort_7;EstDef_7;ActDef_7;EstSize_8;ActSize_8;ActEffort_8;EstDef_8;ActDef_8;EstSize_9;ActSize_9;ActEffort_9;EstDef_9;ActDef_9;EstSize_10;ActSize_10;ActEffort_10;EstDef_10;ActDef_10
+
+Graph Edges:
+1. ActDef_10 --> ActEffort_10
+2. ActDef_10 --> ActSize_10
+3. ActDef_7 --> ActDef_10
+4. ActDef_7 --> ActDef_8
+5. ActDef_7 --> ActDef_9
+6. ActDef_7 --> ActEffort_10
+7. ActDef_7 --> ActEffort_7
+8. ActDef_7 --> ActSize_7
+9. ActDef_7 --> EstDef_10
+10. ActDef_7 --> EstDef_8
+11. ActDef_7 --> EstDef_9
+12. ActDef_8 --> ActDef_9
+13. ActDef_8 --> ActEffort_9
+14. ActDef_8 --> EstDef_10
+15. ActDef_8 --> EstDef_9
+16. ActDef_9 --> ActDef_10
+17. ActDef_9 --> ActEffort_9
+18. ActDef_9 --> EstDef_10
+19. ActEffort_7 --> ActDef_8
+20. ActEffort_7 --> ActEffort_10
+21. ActEffort_7 --> ActEffort_8
+22. ActEffort_7 --> ActEffort_9
+23. ActEffort_7 --> EstSize_10
+24. ActEffort_8 --> ActDef_8
+25. ActEffort_8 --> ActEffort_10
+26. ActEffort_8 --> ActEffort_9
+27. ActEffort_9 --> ActEffort_10
+28. ActSize_7 --> ActEffort_10
+29. ActSize_7 --> ActEffort_7
+30. ActSize_7 --> ActEffort_8
+31. ActSize_7 --> ActEffort_9
+32. ActSize_7 --> ActSize_8
+33. ActSize_7 --> EstDef_10
+34. ActSize_7 --> EstDef_8
+35. ActSize_7 --> EstDef_9
+36. ActSize_7 --> EstSize_8
+37. ActSize_7 --> EstSize_9
+38. ActSize_8 --> ActDef_8
+39. ActSize_8 --> ActEffort_8
+40. ActSize_8 --> ActSize_10
+41. ActSize_8 --> ActSize_9
+42. ActSize_8 --> EstDef_9
+43. ActSize_8 --> EstSize_9
+44. ActSize_9 --> ActEffort_10
+45. ActSize_9 --> ActEffort_9
+46. ActSize_9 --> ActSize_10
+47. ActSize_9 --> EstDef_10
+48. ActSize_9 --> EstSize_10
+49. EstDef_10 --> ActDef_10
+50. EstDef_7 --> ActDef_7
+51. EstDef_7 --> ActDef_9
+52. EstDef_7 --> ActSize_10
+53. EstDef_7 --> ActSize_7
+54. EstDef_7 --> EstDef_8
+55. EstDef_8 --> ActEffort_8
+56. EstDef_8 --> EstDef_10
+57. EstDef_8 --> EstDef_9
+58. EstDef_9 --> ActDef_9
+59. EstDef_9 --> EstDef_10
+60. EstSize_10 --> ActEffort_10
+61. EstSize_10 --> ActSize_10
+62. EstSize_10 --> EstDef_10
+63. EstSize_7 --> ActEffort_10
+64. EstSize_7 --> ActSize_10
+65. EstSize_7 --> ActSize_7
+66. EstSize_7 --> ActSize_9
+67. EstSize_7 --> EstDef_7
+68. EstSize_7 --> EstSize_10
+69. EstSize_7 --> EstSize_8
+70. EstSize_7 --> EstSize_9
+71. EstSize_8 --> ActSize_8
+72. EstSize_8 --> EstDef_10
+73. EstSize_8 --> EstDef_8
+74. EstSize_8 --> EstSize_10
+75. EstSize_9 --> ActSize_9
+76. EstSize_9 --> EstDef_9
+
+Graph Attributes:
+Score: -89348.633314
+BIC: -89348.633314
+
