@@ -132,6 +132,8 @@ document.addEventListener("DOMContentLoaded", () => {
 #| echo: false
 #| include: false
 
+options(shiny.maxRequestSize = Inf) # 200 * 1024^2) # sets max upload to 200MB
+
 suppressMessages({
   library(AIPW)
   library(base64enc)
@@ -2526,7 +2528,6 @@ useShinyjs()
 knitr::opts_knit$set(root.dir = AIRHome)
 knitr::opts_chunk$set(progress = FALSE)
 options(knitr.progress = FALSE)
-options(shiny.maxRequestSize = Inf)
 
 cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 ```
@@ -2572,6 +2573,7 @@ uiOutput('second_column_content')
 
 ```{r backend-compute}
 #| context: server
+
 
 
 ### variable declarations --------------------------------------------------------------
@@ -2668,8 +2670,8 @@ df <- reactive({
   shiny::validate(
     shiny::need(tolower(tools::file_ext(input$file1$name)) == "csv",
                 "Data file must be .csv"),
-    shiny::need(file.size(input$file1$datapath) < 10*1024^2,
-                "CSV too large (10 MB limit)")
+    shiny::need(file.size(input$file1$datapath) < 500*1024^2,
+                "CSV too large (500 MB limit)")
   )
 
   tryCatch({
