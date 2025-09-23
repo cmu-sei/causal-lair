@@ -2521,17 +2521,6 @@ TetradSearch <- setRefClass(
 useShinyjs()
 ```
 
-# Docs
-
-```{r info-tab, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
-# Read the file and output its content as-is
-knitr::opts_knit$set(root.dir = AIRHome)
-knitr::opts_chunk$set(progress = FALSE)
-options(knitr.progress = FALSE)
-
-cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
-```
-
 # Analysis of Bias
 
 ##  {.sidebar}
@@ -2570,12 +2559,184 @@ uiOutput('ui_graph_pane')
 uiOutput('second_column_content')
 # uiOutput('ui_top_right_pane')
 ```
+# Docs
+
+```{r info-tab, echo=FALSE, message=FALSE, warning=FALSE, results='asis'}
+# Read the file and output its content as-is
+knitr::opts_knit$set(root.dir = AIRHome)
+knitr::opts_chunk$set(progress = FALSE)
+options(knitr.progress = FALSE)
+
+cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
+```
+
+# Key
+
+-   Graph Colors
+    -   [Yellow]{style="color: #FFC107; font-weight: bold;"}: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
+    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
+    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
+    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
+-   Histogram Colors
+    -   [Blue]{style="color: #5D9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
+    -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
+-   Ribbon Plot Colors
+    -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
+    -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
+    -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
+
+# Logs {layout-ncol=1}
+::: {.column width=100%}
+```{r logs-dl, echo=FALSE}
+uiOutput("selected_run")
+downloadButton("download_selected", "Download selected log")
+# Full-width table below
+uiOutput("log_table")
+
+```
+:::
 
 ```{r backend-compute}
 #| context: server
 
+### log table stuff -----------------------------------
+  log_root   <- "/workspace/logs"          # parent dir of run-stamped folders
+  display_tz <- "America/Pittsburgh"          # adjust if desired
 
+  # Build a data.frame of runs with times (newest first)
+  get_runs_df <- function() {
+    entries <- dir(log_root, full.names = TRUE, recursive = FALSE, all.files = FALSE)
+    dirs <- entries[file.info(entries)$isdir]
+    if (!length(dirs)) {
+      return(data.frame(run=character(), created=as.POSIXct(character()),
+                        modified=as.POSIXct(character()), size_mb=numeric()))
+    }
 
+    runs <- basename(dirs)
+
+    # Parse "created" from folder name like "YYYY-mm-dd_HH-MM-SS"
+    created <- suppressWarnings(as.POSIXct(runs, format = "%Y-%m-%d_%H-%M-%S", tz = display_tz))
+
+    # Look for a log file inside each folder (use airtool.log, else newest *.log)
+    get_log_info <- function(d) {
+      p1 <- file.path(d, "airtool.log")
+      cand <- if (file.exists(p1)) p1 else {
+        lf <- list.files(d, pattern="\\.log$", full.names=TRUE)
+        if (length(lf)) lf[which.max(file.info(lf)$mtime)] else NA_character_
+      }
+      if (is.na(cand)) return(list(mtime=as.POSIXct(NA), size_mb=NA_real_))
+      fi <- file.info(cand)
+      list(mtime = fi$mtime, size_mb = round(fi$size / 1024^2, 2))
+    }
+
+    info <- lapply(dirs, get_log_info)
+    modified <- as.POSIXct(sapply(info, `[[`, "mtime"), origin="1970-01-01", tz=display_tz)
+    size_mb  <- as.numeric(sapply(info, `[[`, "size_mb"))
+
+    df <- data.frame(run = runs, created = created, modified = modified, size_mb = size_mb,
+                     stringsAsFactors = FALSE)
+
+    # Order: newest first by created (fallback to modified)
+    ord_key <- ifelse(is.na(df$created), as.numeric(df$modified), as.numeric(df$created))
+    df[order(df$run, decreasing = TRUE), , drop = FALSE]
+  }
+
+  # Render the table with a radio column
+output$log_table <- renderUI({
+  df <- get_runs_df()
+  if (!nrow(df)) return(tags$p("No logs found."))
+
+  # Determine which run should be selected:
+  # - current selection if any
+  # - otherwise default to the first (newest)
+  selected <- isolate(input$run_choice)
+  if (is.null(selected)) selected <- df$run[1]
+
+  rows <- lapply(seq_len(nrow(df)), function(i) {
+    run <- df$run[i]
+    tags$tr(
+      tags$td(class = "radio",
+        tags$input(
+          type = "radio",
+          name = "run_choice",          # same group name for all
+          value = run,
+          checked = if (identical(run, selected)) TRUE else NULL,
+          onclick = sprintf(
+            "Shiny.setInputValue('run_choice', %s, {priority:'event'});",
+            jsonlite::toJSON(run, auto_unbox = TRUE)
+          )
+        )
+      ),
+      tags$td(tags$code(run)),
+      tags$td(ifelse(is.na(df$created[i]), "", format(df$created[i], tz = display_tz, usetz = TRUE))),
+      tags$td(ifelse(is.na(df$modified[i]), "", format(df$modified[i], tz = display_tz, usetz = TRUE))),
+      tags$td(ifelse(is.na(df$size_mb[i]), "", sprintf('%.2f', df$size_mb[i])))
+    )
+  })
+
+  # Only initialize the Shiny value once (on first render when there isn't one)
+  init_script <- if (is.null(isolate(input$run_choice))) {
+    tags$script(HTML(sprintf(
+      "Shiny.setInputValue('run_choice', %s, {priority:'event'});",
+      jsonlite::toJSON(selected, auto_unbox = TRUE)
+    )))
+  } else NULL
+
+  tagList(
+    init_script,
+    tags$table(
+      class = "loglist",
+      tags$thead(
+        tags$tr(
+          tags$th("Select"),
+          tags$th("Run"),
+          tags$th("Created"),
+          tags$th("Last modified"),
+          tags$th("Size (MB)")
+        )
+      ),
+      tags$tbody(rows)
+    )
+  )
+})
+  # Optional: show which run is selected
+  output$selected_run <- renderUI({
+    req(input$run_choice)
+    tags$p(HTML(sprintf("Selected run: <code>%s</code>", htmltools::htmlEscape(input$run_choice))))
+  })
+
+  # Download the selected run's log
+output$download_selected <- downloadHandler(
+  filename = function() {
+    shiny::req(input$run_choice)
+    paste0("airtool-", input$run_choice, ".log")
+  },
+  contentType = "text/plain; charset=utf-8",
+  content = function(file) {
+    shiny::req(input$run_choice)
+
+    log_root <- "/workspace/logs"
+    run_dir  <- file.path(log_root, input$run_choice)
+
+    shiny::validate(shiny::need(
+      grepl("^\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}-\\d{2}$", basename(run_dir)),
+      "Invalid run folder selected."
+    ))
+
+    # Prefer airtool.log; else newest *.log
+    src <- file.path(run_dir, "airtool.log")
+    if (!file.exists(src)) {
+      cand <- list.files(run_dir, pattern = "\\.log$", full.names = TRUE)
+      shiny::validate(shiny::need(length(cand) > 0, "No .log file found in the selected folder."))
+      mt   <- file.info(cand)$mtime
+      src  <- cand[which.max(mt)]
+    }
+
+    shiny::validate(shiny::need(file.exists(src), "Log file not found."))
+    ok <- file.copy(src, file, overwrite = TRUE)
+    shiny::validate(shiny::need(isTRUE(ok), "Failed to copy log to download location."))
+  }
+) 
 ### variable declarations --------------------------------------------------------------
 # --- Reactive value containers --- #
 calc_complete <- reactiveVal(FALSE)
@@ -3965,17 +4126,4 @@ output$download_report <- downloadHandler(
 )
 ```
 
-# Key
 
--   Graph Colors
-    -   [Yellow]{style="color: #FFC107; font-weight: bold;"}: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
-    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
-    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
-    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
--   Histogram Colors
-    -   [Blue]{style="color: #5D9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
-    -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
--   Ribbon Plot Colors
-    -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
-    -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
-    -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
