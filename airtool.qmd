@@ -3669,11 +3669,26 @@ output$ui_threshold_x <- renderUI({
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
-      style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste("Test the effect when ", vars_sel()$x, " is >=")),
-      
-      numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
-    ),
+  style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
+  tags$span(paste("Test the effect when ", vars_sel()$x, " is ")),
+
+  tags$div(
+    style = "display:inline-block;",
+    switchInput(
+      inputId  = "tv_dir",
+      label    = NULL,
+      value    = TRUE,
+      onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
+      offLabel = HTML("<span class='op-mono'>&le;</span>"),
+      inline   = TRUE
+    )
+  ),
+
+  tags$div(
+    style = "display:inline-block;",
+    numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
+  )
+),
     if (locked()) tags$script(HTML("
       var tvDisableTries = 0;
       var disableTv = setInterval(function() {
@@ -3697,12 +3712,27 @@ output$ui_threshold_y <- renderUI({
            isolate(ov_val()) else default_split(vec)
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
-    tags$div(
-      style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste("Where success is defined as ", vars_sel()$y, " being >=")),
-      
-      numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
-    ),
+  tags$div(
+  style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
+  tags$span(paste("Where success is defined as ", vars_sel()$y, " being ")),
+
+  tags$div(
+    style = "display:inline-block;",
+    switchInput(
+      inputId  = "ov_dir",
+      label    = NULL,
+      value    = TRUE,
+      onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
+      offLabel = HTML("<span class='op-mono'>&le;</span>"),
+      inline   = TRUE
+    )
+  ),
+
+  tags$div(
+    style = "display:inline-block;",
+    numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
+  )
+),
     if (locked()) tags$script(HTML("
       var ovDisableTries = 0;
       var disableOv = setInterval(function() {
