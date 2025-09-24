@@ -783,8 +783,6 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 MAX_PATH_LENGTH)
     
     ts$print_adjustment_sets(adj_sets_response)
-  } 
-  
   ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
   flag_no_adjustment_set_found = FALSE
   flag_only_one_adjustment_set_found = FALSE
@@ -797,7 +795,12 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   log_debug("Total number of adjustment sets encountered (ignoring duplicates) = {msg}", msg = length(union_of_two_lists))
   log_debug("Size of Treatment - Response adjustment sets = {msg}", msg = length(near_treatment_not_near_response))
   log_debug("Size of Response - Treatment adjustment sets = {msg}", msg = length(near_response_not_near_treatment))
+   } else {
+    union_of_two_lists <- NULL
+    log_debug("MC_passing_cpdag_already_found = FALSE")
+  } 
   
+ 
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
   if (length(union_of_two_lists) == 0) {
@@ -837,14 +840,16 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     }
   }
   
-  log_debug("Summary of results:")
-  log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
-  log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
-  log_debug("Flag status for no adjustment set found: {msg}", msg = flag_no_adjustment_set_found)
-  log_debug("Flag status for only one adjustment set found: {msg}", msg = flag_only_one_adjustment_set_found)
+  if (MC_passing_cpdag_already_found == TRUE) {
+   log_debug("Summary of results:")
+   log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
+   log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
+   log_debug("Flag status for no adjustment set found: {msg}", msg = flag_no_adjustment_set_found)
+   log_debug("Flag status for only one adjustment set found: {msg}", msg = flag_only_one_adjustment_set_found)
   
-  ### return the two adjustment sets plus the two flags instead.
-  return(list(return_first_adj_set, return_second_adj_set))
+   ### return the two adjustment sets plus the two flags instead.
+   return(list(return_first_adj_set, return_second_adj_set))
+  } else {return(NULL)}
 }
 
 scale_ <- function(x){
@@ -3155,6 +3160,15 @@ shiny::validate({
     rv$best_cpdag_seen_so_far
   )
 
+  if (identical(adj_list, NULL)){
+    sendSweetAlert(
+      session,
+      title = "Graph Error",
+      text = "Adjustment sets could not be calculated because the graph estimated from your data does not satisfy the statistical conditions needed for this step.",
+      type = "error"
+      )
+    break()
+  }
   Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
   Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
 
