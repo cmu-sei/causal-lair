@@ -3670,7 +3670,8 @@ output$ui_threshold_x <- renderUI({
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(vars_sel()$x, "is considered treated when it is ≥")),
+      tags$span(paste("Test the effect when ", vars_sel()$x, " is >=")),
+      
       numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
     ),
     if (locked()) tags$script(HTML("
@@ -3698,7 +3699,8 @@ output$ui_threshold_y <- renderUI({
   tagList(
     tags$div(
       style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(vars_sel()$y, "is considered success when it is ≥")),
+      tags$span(paste("Where success is defined as ", vars_sel()$y, " being >=")),
+      
       numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
     ),
     if (locked()) tags$script(HTML("
