@@ -14,110 +14,56 @@ Impact
 *Describe why this scenario provides valuable insight, drives decision
 making, etc.*
 
-  --------------------- ----------------------- -------------------------
-  Experimental Variable                         
-
-  Variable Label                                
-
-  Definition of                                 
-  Treatment                                     
-
-  Outcome Variable                              
-
-  Variable Label                                
-
-  Definition of Success                         
-  --------------------- ----------------------- -------------------------
+|                         |     |     |
+|-------------------------|-----|-----|
+| Experimental Variable   |     |     |
+| Variable Label          |     |     |
+| Definition of Treatment |     |     |
+| Outcome Variable        |     |     |
+| Variable Label          |     |     |
+| Definition of Success   |     |     |
 
 *Note: If more than one variable is to be tested, create the table above
 for each variable of interest*
 
-  -------------------- ------------- --------------------------------------------
-  Scenario Data                      
+|  |  |  |
+|----|----|----|
+| Scenario Data |  |  |
+| Data Selection | *Describe selection of training data, deployment data, or other data source, and impact on value of AIR results.* |  |
+| Feature Engineering Required | *Describe known feature engineering required within the dataset* |  |
+| Completeness of Causal Data | *Describe if the dataset contains all variables with causal impact on the scenario, or any known omissions from the dataset.* |  |
+| Known Causal Hierarchies | *Confirm that SMEs have provided a rough logical hierarchy of causation between variables, noting any outstanding concerns or questions.* |  |
 
-  Data Selection       *Describe     
-                       selection of  
-                       training      
-                       data,         
-                       deployment    
-                       data, or      
-                       other data    
-                       source, and   
-                       impact on     
-                       value of AIR  
-                       results.*     
-
-  Feature Engineering  *Describe     
-  Required             known feature 
-                       engineering   
-                       required      
-                       within the    
-                       dataset*      
-
-  Completeness of      *Describe if  
-  Causal Data          the dataset   
-                       contains all  
-                       variables     
-                       with causal   
-                       impact on the 
-                       scenario, or  
-                       any known     
-                       omissions     
-                       from the      
-                       dataset.*     
-
-  Known Causal         *Confirm that 
-  Hierarchies          SMEs have     
-                       provided a    
-                       rough logical 
-                       hierarchy of  
-                       causation     
-                       between       
-                       variables,    
-                       noting any    
-                       outstanding   
-                       concerns or   
-                       questions.*   
-  -------------------- ------------- --------------------------------------------
-
-+--------------------+-------------+-----------------------------------+
-| Scenario Model     |             |                                   |
-+--------------------+-------------+-----------------------------------+
-| Model Input to AIR | ☐ Upload    |                                   |
-|                    | model into  |                                   |
-|                    | AIR         |                                   |
-|                    |             |                                   |
-|                    | ☐ Input     |                                   |
-|                    | model       |                                   |
-|                    | Average     |                                   |
-|                    | Treatment   |                                   |
-|                    | Effect      |                                   |
-|                    | (ATE) value |                                   |
-|                    |             |                                   |
-|                    | ☐ Allow AIR |                                   |
-|                    | to create   |                                   |
-|                    | model       |                                   |
-+--------------------+-------------+-----------------------------------+
-| Version of Model   | *Describe   |                                   |
-|                    | version,    |                                   |
-|                    | owner,      |                                   |
-|                    | training of |                                   |
-|                    | model under |                                   |
-|                    | test for    |                                   |
-|                    | r           |                                   |
-|                    | obustness.* |                                   |
-+--------------------+-------------+-----------------------------------+
-| Model ATE          | *Capture    |                                   |
-|                    | Average     |                                   |
-|                    | Treatment   |                                   |
-|                    | Effect for  |                                   |
-|                    | this        |                                   |
-|                    | scenario as |                                   |
-|                    | generated   |                                   |
-|                    | by the      |                                   |
-|                    | model, if   |                                   |
-|                    | known.*     |                                   |
-+--------------------+-------------+-----------------------------------+
+<table>
+<colgroup>
+<col style="width: 29%" />
+<col style="width: 19%" />
+<col style="width: 51%" />
+</colgroup>
+<tbody>
+<tr>
+<td>Scenario Model</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Model Input to AIR</td>
+<td colspan="2"><p>☐ Upload model into AIR</p>
+<p>☐ Input model Average Treatment Effect (ATE) value</p>
+<p>☐ Allow AIR to create model</p></td>
+</tr>
+<tr>
+<td>Version of Model</td>
+<td colspan="2"><em>Describe version, owner, training of model under
+test for robustness.</em></td>
+</tr>
+<tr>
+<td>Model ATE</td>
+<td colspan="2"><em>Capture Average Treatment Effect for this scenario
+as generated by the model, if known.</em></td>
+</tr>
+</tbody>
+</table>
 
 Additional Notes
 
