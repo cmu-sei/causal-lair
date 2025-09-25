@@ -859,6 +859,8 @@ scale_ <- function(x){
 runSuperLearner <- function(settings,
                             AIRHome,
                             data_df,
+                            tv_dir,
+                            ov_dir,
                             tv_threshold,
                             ov_threshold,
                             log_file){ 
@@ -872,8 +874,8 @@ runSuperLearner <- function(settings,
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
 
   df <- data_df
-  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
+  if (isTRUE(tv_dir)){ df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)} else { df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)}
+  if (isTRUE(ov_dir)){ df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)} else { df[[outcome  ]] <- ifelse(df[[outcome  ]] <= ov_threshold, 1, 0)}
 
   ## ────────────────────────────────────────────────────────────────
   ##  Coerce the *outcome* to numeric if it’s still a factor
@@ -1065,6 +1067,8 @@ runSuperLearner <- function(settings,
 
 processResults <- function(settings,
                            AIRHome,
+                           tv_dir,
+                           ov_dir,
                            tv_threshold,
                            ov_threshold,
                            model_in, model_yn,
@@ -1073,7 +1077,7 @@ processResults <- function(settings,
                            move_results = FALSE) {
   log_debug("Started processResults()")
   log_debug("Settings: {line}",
-    line = paste(c(settings, AIRHome, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
+    line = paste(c(settings, AIRHome, tv_dir, ov_dir, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
 
 
   treatment <- as.character(settings$varName)
@@ -1085,8 +1089,9 @@ processResults <- function(settings,
   set.seed(123)
 
   # Bin conversion logic
-  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
+  if (isTRUE(tv_dir)){ df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)} else { df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)}
+  if (isTRUE(ov_dir)){ df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)} else { df[[outcome  ]] <- ifelse(df[[outcome  ]] <= ov_threshold, 1, 0)}
+
 
   # Split into train/test
   test_size <- floor(0.3 * nrow(df))
@@ -1875,10 +1880,10 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
 # ──────────────────────────────────────────────────────────────
 #  Histogram for the experimental (X) variable
 # ──────────────────────────────────────────────────────────────
-get_histogram_x <- function(df, xvar, threshold) {
+get_histogram_x <- function(df, xvar, dir, threshold) {
 
   v       <- df[[xvar]]
-  treated <- v >= threshold                    # single comparison rule
+  if (isTRUE(dir)){ treated <- ifelse(v >= threshold, 1, 0)} else { treated <- ifelse(v <= threshold, 1, 0)}
 
   plot_df <- data.frame(
     x         = v,
@@ -1889,8 +1894,8 @@ get_histogram_x <- function(df, xvar, threshold) {
   colors <- c(Treated   = "#5D9AFF",
               Untreated = "#EAE1D7")
 
-  untreated_label <- paste0("Untreated (< ", signif(threshold, 4), ")")
-  treated_label   <- paste0("Treated (≥ ",  signif(threshold, 4), ")")
+  untreated_label <- paste0("Baseline") # (< ", signif(threshold, 4), ")")
+  treated_label   <- paste0("Experimental") #  (≥ ",  signif(threshold, 4), ")")
 
   bw <- diff(range(v, na.rm = TRUE)) / 30
   if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1        # <- arrow fix
@@ -1920,10 +1925,10 @@ get_histogram_x <- function(df, xvar, threshold) {
 # ──────────────────────────────────────────────────────────────
 #  Histogram for the outcome (Y) variable
 # ──────────────────────────────────────────────────────────────
-get_histogram_y <- function(df, yvar, threshold) {
+get_histogram_y <- function(df, yvar, dir, threshold) {
 
   v       <- df[[yvar]]
-  success <- v >= threshold
+  if (isTRUE(dir)){ success <- ifelse(v >= threshold, 1, 0)} else { success <- ifelse(v <= threshold, 1, 0)}
 
   plot_df <- data.frame(
     x      = v,
@@ -1934,8 +1939,8 @@ get_histogram_y <- function(df, yvar, threshold) {
   colors <- c(Success = "#5D9AFF",
               Fail    = "#EAE1D7")
 
-  fail_label    <- paste0("Fail (< ",  signif(threshold, 4), ")")
-  success_label <- paste0("Success (≥ ", signif(threshold, 4), ")")
+  fail_label    <- paste0("Fail") # (< ",  signif(threshold, 4), ")")
+  success_label <- paste0("Success") # (≥ ", signif(threshold, 4), ")")
 
   bw <- diff(range(v, na.rm = TRUE)) / 30
   if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1
@@ -2909,6 +2914,14 @@ x_ready   <- reactive({ nzchar(vars_sel()$x) })         # X chosen & valid
 y_ready   <- reactive({ nzchar(vars_sel()$y) })         # Y chosen & valid
 both_ready <- reactive({ x_ready() && y_ready() })      # X + Y ready
 
+tv_dir <- reactive({
+  input$tv_dir_in
+})
+
+ov_dir <- reactive({
+  input$ov_dir_in
+})
+
 tv_val <- reactive({
   req(x_ready(), !is.null(input$tv_threshold))          # ← new guard
   safe_thresh(input$tv_threshold,
@@ -3259,6 +3272,8 @@ shiny::validate({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
         tv_threshold_val <- tv_val()
         ov_threshold_val <- ov_val()
+        tv_dir_val <- tv_dir()
+        ov_dir_val <- ov_dir()
 
         n_cores <- min(nrow(combos), parallel::detectCores() - 1L)
         cluster <- makeCluster(n_cores)
@@ -3323,6 +3338,8 @@ shiny::validate({
             runSuperLearner(settings,
                             graph_snapshot,
                             df_snapshot,
+                            tv_dir_val,
+                            ov_dir_val,
                             tv_threshold_val,
                             ov_threshold_val,
                             log_file),
@@ -3361,6 +3378,8 @@ shiny::validate({
         
           processResults(settings_stub,
                          AIRHome       = graph_snapshot,
+                         tv_dir        = tv_dir_val,
+                         ov_dir        = ov_dir_val,
                          tv_threshold  = tv_threshold_val,
                          ov_threshold  = ov_threshold_val,
                          model_in      = if (identical(input$model_exist, "Yes"))
@@ -3675,7 +3694,7 @@ output$ui_threshold_x <- renderUI({
   tags$div(
     style = "display:inline-block;",
     switchInput(
-      inputId  = "tv_dir",
+      inputId  = "tv_dir_in",
       label    = NULL,
       value    = TRUE,
       onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
@@ -3719,7 +3738,7 @@ output$ui_threshold_y <- renderUI({
   tags$div(
     style = "display:inline-block;",
     switchInput(
-      inputId  = "ov_dir",
+      inputId  = "ov_dir_in",
       label    = NULL,
       value    = TRUE,
       onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
@@ -3780,13 +3799,13 @@ output$ui_file2 <- renderUI({
 
 output$histogram_x <- renderPlot({
   req(vars_sel()$x, !is.null(input$tv_threshold))   # wait for slider
-  p <- get_histogram_x(df(), vars_sel()$x, tv_val())
+  p <- get_histogram_x(df(), vars_sel()$x, tv_dir(), tv_val())
   p
   }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
   req(vars_sel()$y, !is.null(input$ov_threshold))   # wait for slider
-  p <- get_histogram_y(df(), vars_sel()$y, ov_val())
+  p <- get_histogram_y(df(), vars_sel()$y, ov_dir(), ov_val())
   p
   }, bg = "transparent")
 
@@ -4056,6 +4075,8 @@ output$download_report <- downloadHandler(
         xvar          = vars_sel()$x,
         yvar          = vars_sel()$y,
         df            = df(),
+        tv_dir        = tv_dir(),
+        ov_dir        = ov_dir(),
         tv_threshold  = tv_val(),
         ov_threshold  = ov_val(),
         Zvars         = Zvars,
@@ -4099,11 +4120,11 @@ output$download_report <- downloadHandler(
   
       # ── generate images ────────────────────────────────────────────────────
       save_plot_pdf(
-        get_histogram_x(vals$df, vals$xvar, vals$tv_threshold),
+        get_histogram_x(vals$df, vals$xvar, vals$tv_dir, vals$tv_threshold),
         file.path(tmpdir, "xhist.pdf")
       )
       save_plot_pdf(
-        get_histogram_y(vals$df, vals$yvar, vals$ov_threshold),
+        get_histogram_y(vals$df, vals$yvar, vals$ov_dir, vals$ov_threshold),
         file.path(tmpdir, "yhist.pdf")
       )
       save_plot_pdf(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.pdf"))
