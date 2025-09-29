@@ -2848,6 +2848,7 @@ df <- reactive({
   tryCatch({
     df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
     log_debug("Read in data file: {msg}", msg = input$file1$datapath)
+    log_debug("Column names: {names}", names = names(df))
     continuous_columns <- c(1, ncol(df))
     df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
     df
@@ -2891,6 +2892,8 @@ knowledge <- reactive({
       sendSweetAlert(...); return(NULL)
     }
 
+    log_debug("Knowledge file names: {msg}", msg = fixed$variable)
+    log_debug("Knowledge file levels: {lvl}", lvl = fixed$level)
     file_check(TRUE)
     fixed
   }, error = function(e) {
@@ -2904,6 +2907,13 @@ knowledge <- reactive({
     )
     NULL
   })
+})
+
+cols_mismatch <- reactive({
+  req(input$file2)
+
+  matches <- !all(knowledge()$variable %in% names(df()))
+  return(matches)
 })
 
 vars_ready <- reactive({
@@ -3009,92 +3019,129 @@ observeEvent(input$file2, {
   })
 })
 
+# Handle the user’s choice from the SweetAlert
+observeEvent(input$confirm_mismatch, ignoreInit = TRUE, {
+    if (isTRUE(input$confirm_mismatch)) {
+      # User clicked "Continue"
+      run_calc()
+    } else {
+      # User clicked "Cancel" — do nothing (i.e., break out)
+      showNotification("Calculation cancelled.", type = "message")
+    }
+  })
+
+
 # Causal graph build button
 observeEvent(input$buildButton, {
+  if (isTRUE(cols_mismatch())) {
+      bad <- htmltools::htmlEscape(setdiff(knowledge()$variable, names(df())))
+      confirmSweetAlert(
+        session,
+        inputId = "confirm_mismatch",
+        title = "Warning: Knowledge file variables don't match data headers",
+        type = "warning",
+        btn_labels = c("Cancel", "Continue"),
+        danger_mode = TRUE,
+        closeOnClickOutside = FALSE,
+        html = TRUE,
+        text = htmltools::HTML(
+          paste0(
+            "<b>Mismatches:</b> ", paste(bad, collapse = ", "),
+            "<br><br>Continue anyway?"
+          )
+        )
+      )
+      # IMPORTANT: return here so we don't fall through and run
+      return(invisible(NULL))
+    }
+
+    run_calc()
+})
+
+# run the graph calculation 
+run_calc <- function() {
   tryCatch({
-    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+    withProgress(message = "Building Causal Graph",
+                 style = "notification",
+                 value = 0.1, {
       incProgress(0.2, message = "Generating cpDAG: ", detail = "Calling TETRAD API")
 
-
-    if (Sys.info()["sysname"] != "Linux") {
-      stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
-    }
-
-    graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
-
- incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
- graphtxt_raw <- graph_to_dot(graphlist[[1]])
- graphtxt_stripped <- gsub("(digraph g \\{)|\\}", "", graphtxt_raw)
-
- log_debug("graphtxt_stripped: {msg}", msg = graphtxt_stripped)
-    if (is.null(trimws(graphtxt_stripped)) || !nzchar(trimws(graphtxt_stripped))) {
-      sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "Tetrad Returned an Empty Graph",
-      text = "Please review your data to ensure that a causal relationship exists in your data",
-      type = "warning",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE
-    )
-
-      stop("Tetrad returned an empty graph string")
-    }
-
-    graphtxt <- tryCatch(
-      gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
-      error = function(e) {
-        log_debug("Regex error on graph string: {msg}", msg = conditionMessage(e))
-        graphtxt_raw  # fallback to raw if regex fails
+      if (Sys.info()[["sysname"]] != "Linux") {
+        stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
       }
-    )
 
+      graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
 
-count_components_from_dot <- function(dot) {
-  # pattern that matches either "quoted tokens" or bare A-Za-z0-9_ tokens
-  node_pat <- '(?:"[^"]+"|[A-Za-z0-9_]+)'
-  edge_pat <- paste0(node_pat, "[[:space:]]*(?:->|--)[[:space:]]*", node_pat)
+      incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
+      graphtxt_raw <- graph_to_dot(graphlist[[1]])
+      graphtxt_stripped <- gsub("(digraph g \\{)|\\}", "", graphtxt_raw)
 
-  # find A -> B or A -- B (allowing quotes); needs PCRE
-  edges <- unlist(regmatches(dot, gregexpr(edge_pat, dot, perl = TRUE)))
-  if (length(edges) == 0) return(0L)
+      log_debug("graphtxt_stripped: {msg}", msg = graphtxt_stripped)
+      if (is.null(trimws(graphtxt_stripped)) || !nzchar(trimws(graphtxt_stripped))) {
+        sendSweetAlert(
+          session = shiny::getDefaultReactiveDomain(),
+          title = "Tetrad Returned an Empty Graph",
+          text = "Please review your data to ensure that a causal relationship exists in your data",
+          type = "warning",
+          btn_labels = "Continue",
+          btn_colors = "#3085d6",
+          closeOnClickOutside = TRUE,
+          showCloseButton = FALSE
+        )
+        stop("Tetrad returned an empty graph string")
+      }
 
-  # normalize "A -> B" / "A -- B" into "A B"
-  edges_norm <- gsub("[[:space:]]*(?:->|--)[[:space:]]*", " ", edges, perl = TRUE)
+      graphtxt <- tryCatch(
+        gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
+        error = function(e) {
+          log_debug("Regex error on graph string: {msg}", msg = conditionMessage(e))
+          graphtxt_raw  # fallback to raw if regex fails
+        }
+      )
 
-  # split into pairs and drop the quotes around node names
-  edge_pairs <- do.call(rbind, strsplit(edges_norm, " "))
-  edge_pairs <- gsub('^"|"$', "", edge_pairs)  # remove surrounding quotes
+      count_components_from_dot <- function(dot) {
+        # pattern that matches either "quoted tokens" or bare A-Za-z0-9_ tokens
+        node_pat <- '(?:"[^"]+"|[A-Za-z0-9_]+)'
+        edge_pat <- paste0(node_pat, "[[:space:]]*(?:->|--)[[:space:]]*", node_pat)
 
-  # build graph directly from edgelist matrix
-  g <- igraph::graph_from_edgelist(edge_pairs, directed = TRUE)
-  igraph::components(igraph::as.undirected(g, mode = "collapse"))$no
-}
-    subgraphs <- count_components_from_dot(graphtxt)
-    log_debug("Number of subgraphs: {no}", no = subgraphs)
+        # find A -> B or A -- B (allowing quotes); needs PCRE
+        edges <- unlist(regmatches(dot, gregexpr(edge_pat, dot, perl = TRUE)))
+        if (length(edges) == 0) return(0L)
 
-    rv$ts <- graphlist[[2]]
-    rv$MC_passing_cpdag_already_found <- graphlist[[3]]
-    rv$best_cpdag_seen_so_far <- graphlist[[4]]
+        # normalize "A -> B" / "A -- B" into "A B"
+        edges_norm <- gsub("[[:space:]]*(?:->|--)[[:space:]]*", " ", edges, perl = TRUE)
 
-    dot_raw <- graph_to_dot(graphlist[[1]])
+        # split into pairs and drop the quotes around node names
+        edge_pairs <- do.call(rbind, strsplit(edges_norm, " "))
+        edge_pairs <- gsub('^"|"$', "", edge_pairs)  # remove surrounding quotes
 
-    rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
+        # build graph directly from edgelist matrix
+        g <- igraph::graph_from_edgelist(edge_pairs, directed = TRUE)
+        igraph::components(igraph::as.undirected(g, mode = "collapse"))$no
+      }
 
-    log_debug("Graph: {msg}", msg = rv$dot)
-    graph_complete(TRUE)
-    })
+      subgraphs <- count_components_from_dot(graphtxt)
+      log_debug("Number of subgraphs: {no}", no = subgraphs)
+
+      rv$ts <- graphlist[[2]]
+      rv$MC_passing_cpdag_already_found <- graphlist[[3]]
+      rv$best_cpdag_seen_so_far <- graphlist[[4]]
+
+      dot_raw <- graph_to_dot(graphlist[[1]])
+      rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
+
+      log_debug("Graph: {msg}", msg = rv$dot)
+      graph_complete(TRUE)
+    }) # <- closes withProgress
 
     output$blankGraph <- renderGrViz({
       req(graph_complete(), rv$dot)
       log_debug("Graph Built.")
       dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Causal graph\"]", rv$dot, perl = TRUE)
       grViz(dot)
-    })
+    }) # <- closes renderGrViz
 
-   
-    if (subgraphs > 1){  
+    if (subgraphs > 1) {
       sendSweetAlert(
         session = shiny::getDefaultReactiveDomain(),
         title = "Tetrad Returned Multiple Sub-graphs",
@@ -3115,10 +3162,9 @@ count_components_from_dot <- function(dot) {
         btn_colors = "#3085d6",
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
-    )
-  }
-
-  },
+      )
+    } # <- closes if/else
+  }, # <- ends tryCatch expr arg
   error = function(e) {
     err_summary <- tryCatch({
       paste0("Error in buildButton observer: ", conditionMessage(e), "\n")
@@ -3126,8 +3172,8 @@ count_components_from_dot <- function(dot) {
       paste0("Unknown error in buildButton observer: ", capture.output(str(e)), collapse = "\n")
     })
     log_debug(err_summary)
-  })
-})
+  }) # <- closes tryCatch
+} # <- closes run_calc()
 
 observeEvent( {input$xvar; input$yvar}, ignoreInit = TRUE, {
   req(both_ready())
