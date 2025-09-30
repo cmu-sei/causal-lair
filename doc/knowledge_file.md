@@ -39,7 +39,8 @@ column B.
 
 10\. All other cells remain blank.
 
-<img src="media/image2.png" style="width:2.47951in;height:2.85456in"
+<img src="./knowledge_file_files/media/image2.png"
+style="width:2.47951in;height:2.85456in"
 alt="Table, Excel AI-generated content may be incorrect." />
 
 9\. All variables are assigned a level in column A.
