@@ -2881,7 +2881,17 @@ knowledge <- reactive({
       }
     )
 
-    fixed <- fix_knowledge(knowledge_in)
+    if (!all(colnames(knowledge_in) %in% c("level", "variable"))){
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Warning: knowledge file not formatted properly",
+        text = "Attempting to fix header and assign columns.
+        Please fix knowledge file formatting to ensure proper functionality.",
+        type = "warning",
+        btn_labels = "Continue"
+      )    
+    }
+    fixed <- fix_knowledge(knowledge_in)  
 
     shiny::validate(
       shiny::need(all(c("level","variable") %in% names(fixed)),
