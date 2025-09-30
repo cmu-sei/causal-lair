@@ -3541,184 +3541,148 @@ output$step3 = renderUI({
 output$xvar <- renderUI({
   req(graph_complete(), df())
 
-  # compute allowed X choices
-  all_cols <- names(df())
-  orphans  <- get_orphans(graphtxt_buffer)   # nodes without parents
-  spinsters <- get_spinsters(graphtxt_buffer) # nodes without children
+  all_cols   <- names(df())
+  orphans    <- get_orphans(graphtxt_buffer)
+  spinsters  <- get_spinsters(graphtxt_buffer)
   base_choices <- sort(unique(setdiff(all_cols, union(orphans, spinsters))))
-  blocked <- sort(setdiff(all_cols, base_choices))  # visible but not selectable
+  blocked      <- sort(setdiff(all_cols, base_choices))
 
   log_debug("orphans: {orphans}", orphans = orphans)
   log_debug("spinsters: {spinsters}", spinsters = spinsters)
   log_debug("base_choices: {base_choices}", base_choices = base_choices)
-  
-  # keep prior selection only if it's still allowed
-selected_val <- {
-  prev <- isolate(input$xvar)
-  if (!is.null(prev) && prev %in% base_choices) prev else ""
-}
 
-# UI: native <select>, grouped, with blocked options disabled via JS
-tagList(
-  selectInput(
-    inputId   = "xvar",
-    label     = "Experimental (X) variable:",
-    # Group for clarity: users see both groups
-    choices   = list(
-      "Available"      = base_choices,
-      "Not selectable" = blocked
+  grouped_x_choices <- list(
+    "Available (estimable)" = c("— Select X —" = "", setNames(base_choices, base_choices)),
+    "Not estimable"         = setNames(blocked, blocked)
+  )
+
+  selected_val <- {
+    prev <- isolate(input$xvar)
+    if (!is.null(prev) && prev %in% base_choices) prev else ""  # nothing selected on first load
+  }
+
+  tagList(
+    selectInput(
+      inputId   = "xvar",
+      label     = "Experimental (X) variable:",
+      choices   = grouped_x_choices,  # <-- no nested optgroups
+      selected  = selected_val,
+      selectize = FALSE
     ),
-    selected  = selected_val,
-    selectize = FALSE   # IMPORTANT: native select supports per-option disabled
-  ),
+    tags$style(HTML("#xvar option:disabled { color:#9aa0a6; }")),
+    tags$script(HTML(sprintf("
+      (function(){
+        function applyDisabled(){
+          var sel = document.getElementById('xvar');
+          if(!sel) return;
+          var blocked = %s;
 
-  # (Optional) visual nudge for disabled options
-  tags$style(HTML("#xvar option:disabled { color:#9aa0a6; }")),
+          if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
 
-  # Disable the blocked options (and clear selection if it was blocked)
-  # Uses jsonlite to safely embed the R vector in JS.
-  tags$script(HTML(sprintf("
-    (function(){
-      function applyDisabled(){
-        var sel = document.getElementById('xvar');
-        if(!sel) return;
-        var blocked = %s;
-
-        // If currently selected value is blocked, clear it
-        if (blocked.indexOf(sel.value) !== -1) {
-          sel.value = '';
-          $(sel).trigger('change');
+          $('#xvar option').each(function(){
+            if (this.value && blocked.indexOf(this.value) !== -1){
+              this.disabled = true;
+              this.title = 'Not selectable (orphan/spinster)';
+            }
+          });
         }
-
-        // Disable each blocked option (still visible, but not selectable)
-        $('#xvar option').each(function(){
-          if (blocked.indexOf(this.value) !== -1){
-            this.disabled = true;
-            this.title = 'Not selectable (orphan/spinster)';
-          }
-        });
-      }
-
-      // Run now and after Shiny updates
-      var tries = 0, t = setInterval(function(){
-        applyDisabled();
-        if (++tries > 20) clearInterval(t);
-      }, 100);
-      $(document).on('shiny:value shiny:visualchange', applyDisabled);
-    })();
-  ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
-)
+        var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
+        $(document).on('shiny:value shiny:visualchange', applyDisabled);
+      })();
+    ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
+  )
 })
 
 # --- Y -----------------------------------------------------------------------
 output$yvar <- renderUI({
   req(x_ready(), graph_complete(), df())
 
-step1lock(TRUE)
+  step1lock(TRUE)
 
-# freeze X for this render; don't re-run on Y changes
-xcol <- isolate(vars_sel()$x)
-req(!is.null(xcol), nzchar(xcol))
+  # freeze X for this render; don't re-run on Y changes
+  xcol <- isolate(vars_sel()$x)
+  req(!is.null(xcol), nzchar(xcol))
 
-# candidates for Y (descendants of X, not X)
-descs <- get_X_descendents(xcol, graphtxt_buffer)
-descs <- sort(setdiff(unique(descs), xcol))
+  # candidates for Y (descendants of X, not X)
+  descs <- get_X_descendents(xcol, graphtxt_buffer)
+  descs <- sort(setdiff(unique(descs), xcol))
 
-# In unlocked mode, require at least one descendant
-if (!isTRUE(locked())) {
-  shiny::validate(
-    shiny::need(length(descs) > 0, "Graph not ready yet – build the causal graph first")
-  )
-}
+  if (!isTRUE(locked())) {
+    shiny::validate(
+      shiny::need(length(descs) > 0, "Graph not ready yet – build the causal graph first")
+    )
+  }
 
-# We'll show *all* columns but only allow selecting descendants
-all_cols <- names(df())
-blocked  <- sort(setdiff(all_cols, descs))  # visible but not selectable
+  all_cols   <- names(df())
+  blocked_y  <- sort(setdiff(all_cols, descs))  # visible but not selectable
 
-if (isTRUE(locked())) {
-  # Freeze to canonical Y and expose ONLY that choice
-  selected_val <- isolate(vars_sel()$y)
-  if (is.null(selected_val)) selected_val <- ""
-  choices <- if (nzchar(selected_val)) selected_val else c("")
+  if (isTRUE(locked())) {
+    # LOCKED: show only canonical Y and disable control
+    selected_val <- isolate(vars_sel()$y)
+    if (is.null(selected_val)) selected_val <- ""
+    choices <- if (nzchar(selected_val)) selected_val else ""
 
-  tagList(
-    selectInput(
-      inputId   = "yvar",
-      label     = "Outcome (Y) variable:",
-      choices   = choices,
-      selected  = selected_val,
-      selectize = FALSE
-    ),
-    tags$script(HTML("
-      var tries = 0;
-      var t = setInterval(function(){
-        var $sel = $('#yvar');
-        if ($sel.length) {
-          $sel.prop('disabled', true);
-          clearInterval(t);
-        }
-        if (++tries > 50) clearInterval(t);
-      }, 100);
-    "))
-  )
+    tagList(
+      selectInput(
+        inputId   = "yvar",
+        label     = "Outcome (Y) variable:",
+        choices   = choices,
+        selected  = selected_val,
+        selectize = FALSE
+      ),
+      tags$script(HTML("
+        var tries=0,t=setInterval(function(){
+          var $sel=$('#yvar');
+          if($sel.length){ $sel.prop('disabled',true); clearInterval(t); }
+          if(++tries>50) clearInterval(t);
+        },100);
+      "))
+    )
 
-} else {
-  # Unlocked: keep prior input if it's still valid; otherwise pick none (lets browser use first available)
-  prev <- isolate(input$yvar)
-  selected_val <- if (!is.null(prev) && prev %in% descs) prev else NULL
+  } else {
+    # UNLOCKED
+    grouped_y_choices <- list(
+      "Available (descendants of X)" = c("— Select Y —" = "", setNames(descs, descs)),
+      "Not selectable"               = setNames(blocked_y, blocked_y)
+    )
 
-  # Grouped choices: users see both groups
-  # (Put Available first so the first option is selectable even if selected_val is NULL)
-  grouped_choices <- list(
-    "Available (descendants of X)" = descs,
-    "Not selectable"               = blocked
-  )
+    selected_y <- {
+      prev <- isolate(input$yvar)
+      if (!is.null(prev) && prev %in% descs) prev else ""  # nothing selected on first load
+    }
 
-  tagList(
-    selectInput(
-      inputId   = "yvar",
-      label     = "Outcome (Y) variable:",
-      choices   = grouped_choices,
-      selected  = selected_val,
-      selectize = FALSE
-    ),
+    tagList(
+      selectInput(
+        inputId   = "yvar",
+        label     = "Outcome (Y) variable:",
+        choices   = grouped_y_choices,
+        selected  = selected_y,
+        selectize = FALSE
+      ),
+      tags$style(HTML("#yvar option:disabled { color:#9aa0a6; }")),
+      tags$script(HTML(sprintf("
+        (function(){
+          function applyDisabled(){
+            var sel = document.getElementById('yvar');
+            if(!sel) return;
+            var blocked = %s;
 
-    # Subtle gray for disabled options
-    tags$style(HTML("#yvar option:disabled { color:#9aa0a6; }")),
+            if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
 
-    # Disable non-descendant options (still visible, but unselectable)
-    tags$script(HTML(sprintf("
-      (function(){
-        function applyDisabled(){
-          var sel = document.getElementById('yvar');
-          if(!sel) return;
-          var blocked = %s;
-
-          // If the currently selected value is blocked (shouldn't happen with selected_val logic),
-          // clear it to let the user pick a valid descendant.
-          if (blocked.indexOf(sel.value) !== -1) {
-            sel.value = '';
-            $(sel).trigger('change');
+            $('#yvar option').each(function(){
+              if (this.value && blocked.indexOf(this.value) !== -1){
+                this.disabled = true;
+                this.title = 'Not selectable (not a descendant of X)';
+              }
+            });
           }
-
-          // Disable each blocked option
-          $('#yvar option').each(function(){
-            if (blocked.indexOf(this.value) !== -1){
-              this.disabled = true;
-              this.title = 'Not selectable (not a descendant of X)';
-            }
-          });
-        }
-
-        var tries = 0, t = setInterval(function(){
-          applyDisabled();
-          if (++tries > 20) clearInterval(t);
-        }, 100);
-        $(document).on('shiny:value shiny:visualchange', applyDisabled);
-      })();
-    ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
-  )
-}})
+          var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
+          $(document).on('shiny:value shiny:visualchange', applyDisabled);
+        })();
+      ", jsonlite::toJSON(blocked_y, auto_unbox = TRUE))))
+    )
+  }
+})
 
 # ui: useShinyjs()
 #observeEvent(locked(), {
