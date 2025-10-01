@@ -36,5 +36,4 @@ alt="Text AI-generated content may be incorrect." />
  **Example: tail -f logs/2025-09-04_14-44-22/airtool.log**
 
  <img src="./log_retrieval_instructions_files/media/image4.png"
- style="width:6.5in;height:1.96939in"
  alt="Text AI-generated content may be incorrect." />
