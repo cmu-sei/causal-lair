@@ -783,8 +783,6 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 MAX_PATH_LENGTH)
     
     ts$print_adjustment_sets(adj_sets_response)
-  } 
-  
   ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
   flag_no_adjustment_set_found = FALSE
   flag_only_one_adjustment_set_found = FALSE
@@ -797,7 +795,12 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   log_debug("Total number of adjustment sets encountered (ignoring duplicates) = {msg}", msg = length(union_of_two_lists))
   log_debug("Size of Treatment - Response adjustment sets = {msg}", msg = length(near_treatment_not_near_response))
   log_debug("Size of Response - Treatment adjustment sets = {msg}", msg = length(near_response_not_near_treatment))
+   } else {
+    union_of_two_lists <- NULL
+    log_debug("MC_passing_cpdag_already_found = FALSE")
+  } 
   
+ 
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
   if (length(union_of_two_lists) == 0) {
@@ -837,14 +840,16 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     }
   }
   
-  log_debug("Summary of results:")
-  log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
-  log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
-  log_debug("Flag status for no adjustment set found: {msg}", msg = flag_no_adjustment_set_found)
-  log_debug("Flag status for only one adjustment set found: {msg}", msg = flag_only_one_adjustment_set_found)
+  if (MC_passing_cpdag_already_found == TRUE) {
+   log_debug("Summary of results:")
+   log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
+   log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
+   log_debug("Flag status for no adjustment set found: {msg}", msg = flag_no_adjustment_set_found)
+   log_debug("Flag status for only one adjustment set found: {msg}", msg = flag_only_one_adjustment_set_found)
   
-  ### return the two adjustment sets plus the two flags instead.
-  return(list(return_first_adj_set, return_second_adj_set))
+   ### return the two adjustment sets plus the two flags instead.
+   return(list(return_first_adj_set, return_second_adj_set))
+  } else {return(NULL)}
 }
 
 scale_ <- function(x){
@@ -854,6 +859,8 @@ scale_ <- function(x){
 runSuperLearner <- function(settings,
                             AIRHome,
                             data_df,
+                            tv_dir,
+                            ov_dir,
                             tv_threshold,
                             ov_threshold,
                             log_file){ 
@@ -867,8 +874,8 @@ runSuperLearner <- function(settings,
   outcome =  as.character(df_vars[df_vars$var == "OV",]$val)
 
   df <- data_df
-  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
+  if (isTRUE(tv_dir)){ df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)} else { df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)}
+  if (isTRUE(ov_dir)){ df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)} else { df[[outcome  ]] <- ifelse(df[[outcome  ]] <= ov_threshold, 1, 0)}
 
   ## ────────────────────────────────────────────────────────────────
   ##  Coerce the *outcome* to numeric if it’s still a factor
@@ -1060,6 +1067,8 @@ runSuperLearner <- function(settings,
 
 processResults <- function(settings,
                            AIRHome,
+                           tv_dir,
+                           ov_dir,
                            tv_threshold,
                            ov_threshold,
                            model_in, model_yn,
@@ -1068,7 +1077,7 @@ processResults <- function(settings,
                            move_results = FALSE) {
   log_debug("Started processResults()")
   log_debug("Settings: {line}",
-    line = paste(c(settings, AIRHome, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
+    line = paste(c(settings, AIRHome, tv_dir, ov_dir, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
 
 
   treatment <- as.character(settings$varName)
@@ -1080,8 +1089,9 @@ processResults <- function(settings,
   set.seed(123)
 
   # Bin conversion logic
-  df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)
-  df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)
+  if (isTRUE(tv_dir)){ df[[treatment]] <- ifelse(df[[treatment]] >= tv_threshold, 1, 0)} else { df[[treatment]] <- ifelse(df[[treatment]] <= tv_threshold, 1, 0)}
+  if (isTRUE(ov_dir)){ df[[outcome  ]] <- ifelse(df[[outcome  ]] >= ov_threshold, 1, 0)} else { df[[outcome  ]] <- ifelse(df[[outcome  ]] <= ov_threshold, 1, 0)}
+
 
   # Split into train/test
   test_size <- floor(0.3 * nrow(df))
@@ -1870,10 +1880,10 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
 # ──────────────────────────────────────────────────────────────
 #  Histogram for the experimental (X) variable
 # ──────────────────────────────────────────────────────────────
-get_histogram_x <- function(df, xvar, threshold) {
+get_histogram_x <- function(df, xvar, dir, threshold) {
 
   v       <- df[[xvar]]
-  treated <- v >= threshold                    # single comparison rule
+  if (isTRUE(dir)){ treated <- ifelse(v >= threshold, 1, 0)} else { treated <- ifelse(v <= threshold, 1, 0)}
 
   plot_df <- data.frame(
     x         = v,
@@ -1884,8 +1894,8 @@ get_histogram_x <- function(df, xvar, threshold) {
   colors <- c(Treated   = "#5D9AFF",
               Untreated = "#EAE1D7")
 
-  untreated_label <- paste0("Untreated (< ", signif(threshold, 4), ")")
-  treated_label   <- paste0("Treated (≥ ",  signif(threshold, 4), ")")
+  untreated_label <- paste0("Baseline") # (< ", signif(threshold, 4), ")")
+  treated_label   <- paste0("Experimental") #  (≥ ",  signif(threshold, 4), ")")
 
   bw <- diff(range(v, na.rm = TRUE)) / 30
   if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1        # <- arrow fix
@@ -1915,10 +1925,10 @@ get_histogram_x <- function(df, xvar, threshold) {
 # ──────────────────────────────────────────────────────────────
 #  Histogram for the outcome (Y) variable
 # ──────────────────────────────────────────────────────────────
-get_histogram_y <- function(df, yvar, threshold) {
+get_histogram_y <- function(df, yvar, dir, threshold) {
 
   v       <- df[[yvar]]
-  success <- v >= threshold
+  if (isTRUE(dir)){ success <- ifelse(v >= threshold, 1, 0)} else { success <- ifelse(v <= threshold, 1, 0)}
 
   plot_df <- data.frame(
     x      = v,
@@ -1929,8 +1939,8 @@ get_histogram_y <- function(df, yvar, threshold) {
   colors <- c(Success = "#5D9AFF",
               Fail    = "#EAE1D7")
 
-  fail_label    <- paste0("Fail (< ",  signif(threshold, 4), ")")
-  success_label <- paste0("Success (≥ ", signif(threshold, 4), ")")
+  fail_label    <- paste0("Fail") # (< ",  signif(threshold, 4), ")")
+  success_label <- paste0("Success") # (≥ ", signif(threshold, 4), ")")
 
   bw <- diff(range(v, na.rm = TRUE)) / 30
   if (bw <= 0 || is.na(bw) || is.infinite(bw)) bw <- 1
@@ -2838,6 +2848,7 @@ df <- reactive({
   tryCatch({
     df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
     log_debug("Read in data file: {msg}", msg = input$file1$datapath)
+    log_debug("Column names: {names}", names = names(df))
     continuous_columns <- c(1, ncol(df))
     df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
     df
@@ -2870,7 +2881,17 @@ knowledge <- reactive({
       }
     )
 
-    fixed <- fix_knowledge(knowledge_in)
+    if (!all(colnames(knowledge_in) %in% c("level", "variable"))){
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Warning: knowledge file not formatted properly",
+        text = "Attempting to fix header and assign columns.
+        Please fix knowledge file formatting to ensure proper functionality.",
+        type = "warning",
+        btn_labels = "Continue"
+      )    
+    }
+    fixed <- fix_knowledge(knowledge_in)  
 
     shiny::validate(
       shiny::need(all(c("level","variable") %in% names(fixed)),
@@ -2881,6 +2902,8 @@ knowledge <- reactive({
       sendSweetAlert(...); return(NULL)
     }
 
+    log_debug("Knowledge file names: {msg}", msg = fixed$variable)
+    log_debug("Knowledge file levels: {lvl}", lvl = fixed$level)
     file_check(TRUE)
     fixed
   }, error = function(e) {
@@ -2896,6 +2919,13 @@ knowledge <- reactive({
   })
 })
 
+cols_mismatch <- reactive({
+  req(input$file2)
+
+  matches <- !all(knowledge()$variable %in% names(df()))
+  return(matches)
+})
+
 vars_ready <- reactive({
   nzchar(input$xvar) && nzchar(input$yvar)
 })
@@ -2903,6 +2933,14 @@ vars_ready <- reactive({
 x_ready   <- reactive({ nzchar(vars_sel()$x) })         # X chosen & valid
 y_ready   <- reactive({ nzchar(vars_sel()$y) })         # Y chosen & valid
 both_ready <- reactive({ x_ready() && y_ready() })      # X + Y ready
+
+tv_dir <- reactive({
+  input$tv_dir_in
+})
+
+ov_dir <- reactive({
+  input$ov_dir_in
+})
 
 tv_val <- reactive({
   req(x_ready(), !is.null(input$tv_threshold))          # ← new guard
@@ -2991,92 +3029,129 @@ observeEvent(input$file2, {
   })
 })
 
+# Handle the user’s choice from the SweetAlert
+observeEvent(input$confirm_mismatch, ignoreInit = TRUE, {
+    if (isTRUE(input$confirm_mismatch)) {
+      # User clicked "Continue"
+      run_calc()
+    } else {
+      # User clicked "Cancel" — do nothing (i.e., break out)
+      showNotification("Calculation cancelled.", type = "message")
+    }
+  })
+
+
 # Causal graph build button
 observeEvent(input$buildButton, {
+  if (isTRUE(cols_mismatch())) {
+      bad <- htmltools::htmlEscape(setdiff(knowledge()$variable, names(df())))
+      confirmSweetAlert(
+        session,
+        inputId = "confirm_mismatch",
+        title = "Warning: Knowledge file variables don't match data headers",
+        type = "warning",
+        btn_labels = c("Cancel", "Continue"),
+        danger_mode = TRUE,
+        closeOnClickOutside = FALSE,
+        html = TRUE,
+        text = htmltools::HTML(
+          paste0(
+            "<b>Mismatches:</b> ", paste(bad, collapse = ", "),
+            "<br><br>Continue anyway?"
+          )
+        )
+      )
+      # IMPORTANT: return here so we don't fall through and run
+      return(invisible(NULL))
+    }
+
+    run_calc()
+})
+
+# run the graph calculation 
+run_calc <- function() {
   tryCatch({
-    withProgress(message = 'Building Causal Graph', style = "notification", value = 0.1, {
+    withProgress(message = "Building Causal Graph",
+                 style = "notification",
+                 value = 0.1, {
       incProgress(0.2, message = "Generating cpDAG: ", detail = "Calling TETRAD API")
 
-
-    if (Sys.info()["sysname"] != "Linux") {
-      stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
-    }
-
-    graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
-
- incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
- graphtxt_raw <- graph_to_dot(graphlist[[1]])
- graphtxt_stripped <- gsub("(digraph g \\{)|\\}", "", graphtxt_raw)
-
- log_debug("graphtxt_stripped: {msg}", msg = graphtxt_stripped)
-    if (is.null(trimws(graphtxt_stripped)) || !nzchar(trimws(graphtxt_stripped))) {
-      sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "Tetrad Returned an Empty Graph",
-      text = "Please review your data to ensure that a causal relationship exists in your data",
-      type = "warning",
-      btn_labels = "Continue",
-      btn_colors = "#3085d6",
-      closeOnClickOutside = TRUE,
-      showCloseButton = FALSE
-    )
-
-      stop("Tetrad returned an empty graph string")
-    }
-
-    graphtxt <- tryCatch(
-      gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
-      error = function(e) {
-        log_debug("Regex error on graph string: {msg}", msg = conditionMessage(e))
-        graphtxt_raw  # fallback to raw if regex fails
+      if (Sys.info()[["sysname"]] != "Linux") {
+        stop("Non-Linux execution path no longer supported: remove or re-implement without file I/O")
       }
-    )
 
+      graphlist <- AIR_getGraph(df(), knowledge(), graphtxt_buffer = graphtxt_buffer)
 
-count_components_from_dot <- function(dot) {
-  # pattern that matches either "quoted tokens" or bare A-Za-z0-9_ tokens
-  node_pat <- '(?:"[^"]+"|[A-Za-z0-9_]+)'
-  edge_pat <- paste0(node_pat, "[[:space:]]*(?:->|--)[[:space:]]*", node_pat)
+      incProgress(0.6, message = "Generating cpDAG: ", detail = "Formatting output")
+      graphtxt_raw <- graph_to_dot(graphlist[[1]])
+      graphtxt_stripped <- gsub("(digraph g \\{)|\\}", "", graphtxt_raw)
 
-  # find A -> B or A -- B (allowing quotes); needs PCRE
-  edges <- unlist(regmatches(dot, gregexpr(edge_pat, dot, perl = TRUE)))
-  if (length(edges) == 0) return(0L)
+      log_debug("graphtxt_stripped: {msg}", msg = graphtxt_stripped)
+      if (is.null(trimws(graphtxt_stripped)) || !nzchar(trimws(graphtxt_stripped))) {
+        sendSweetAlert(
+          session = shiny::getDefaultReactiveDomain(),
+          title = "Tetrad Returned an Empty Graph",
+          text = "Please review your data to ensure that a causal relationship exists in your data",
+          type = "warning",
+          btn_labels = "Continue",
+          btn_colors = "#3085d6",
+          closeOnClickOutside = TRUE,
+          showCloseButton = FALSE
+        )
+        stop("Tetrad returned an empty graph string")
+      }
 
-  # normalize "A -> B" / "A -- B" into "A B"
-  edges_norm <- gsub("[[:space:]]*(?:->|--)[[:space:]]*", " ", edges, perl = TRUE)
+      graphtxt <- tryCatch(
+        gsub("(?s)Graph Attributes:.*", "", graphtxt_raw, perl = TRUE),
+        error = function(e) {
+          log_debug("Regex error on graph string: {msg}", msg = conditionMessage(e))
+          graphtxt_raw  # fallback to raw if regex fails
+        }
+      )
 
-  # split into pairs and drop the quotes around node names
-  edge_pairs <- do.call(rbind, strsplit(edges_norm, " "))
-  edge_pairs <- gsub('^"|"$', "", edge_pairs)  # remove surrounding quotes
+      count_components_from_dot <- function(dot) {
+        # pattern that matches either "quoted tokens" or bare A-Za-z0-9_ tokens
+        node_pat <- '(?:"[^"]+"|[A-Za-z0-9_]+)'
+        edge_pat <- paste0(node_pat, "[[:space:]]*(?:->|--)[[:space:]]*", node_pat)
 
-  # build graph directly from edgelist matrix
-  g <- igraph::graph_from_edgelist(edge_pairs, directed = TRUE)
-  igraph::components(igraph::as.undirected(g, mode = "collapse"))$no
-}
-    subgraphs <- count_components_from_dot(graphtxt)
-    log_debug("Number of subgraphs: {no}", no = subgraphs)
+        # find A -> B or A -- B (allowing quotes); needs PCRE
+        edges <- unlist(regmatches(dot, gregexpr(edge_pat, dot, perl = TRUE)))
+        if (length(edges) == 0) return(0L)
 
-    rv$ts <- graphlist[[2]]
-    rv$MC_passing_cpdag_already_found <- graphlist[[3]]
-    rv$best_cpdag_seen_so_far <- graphlist[[4]]
+        # normalize "A -> B" / "A -- B" into "A B"
+        edges_norm <- gsub("[[:space:]]*(?:->|--)[[:space:]]*", " ", edges, perl = TRUE)
 
-    dot_raw <- graph_to_dot(graphlist[[1]])
+        # split into pairs and drop the quotes around node names
+        edge_pairs <- do.call(rbind, strsplit(edges_norm, " "))
+        edge_pairs <- gsub('^"|"$', "", edge_pairs)  # remove surrounding quotes
 
-    rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
+        # build graph directly from edgelist matrix
+        g <- igraph::graph_from_edgelist(edge_pairs, directed = TRUE)
+        igraph::components(igraph::as.undirected(g, mode = "collapse"))$no
+      }
 
-    log_debug("Graph: {msg}", msg = rv$dot)
-    graph_complete(TRUE)
-    })
+      subgraphs <- count_components_from_dot(graphtxt)
+      log_debug("Number of subgraphs: {no}", no = subgraphs)
+
+      rv$ts <- graphlist[[2]]
+      rv$MC_passing_cpdag_already_found <- graphlist[[3]]
+      rv$best_cpdag_seen_so_far <- graphlist[[4]]
+
+      dot_raw <- graph_to_dot(graphlist[[1]])
+      rv$dot <- gsub("(?m)^\\s*\\n", "", dot_raw %||% "", perl = TRUE)
+
+      log_debug("Graph: {msg}", msg = rv$dot)
+      graph_complete(TRUE)
+    }) # <- closes withProgress
 
     output$blankGraph <- renderGrViz({
       req(graph_complete(), rv$dot)
       log_debug("Graph Built.")
       dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Causal graph\"]", rv$dot, perl = TRUE)
       grViz(dot)
-    })
+    }) # <- closes renderGrViz
 
-   
-    if (subgraphs > 1){  
+    if (subgraphs > 1) {
       sendSweetAlert(
         session = shiny::getDefaultReactiveDomain(),
         title = "Tetrad Returned Multiple Sub-graphs",
@@ -3097,10 +3172,9 @@ count_components_from_dot <- function(dot) {
         btn_colors = "#3085d6",
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
-    )
-  }
-
-  },
+      )
+    } # <- closes if/else
+  }, # <- ends tryCatch expr arg
   error = function(e) {
     err_summary <- tryCatch({
       paste0("Error in buildButton observer: ", conditionMessage(e), "\n")
@@ -3108,8 +3182,8 @@ count_components_from_dot <- function(dot) {
       paste0("Unknown error in buildButton observer: ", capture.output(str(e)), collapse = "\n")
     })
     log_debug(err_summary)
-  })
-})
+  }) # <- closes tryCatch
+} # <- closes run_calc()
 
 observeEvent( {input$xvar; input$yvar}, ignoreInit = TRUE, {
   req(both_ready())
@@ -3155,6 +3229,15 @@ shiny::validate({
     rv$best_cpdag_seen_so_far
   )
 
+  if (identical(adj_list, NULL)){
+    sendSweetAlert(
+      session,
+      title = "Graph Error",
+      text = "Adjustment sets could not be calculated because the graph estimated from your data does not satisfy the statistical conditions needed for this step.",
+      type = "error"
+      )
+    break()
+  }
   Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
   Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
 
@@ -3245,6 +3328,8 @@ shiny::validate({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
         tv_threshold_val <- tv_val()
         ov_threshold_val <- ov_val()
+        tv_dir_val <- tv_dir()
+        ov_dir_val <- ov_dir()
 
         n_cores <- min(nrow(combos), parallel::detectCores() - 1L)
         cluster <- makeCluster(n_cores)
@@ -3309,6 +3394,8 @@ shiny::validate({
             runSuperLearner(settings,
                             graph_snapshot,
                             df_snapshot,
+                            tv_dir_val,
+                            ov_dir_val,
                             tv_threshold_val,
                             ov_threshold_val,
                             log_file),
@@ -3347,6 +3434,8 @@ shiny::validate({
         
           processResults(settings_stub,
                          AIRHome       = graph_snapshot,
+                         tv_dir        = tv_dir_val,
+                         ov_dir        = ov_dir_val,
                          tv_threshold  = tv_threshold_val,
                          ov_threshold  = ov_threshold_val,
                          model_in      = if (identical(input$model_exist, "Yes"))
@@ -3452,60 +3541,56 @@ output$step3 = renderUI({
 output$xvar <- renderUI({
   req(graph_complete(), df())
 
-  # compute allowed X choices
-  all_cols <- names(df())
-  orphans  <- get_orphans(graphtxt_buffer)
-  spinners <- get_spinsters(graphtxt_buffer)
-  base_choices <- sort(unique(setdiff(all_cols, union(orphans, spinners))))
+  all_cols   <- names(df())
+  orphans    <- get_orphans(graphtxt_buffer)
+  spinsters  <- get_spinsters(graphtxt_buffer)
+  base_choices <- sort(unique(setdiff(all_cols, union(orphans, spinsters))))
+  blocked      <- sort(setdiff(all_cols, base_choices))
 
-  if (isTRUE(locked())) {
-    # Freeze to canonical X and expose ONLY that choice
-    selected_val <- isolate(vars_sel()$x)
-    if (is.null(selected_val)) selected_val <- ""
-    choices <- if (nzchar(selected_val)) selected_val else c("")
+  log_debug("orphans: {orphans}", orphans = orphans)
+  log_debug("spinsters: {spinsters}", spinsters = spinsters)
+  log_debug("base_choices: {base_choices}", base_choices = base_choices)
 
-    tagList(
-      selectInput(
-        inputId = "xvar",
-        label   = "Experimental (X) variable:",
-        choices = choices,          # no "" here when locked
-        selected = selected_val
-      ),
-      tags$script(HTML("
-        var tries = 0;
-        var t = setInterval(function(){
-          var $sel = $('#xvar');
-          var $inp = $('#xvar-selectized');
-          if ($sel.length && ($inp.length ? $inp.parent().hasClass('selectize-input') : true)) {
-            $sel.prop('disabled', true);
-            if ($inp.length) {
-              $inp.prop('disabled', true);
-              $inp.parent().css({'pointer-events':'none','opacity':0.5});
-            }
-            clearInterval(t);
-          }
-          if (++tries > 50) clearInterval(t);
-        }, 100);
-      "))
-    )
-  } else {
-    # Unlocked: keep prior input if present; allow it even if not in base_choices
-    selected_val <- isolate(input$xvar)
-    if (is.null(selected_val)) selected_val <- ""
-    choices <- if (nzchar(selected_val) && !(selected_val %in% base_choices)) {
-      c(selected_val, base_choices)
-    } else {
-      base_choices
-    }
-    if (!(selected_val %in% c("", choices))) selected_val <- ""
+  grouped_x_choices <- list(
+    "Available (estimable)" = c("— Select X —" = "", setNames(base_choices, base_choices)),
+    "Not estimable"         = setNames(blocked, blocked)
+  )
 
-    selectInput(
-      inputId = "xvar",
-      label   = "Experimental (X) variable:",
-      choices = c("", choices),
-      selected = selected_val
-    )
+  selected_val <- {
+    prev <- isolate(input$xvar)
+    if (!is.null(prev) && prev %in% base_choices) prev else ""  # nothing selected on first load
   }
+
+  tagList(
+    selectInput(
+      inputId   = "xvar",
+      label     = "Experimental (X) variable:",
+      choices   = grouped_x_choices,  # <-- no nested optgroups
+      selected  = selected_val,
+      selectize = FALSE
+    ),
+    tags$style(HTML("#xvar option:disabled { color:#9aa0a6; }")),
+    tags$script(HTML(sprintf("
+      (function(){
+        function applyDisabled(){
+          var sel = document.getElementById('xvar');
+          if(!sel) return;
+          var blocked = %s;
+
+          if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
+
+          $('#xvar option').each(function(){
+            if (this.value && blocked.indexOf(this.value) !== -1){
+              this.disabled = true;
+              this.title = 'Not selectable (orphan/spinster)';
+            }
+          });
+        }
+        var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
+        $(document).on('shiny:value shiny:visualchange', applyDisabled);
+      })();
+    ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
+  )
 })
 
 # --- Y -----------------------------------------------------------------------
@@ -3528,52 +3613,73 @@ output$yvar <- renderUI({
     )
   }
 
+  all_cols   <- names(df())
+  blocked_y  <- sort(setdiff(all_cols, descs))  # visible but not selectable
+
   if (isTRUE(locked())) {
-    # Freeze to canonical Y and expose ONLY that choice
+    # LOCKED: show only canonical Y and disable control
     selected_val <- isolate(vars_sel()$y)
     if (is.null(selected_val)) selected_val <- ""
-    choices <- if (nzchar(selected_val)) selected_val else c("")
+    choices <- if (nzchar(selected_val)) selected_val else ""
 
     tagList(
       selectInput(
-        inputId = "yvar",
-        label   = "Outcome (Y) variable:",
-        choices = choices,          # no "" here when locked
-        selected = selected_val
+        inputId   = "yvar",
+        label     = "Outcome (Y) variable:",
+        choices   = choices,
+        selected  = selected_val,
+        selectize = FALSE
       ),
       tags$script(HTML("
-        var tries = 0;
-        var t = setInterval(function(){
-          var $sel = $('#yvar');
-          var $inp = $('#yvar-selectized');
-          if ($sel.length && ($inp.length ? $inp.parent().hasClass('selectize-input') : true)) {
-            $sel.prop('disabled', true);
-            if ($inp.length) {
-              $inp.prop('disabled', true);
-              $inp.parent().css({'pointer-events':'none','opacity':0.5});
-            }
-            clearInterval(t);
-          }
-          if (++tries > 50) clearInterval(t);
-        }, 100);
+        var tries=0,t=setInterval(function(){
+          var $sel=$('#yvar');
+          if($sel.length){ $sel.prop('disabled',true); clearInterval(t); }
+          if(++tries>50) clearInterval(t);
+        },100);
       "))
     )
-  } else {
-    # Unlocked: keep prior input if present; allow it even if not in descs
-    selected_val <- isolate(input$yvar)
-    if (is.null(selected_val)) selected_val <- ""
-    choices <- if (nzchar(selected_val) && !(selected_val %in% descs)) {
-      c(selected_val, descs)
-    } else {
-      descs
-    }
-    if (!(selected_val %in% c("", choices))) selected_val <- ""
 
-    selectInput(
-      inputId = "yvar",
-      label   = "Outcome (Y) variable:",
-      choices = c("", choices),
-      selected = selected_val
+  } else {
+    # UNLOCKED
+    grouped_y_choices <- list(
+      "Available (descendants of X)" = c("— Select Y —" = "", setNames(descs, descs)),
+      "Not selectable"               = setNames(blocked_y, blocked_y)
+    )
+
+    selected_y <- {
+      prev <- isolate(input$yvar)
+      if (!is.null(prev) && prev %in% descs) prev else ""  # nothing selected on first load
+    }
+
+    tagList(
+      selectInput(
+        inputId   = "yvar",
+        label     = "Outcome (Y) variable:",
+        choices   = grouped_y_choices,
+        selected  = selected_y,
+        selectize = FALSE
+      ),
+      tags$style(HTML("#yvar option:disabled { color:#9aa0a6; }")),
+      tags$script(HTML(sprintf("
+        (function(){
+          function applyDisabled(){
+            var sel = document.getElementById('yvar');
+            if(!sel) return;
+            var blocked = %s;
+
+            if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
+
+            $('#yvar option').each(function(){
+              if (this.value && blocked.indexOf(this.value) !== -1){
+                this.disabled = true;
+                this.title = 'Not selectable (not a descendant of X)';
+              }
+            });
+          }
+          var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
+          $(document).on('shiny:value shiny:visualchange', applyDisabled);
+        })();
+      ", jsonlite::toJSON(blocked_y, auto_unbox = TRUE))))
     )
   }
 })
@@ -3655,10 +3761,26 @@ output$ui_threshold_x <- renderUI({
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
-      style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(vars_sel()$x, "is considered treated when it is ≥")),
-      numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
-    ),
+  style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
+  tags$span(paste("Test the effect when ", vars_sel()$x, " is ")),
+
+  tags$div(
+    style = "display:inline-block;",
+    switchInput(
+      inputId  = "tv_dir_in",
+      label    = NULL,
+      value    = TRUE,
+      onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
+      offLabel = HTML("<span class='op-mono'>&le;</span>"),
+      inline   = TRUE
+    )
+  ),
+
+  tags$div(
+    style = "display:inline-block;",
+    numericInput("tv_threshold", NULL, value = val, step = step, width = "90px")
+  )
+),
     if (locked()) tags$script(HTML("
       var tvDisableTries = 0;
       var disableTv = setInterval(function() {
@@ -3682,11 +3804,27 @@ output$ui_threshold_y <- renderUI({
            isolate(ov_val()) else default_split(vec)
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
-    tags$div(
-      style = "display:flex;align-items:center;flex-wrap:wrap;",
-      tags$span(paste(vars_sel()$y, "is considered success when it is ≥")),
-      numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
-    ),
+  tags$div(
+  style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
+  tags$span(paste("Where success is defined as ", vars_sel()$y, " being ")),
+
+  tags$div(
+    style = "display:inline-block;",
+    switchInput(
+      inputId  = "ov_dir_in",
+      label    = NULL,
+      value    = TRUE,
+      onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
+      offLabel = HTML("<span class='op-mono'>&le;</span>"),
+      inline   = TRUE
+    )
+  ),
+
+  tags$div(
+    style = "display:inline-block;",
+    numericInput("ov_threshold", NULL, value = val, step = step, width = "90px")
+  )
+),
     if (locked()) tags$script(HTML("
       var ovDisableTries = 0;
       var disableOv = setInterval(function() {
@@ -3734,13 +3872,13 @@ output$ui_file2 <- renderUI({
 
 output$histogram_x <- renderPlot({
   req(vars_sel()$x, !is.null(input$tv_threshold))   # wait for slider
-  p <- get_histogram_x(df(), vars_sel()$x, tv_val())
+  p <- get_histogram_x(df(), vars_sel()$x, tv_dir(), tv_val())
   p
   }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
   req(vars_sel()$y, !is.null(input$ov_threshold))   # wait for slider
-  p <- get_histogram_y(df(), vars_sel()$y, ov_val())
+  p <- get_histogram_y(df(), vars_sel()$y, ov_dir(), ov_val())
   p
   }, bg = "transparent")
 
@@ -4010,6 +4148,8 @@ output$download_report <- downloadHandler(
         xvar          = vars_sel()$x,
         yvar          = vars_sel()$y,
         df            = df(),
+        tv_dir        = tv_dir(),
+        ov_dir        = ov_dir(),
         tv_threshold  = tv_val(),
         ov_threshold  = ov_val(),
         Zvars         = Zvars,
@@ -4053,11 +4193,11 @@ output$download_report <- downloadHandler(
   
       # ── generate images ────────────────────────────────────────────────────
       save_plot_pdf(
-        get_histogram_x(vals$df, vals$xvar, vals$tv_threshold),
+        get_histogram_x(vals$df, vals$xvar, vals$tv_dir, vals$tv_threshold),
         file.path(tmpdir, "xhist.pdf")
       )
       save_plot_pdf(
-        get_histogram_y(vals$df, vals$yvar, vals$ov_threshold),
+        get_histogram_y(vals$df, vals$yvar, vals$ov_dir, vals$ov_threshold),
         file.path(tmpdir, "yhist.pdf")
       )
       save_plot_pdf(get_ribbon_plot(AIRHome), file.path(tmpdir, "ribbon.pdf"))

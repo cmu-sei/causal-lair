@@ -10,7 +10,7 @@ level,variable
 4,temp
 5,bird_strike
 5,speed_avg
-6,fueld_consumed
+6,fuel_consumed
 6,ice_accrual
 7,hard_landing
 7,ice_sublimation
