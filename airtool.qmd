@@ -2741,10 +2741,31 @@ output$download_selected <- downloadHandler(
       mt   <- file.info(cand)$mtime
       src  <- cand[which.max(mt)]
     }
-
     shiny::validate(shiny::need(file.exists(src), "Log file not found."))
-    ok <- file.copy(src, file, overwrite = TRUE)
-    shiny::validate(shiny::need(isTRUE(ok), "Failed to copy log to download location."))
+
+    # --- retry wrapper to avoid races/overlayfs quirks ---
+    copy_log_with_retries <- function(from, to, tries = 5, base_pause = 0.12) {
+      for (i in seq_len(tries)) {
+        ok <- try({
+          # Snapshot the file as text (safer for logs than raw-bytes sizing)
+          lines <- readLines(from, warn = FALSE, encoding = "UTF-8")
+
+          con <- file(to, open = "w", encoding = "UTF-8")
+          on.exit(try(close(con), silent = TRUE), add = TRUE)
+          writeLines(lines, con, sep = "\n", useBytes = TRUE)
+          flush(con)
+
+          TRUE
+        }, silent = TRUE)
+
+        if (isTRUE(ok)) return(TRUE)
+        Sys.sleep(base_pause * i)  # backoff
+      }
+      FALSE
+    }
+
+    ok <- copy_log_with_retries(src, file)
+    shiny::validate(shiny::need(ok, "Could not stage log for download after several attempts."))
   }
 ) 
 ### variable declarations --------------------------------------------------------------
