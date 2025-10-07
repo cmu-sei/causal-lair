@@ -3004,7 +3004,7 @@ options(shiny.error = function() {
   tb <- traceback()  # Capture the call stack
   showModal(modalDialog(
     title = "An error occurred",
-    paste0("AIR Tool crashed. See log file, ", log_file, ", for details"),
+    paste0("AIR Tool crashed. Refresh your browser and see log file, ", log_file, ", for details"),
     easyClose = TRUE
   ))
 })
