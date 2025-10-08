@@ -102,6 +102,9 @@ The blue status bar will confirm when each upload is complete. The tool will pro
 
 More detailed information about assessing causal graphs can be found in: **CAUSAL GRAPH INSIGHTS** Job Aid.
 
+ <img src="./log_retrieval_instructions_files/media/step_1.png"
+  alt="AIR Tool screen at Step 1." />
+
 ### Step 2: Identifying potential sources of bias
 
 The tool will now prompt users for additional information about the problem scenario that the classifier is attempting to solve. Most important will be identifying both the experimental/treatment (x) and outcome (y) variables. The experimental (x) variable definition will be pulled from the data file uploaded in Step 1.  Experimental (x) variables that have no inputs or no outputs cannot be selected in the tool. The Outcome (y) variables available in tool will be the causal successors of the selected Experimental (x) variable.
@@ -114,7 +117,8 @@ Once the user has completed their definitions for experimental (x) and outcome (
 	- potential confounders that are parents of x and y in medium gray
 	- potential confounders that are parents of x and intermediate variables and/or y in light gray.
 
-
+ <img src="./log_retrieval_instructions_files/media/step_2.png"
+  alt="AIR Tool screen at Step 2." />
 
 ### Step 3: Estimating the causal effect to compare with your model 
 
@@ -128,6 +132,9 @@ The tool will now prompt the user for information about their model that is to b
 
 Once the user has made a selection, you can click the "Calculate Results" button to finish the causal estimation portion of the tool. Once this process has started, it cannot be undone, so be careful and make sure you are ready. This process will inevitably take some time to complete. In our trials with a fairly simple model this usually takes 2-5 minutes to run. Once complete, the progress bar will disappear and the results will be displayed.
 
+ <img src="./log_retrieval_instructions_files/media/step_3.png"
+  alt="AIR Tool screen at Step 3." />
+
 ### Results
 
 This page requires no input from the user but will display the entire health report. It contains the following contents:
@@ -140,7 +147,7 @@ This page requires no input from the user but will display the entire health rep
 
 The blue Download button on the lower left will allow users to download a PDF summary of these results.
 
-More detailed information about interpreting AIR results can be found in:  **INTERPRETING AIR RESULTS**  
+More detailed information about interpreting AIR results can be found in: [Interpreting AIR Results]("./interpreting_results.md)  
 
 Refreshing the browser will reset the tool and allow the user to begin a new analysis.
 
