@@ -35,7 +35,7 @@ When using the AIR tool to analyze results of an AI model that makes predictions
 
 Leveraging the Earth Science Information Partners (ESIP) Checklist to Examine AI-readiness for Open Environmental Datasets, we have identified the dataset readiness conditions that are likely to ensure successful application of the current version of the AIR Tool.
 
-[Annotated ESIP Checklist](./log_retrieval_instructions_files/media/data_guidelines_ESIP.pdf")
+[Annotated ESIP Checklist](./log_retrieval_instructions_files/media/data_guidelines_ESIP.pdf)
 
 To indicate dataset attributes important to successful AIR Tool application and evaluation, we have: 
 
