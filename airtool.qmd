@@ -1653,10 +1653,10 @@ get_ribbon_plot <- function(AIRHome) {
   }
 
   # code for generating ribbon plot
-  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI)) {
+  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI, na.rm = TRUE)) {
     inZ1 <- TRUE
   } else { inZ1 <- FALSE }
-  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI)) {
+  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI, na.rm = TRUE)) {
     inZ2 <- TRUE
   } else { inZ2 <- FALSE }
   
@@ -1740,7 +1740,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
-                   lineend = "round",
+                   #lineend = "round",
                    position = position_nudge(x = 0)) +
 
                    # overlap (green) ribbon: max LCI → min UCI
@@ -1750,7 +1750,7 @@ get_ribbon_plot <- function(AIRHome) {
                    col = "#378855",
                    alpha = 1,
                    stat = "unique",
-                   lineend = "round",
+                   #lineend = "round",
                    position = position_nudge(x = 0)) +
     geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
     ## algorithm estimates
@@ -1813,10 +1813,10 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
   }
   
   
-  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]))) {
+  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]), na.rm = TRUE)) {
     inZ1 <- TRUE
   } else { inZ1 <- FALSE }
-  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]))) {
+  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), na.rm = TRUE)) {
     inZ2 <- TRUE
   } else { inZ2 <- FALSE }
   
@@ -1891,7 +1891,7 @@ get_histogram_x <- function(df, xvar, dir, threshold) {
                        levels = c("Untreated", "Treated"))   # lock legend order
   )
 
-  colors <- c(Treated   = "#5D9AFF",
+  colors <- c(Treated   = "#5C9AFF",
               Untreated = "#EAE1D7")
 
   untreated_label <- paste0("Baseline") # (< ", signif(threshold, 4), ")")
@@ -1936,7 +1936,7 @@ get_histogram_y <- function(df, yvar, dir, threshold) {
                     levels = c("Fail", "Success"))
   )
 
-  colors <- c(Success = "#5D9AFF",
+  colors <- c(Success = "#5C6CFF",
               Fail    = "#EAE1D7")
 
   fail_label    <- paste0("Fail") # (< ",  signif(threshold, 4), ")")
@@ -1979,7 +1979,9 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   Z2 <- if (!is.null(Zvars)) Zvars$Z[Zvars$grp == "Z2"] else character(0)
 
   nodes_by_color <- list(
-    "#FFC107" = c(xvar, yvar),
+   # "#FFC107" = c(xvar, yvar),
+    "#5C9AFF" = xvar,
+    "#5C6CFF" = yvar,
     "#9394A2" = Z1,
     "#D4C7C7" = Z2
   )
@@ -1999,8 +2001,8 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
 
   # synthesize new declarations
   new_lines <- c(
-    if (nzchar(xvar)) sapply(xvar, make_decl, colour = "#FFC107"),
-    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#FFC107"),
+    if (nzchar(xvar)) sapply(xvar, make_decl, colour = "#5C9AFF"),
+    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#5C6CFF"),
     if (length(Z1))   sapply(Z1,   make_decl, colour = "#9394A2"),
     if (length(Z2))   sapply(Z2,   make_decl, colour = "#D4C7C7")
   )
@@ -2018,13 +2020,13 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
 
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
   # Highlight treatment and outcome nodes
-  dot <- change_node_color(dot, xvar, "'#FFC107'")
-  dot <- change_node_color(dot, yvar, "'#FFC107'")
+  dot <- change_node_color(dot, xvar, "'#5C9AFF'")
+  dot <- change_node_color(dot, yvar, "'#5C6CFF'")
 
   # Extract Z1 and Z2 sets
   Z1 <- Zvars[Zvars$grp == "Z1", ]$Z
   Z2 <- Zvars[Zvars$grp == "Z2", ]$Z
-
+  log_debug("get final graph vars")
   log_debug("dfr$flag: {msg}", msg = dfr$flag)
   log_debug("dfr$z1_ATE_UCI: {msg}", msg = dfr$z1_ATE_UCI)
   log_debug("dfr$z2_ATE_UCI: {msg}", msg = dfr$z2_ATE_UCI)
@@ -2034,18 +2036,35 @@ get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) 
   log_debug("Z2: {msg}", msg = Z2)
 
   # Ribbon plot flag logic to color additional nodes
-  if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
-    dot <- paint_nodes(dot, Z2, "'#FFC107'")
-  } else if (any(dfr$flag > dfr$z1_ATE_LCI & dfr$flag < dfr$z2_ATE_LCI)) {
+# Determine whether flag is inside each interval
+in_z1 <- with(dfr, flag >= z1_ATE_LCI & flag <= z1_ATE_UCI)
+in_z2 <- with(dfr, flag >= z2_ATE_LCI & flag <= z2_ATE_UCI)
+
+# Use any() to handle multiple rows safely
+in_z1 <- any(in_z1, na.rm = TRUE)
+in_z2 <- any(in_z2, na.rm = TRUE)
+
+if (in_z1 && in_z2) {
+  # Inside both → do nothing
+  log_debug("flag within both intervals")
+
+} else if (xor(in_z1, in_z2)) {
+  # Inside one, outside the other → paint the one that's outside
+  if (!in_z1) {
     dot <- paint_nodes(dot, Z1, "'#FFC107'")
-  } else if (any(dfr$flag > dfr$z1_ATE_UCI & dfr$flag > dfr$z2_ATE_UCI)) {
-    dot <- paint_nodes(dot, Z1, "'#C00000'")
-    dot <- paint_nodes(dot, Z2, "'#C00000'")
-  } else if (any(dfr$flag < dfr$z1_ATE_UCI & dfr$flag < dfr$z2_ATE_UCI)) {
-    dot <- paint_nodes(dot, Z1, "'#C00000'")
-    dot <- paint_nodes(dot, Z2, "'#C00000'")
+    log_debug("flag outside Z1 only")
+  }
+  if (!in_z2) {
+    dot <- paint_nodes(dot, Z2, "'#FFC107'")
+    log_debug("flag outside Z2 only")
   }
 
+} else if (!in_z1 && !in_z2) {
+  # Outside both → paint both in red
+  dot <- paint_nodes(dot, Z1, "'#C00000'")
+  dot <- paint_nodes(dot, Z2, "'#C00000'")
+  log_debug("flag outside both intervals")
+}
   dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Final Causal graph\"]", 
            dot, perl = TRUE)
   return(dot)
@@ -2583,12 +2602,14 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 # Key
 
 -   Graph Colors
-    -   [Yellow]{style="color: #FFC107; font-weight: bold;"}: Variable of interest, selected by the user in step 2. Both X and Y variables are shaded yellow to quickly draw the attention of the user to their selected variables.
+    -   [Blue]{style="color: #5C9AFF; font-weight: bold;"}: X Variable of interest, selected by the user in step 2. 
+    -   [Violet]{style="color: #5C6CFF; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
     -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
     -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
     -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
 -   Histogram Colors
-    -   [Blue]{style="color: #5D9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...
+    -   [Blue]{style="color: #5C9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...X Variable of interest, selected by the user in step 2. 
+    -   [Violet]{style="color: #5C6CFF; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
     -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
 -   Ribbon Plot Colors
     -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
@@ -3005,11 +3026,11 @@ highlighted_graph <- reactive({
   
   ## — colour the experimental variable if one is chosen
   if (!is.null(vars_sel()$x) && nzchar(vars_sel()$x))
-    dot <- change_node_color(dot, vars_sel()$x, "'#FFC107'")
+    dot <- change_node_color(dot, vars_sel()$x, "'#5C9AFF'")
 
   ## — colour the outcome variable if one is chosen
   if (!is.null(vars_sel()$y) && nzchar(vars_sel()$y))
-    dot <- change_node_color(dot, vars_sel()$y, "'#FFC107'")
+    dot <- change_node_color(dot, vars_sel()$y, "'#5C6CFF'")
 
 
   if (!is.null(Z) && nrow(Z)) {
@@ -3427,14 +3448,15 @@ shiny::validate({
           )
           res
         }
+  
 
         ## Main thread again.
         for (res in results_list) {
           if (!is.null(res)) {
-            results_buffer(
+              results_buffer(
               dplyr::bind_rows(results_buffer(), res$tmle)
             )
-            superlearner_output_buffer(
+              superlearner_output_buffer(
               append(superlearner_output_buffer(), res$diag)
             )
           }
