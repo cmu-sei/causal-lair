@@ -45,5 +45,4 @@ To indicate dataset attributes important to successful AIR Tool application and 
 
 >Highlighted in Yellow: Additional notes to elaboration on the applicability of the check-list question to the AIR Tool. 
 
-<img src="./log_retrieval_instructions_files/media/welcome_message.png"
-  alt="AIR Tool welcome message." />
+ 
