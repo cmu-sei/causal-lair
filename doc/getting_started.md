@@ -44,7 +44,7 @@ AIR tool can be installed at a partner site or run in the SEI environment. Class
 - No missing or null entries in the data
 - Features must have variability (i.e., no constant columns) and not be intentional duplicates of one another
 
-More information about Data Requirements can be found in: **DATASET GUIDELINES Job Aid.**
+More information about Data Requirements can be found in [AIR Tool Dataset Guidelines](./dataset_guidelines.md)
 
 
 ## Installation Instructions
@@ -70,7 +70,7 @@ docker images
 
 You may wish to add a data volume to your container. A limitation of the current release is that intermediate products are not stored within the container, i.e., every run starts from a new state.
 
-More detailed instructions can be found in: **TOOL INSTALLATION INSTRUCTIONS** Job Aid.
+More detailed instructions can be found in [AIR Tool Installation Instructions](./Installation_Instructions.md)
 
 ## Getting Started
 
@@ -78,13 +78,13 @@ More detailed instructions can be found in: **TOOL INSTALLATION INSTRUCTIONS** J
 
 Before beginning analysis with the tool, it is useful to carefully consider the causal scenario that the classifier model is used to solve. Understanding the scenario variables to be analyzed and confirming completeness of the data will contribute to gaining insight from the AIR results.
 
-More detailed information about preparing the scenario for analysis can be found in: SCENARIO DEFINITION WORKSHEET Job Aid.
+More detailed information about preparing the scenario for analysis can be found in [Scenario Definition Worksheet](./scenario_definition_worksheet.md)
 
 ### Step 1: Building your Causal Graph
 
 Once the AIR tool is successfully installed, it will open in the web browser.
 
-More detailed instructions can be found in: **TOOL INSTALLATION INSTRUCTIONS** Job Aid.
+More detailed instructions can be found in [AIR Tool Installation Instructions](./Installation_Instructions.md)
 
 The tool will first prompt the user to upload their data file. This file should conform to the characteristics outlined in the "Model and Data Requirements" section above. This file is most helpful if it is either the same data that was used to build the AI classifier in question or if it is data that is otherwise fed (or could be fed) to the AI classifier to make predictions. The blue status bar will confirm when upload is complete.
 
@@ -96,11 +96,11 @@ After a data file is uploaded, the user will then be prompted to upload the know
 
 Currently, all knowledge assertions will need to be done ahead of time by the user as in-place editing is not yet supported by the tool. The file format should be similar to the data file (i.e., .csv tabular format with headers), but will contain only two columns: level and variable, where level contains a value for tier, 0-n, and variable contains the variable name as written in the data file (the variable names must match exactly).  Each variable name should be represented exactly once and on its own line (i.e., file must contain all names), each with a corresponding numeric value in the 'level' column.
 
-More detailed information about creating a knowledge file can be found in: **AIR KNOWLEDGE FILE GUIDANCE**  
+More detailed information about creating a knowledge file can be found in [AIR Tool Knowledge File Guidance](./knowledge_file.md) 
 
 The blue status bar will confirm when each upload is complete. The tool will provide a notification if errors are discovered during the upload. Once both the data and knowledge file files are uploaded and accepted a new button, "Build Graph," will appear. Once activated, the tool will run Causal Discovery algorithms to build your causal graph, provide a notification when the causal graph is complete with a Continue notification. The tool will then display the causal graph in the main panel (right). If you are unsatisfied with the graph and feel that updating your data and/or knowledge file might help, you can select new files and re-build your graph until satisfied.
 
-More detailed information about assessing causal graphs can be found in: **CAUSAL GRAPH INSIGHTS** Job Aid.
+More detailed information about assessing causal graphs can be found in [AIR Tool Causal Graph Insights](./causal_graph_checks.md)
 
  <img src="./log_retrieval_instructions_files/media/step_1.png"
   alt="AIR Tool screen at Step 1." />
@@ -126,11 +126,11 @@ The tool will now prompt the user for information about their model that is to b
 
 - Uploading their model -- this choice prompts the user to upload a copy of their model used to estimate the average treatment effect predicted by their model to compare against the causally-derived estimates of AIR. Currently, this tool only accepts models in the .rda format, but more can be added upon request. Once selected, a file upload prompt will appear below.
 
-- Providing an ATE -- if the user can calculate their own average treatment effect (ATE) of their model, they can input that directly here. Once selected, an ATE input box will appear below. See "**Generating your own ATE** " for more information.
+- Providing an ATE -- if the user can calculate their own average treatment effect (ATE) of their model, they can input that directly here. Once selected, an ATE input box will appear below. See [Calculating ATE](./calculating_ATE.md) for more information.
 
 - No information (Do it all for me) -- this last option is for a user who doesn't have a specific model but would like the tool to generate several commonly-used machine learning models to compare against the causally-derived model of AIR. No additional input required.
 
-Once the user has made a selection, you can click the "Calculate Results" button to finish the causal estimation portion of the tool. Once this process has started, it cannot be undone, so be careful and make sure you are ready. This process will inevitably take some time to complete. In our trials with a fairly simple model this usually takes 2-5 minutes to run. Once complete, the progress bar will disappear and the results will be displayed.
+Once the user has made a selection, you can click the "Calculate Results" button to finish the causal estimation portion of the tool. After this process has started, it cannot be undone, so be careful and make sure you are ready. This process will inevitably take some time to complete. In our trials with a fairly simple model this usually takes 2-10 minutes to run. Once complete, the progress bar will disappear and the results will be displayed.
 
  <img src="./log_retrieval_instructions_files/media/step_3.png"
   alt="AIR Tool screen at Step 3." />
@@ -149,7 +149,7 @@ The blue Download button on the lower left will allow users to download a PDF su
 
 More detailed information about interpreting AIR results can be found in: [Interpreting AIR Results]("./interpreting_results.md)  
 
-Refreshing the browser will reset the tool and allow the user to begin a new analysis.
+Refreshing the browser at any time will reset the tool and allow the user to begin a new analysis.
 
  
 ## Known Issues/Limitations
