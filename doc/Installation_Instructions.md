@@ -48,4 +48,4 @@ When link loads page in browser (may require approx. 30 seconds and/or browser r
  alt="AIR Tool screen at start up." />
 
 
-For additional instructions about using the AIR Tool, please refer to Getting Started Guide. 
+For additional instructions about using the AIR Tool, please refer to [Getting Started Guide](./getting_started.md) 
