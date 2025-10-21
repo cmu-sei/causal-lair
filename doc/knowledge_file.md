@@ -8,13 +8,16 @@ Levels are defined as follows:
 
 - **Level 1 – Endogenous variables:** Variables in this level are potentially influenced by those in level 0 and possibly other level 1 variables.
 
-- **Level 2 and up – Higher-level variables:** These variables may be influenced by any preceding levels or its own. There can be any number of levels, though as few as three are strictly necessary.
+- **Level 2 and up – Higher-level variables:** These variables may be influenced by any preceding levels or its own.  
 
 Although it’s not necessary to assign every variable to a level, subject matter experts are encouraged to assign as many variables to as many hierarchy levels as logically correct, which will improve the performance of the tool. Two levels are sufficient, but three or more are generally recommended.
 
 The Knowledge File should be a CSV with two columns. The AIR tool will provide a notification if it detects header formatting issues or when there are variable names in the Knowledge File that don’t appear in the uploaded data.
 
 Here is an example about growing crops with reminders for appropriate formatting and content of the Knowledge File. 
+
+ <img src="./log_retrieval_instructions_files/media/KF_Example.png"
+  alt="Knowledge File Example." />
 
 
 V 0.10.0
