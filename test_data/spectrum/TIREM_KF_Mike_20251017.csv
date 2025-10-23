@@ -1,0 +1,15 @@
+﻿level,variable
+1,distance_vals
+1,ray_path_elevs
+2,knife_edge_count
+2,computed_free_space_loss
+3,alpha_1k
+3,alpha_2k
+3,a_1k
+3,a_2k
+3,sum_a_fk
+3,a_knife
+4,modeled_loss_vals
+4,tirem_loss
+5,residuals
+6,abs_residuals_gt5
