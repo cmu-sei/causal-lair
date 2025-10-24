@@ -140,6 +140,12 @@ before using the tool.
     -   Features must have variability (i.e., no constant columns) and
         not be intentional duplicates of one another.
 
+    -   Derived variables—like principal components, indices, or other
+        mathematical combinations of inputs—can’t be used together since
+        they aren’t independent entities. Where one may be a deterministic
+        function of the other, including both introduces circular
+        dependencies and destroys the causal meaning of the relationships. 
+    
 ### Installation Instructions
 
 Having met the usage requirements above, installation is a matter of

@@ -2890,19 +2890,47 @@ model_in <- reactive({
 
 df <- reactive({
   req(input$file1)
+
+  ext <- tolower(tools::file_ext(input$file1$name))
+
   shiny::validate(
-    shiny::need(tolower(tools::file_ext(input$file1$name)) == "csv",
-                "Data file must be .csv"),
-    shiny::need(file.size(input$file1$datapath) < 500*1024^2,
-                "CSV too large (500 MB limit)")
+    shiny::need(ext %in% c("csv", "xlsx"),
+                "Data file must be .csv or .xlsx"),
+    shiny::need(file.size(input$file1$datapath) < 500 * 1024^2,
+                "File too large (500 MB limit)")
   )
 
   tryCatch({
-    df <- read_csv(input$file1$datapath, col_types = cols(.default = col_number()))
-    log_debug("Read in data file: {msg}", msg = input$file1$datapath)
+    if (ext == "csv") {
+      # --- Detect delimiter from first line ---
+      first_line <- readLines(input$file1$datapath, n = 1)
+      delim <- if (grepl("\t", first_line)) "\t" else ","
+
+      df <- readr::read_delim(
+        input$file1$datapath,
+        delim = delim,
+        col_types = readr::cols(.default = readr::col_number())
+      )
+
+      log_debug("Read in CSV file: {msg}", msg = input$file1$datapath)
+      log_debug("Detected delimiter: '{delim}'", delim = ifelse(delim == "\t", "tab", delim))
+    } else  {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Unsupported file type",
+        text = "Only .csv files are supported.",
+        type = "error",
+        btn_labels = "Continue"
+      )
+      return(NULL)
+    }
+
     log_debug("Column names: {names}", names = names(df))
+
+    # --- Optionally coerce first and last columns to numeric (if numeric-like) ---
     continuous_columns <- c(1, ncol(df))
-    df[, continuous_columns] <- apply(df[, continuous_columns], 2, as.numeric)
+    df[continuous_columns] <- lapply(df[continuous_columns], function(x) suppressWarnings(as.numeric(x)))
+
     df
   }, error = function(e) {
     log_debug("Error reading data file: {msg}", msg = conditionMessage(e))
@@ -2914,49 +2942,75 @@ knowledge <- reactive({
   req(input$file2)
 
   shiny::validate(
-    shiny::need(tolower(tools::file_ext(input$file2$name)) %in% c("csv","xlsx"),
+    shiny::need(tolower(tools::file_ext(input$file2$name)) %in% c("csv", "xlsx"),
                 "Knowledge file must be .csv or .xlsx"),
-    shiny::need(file.size(input$file2$datapath) < 5*1024^2,
+    shiny::need(file.size(input$file2$datapath) < 5 * 1024^2,
                 "Knowledge file too large (5 MB limit)")
   )
 
   tryCatch({
     path2 <- input$file2$datapath
+    ext <- tolower(tools::file_ext(path2))
     log_debug("Read in knowledge file: {p}", p = path2)
 
-    ext <- tolower(tools::file_ext(path2))
-    knowledge_in <- switch(ext,
-      csv = read_csv(path2, col_names = TRUE),
-      xlsx = readxl::read_excel(path2, col_names = TRUE),
-      {
-        sendSweetAlert(...); return(NULL)
-      }
-    )
+    # --- Detect delimiter if CSV ---
+    if (ext == "csv") {
+      first_line <- readLines(path2, n = 1)
+      delim <- if (grepl("\t", first_line)) "\t" else ","
 
-    if (!all(colnames(knowledge_in) %in% c("level", "variable"))){
+      knowledge_in <- readr::read_delim(
+        path2,
+        delim = delim,
+        col_names = TRUE,
+        show_col_types = FALSE
+      )
+
+      log_debug("Detected delimiter: '{delim}'", delim = ifelse(delim == "\t", "tab", delim))
+    } else  {
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Unsupported file type",
+        text = "Only .csv files are supported.",
+        type = "error",
+        btn_labels = "Continue"
+      )
+      return(NULL)
+    }
+
+    # --- Column validation and auto-fix ---
+    if (!all(colnames(knowledge_in) %in% c("level", "variable"))) {
       sendSweetAlert(
         session = shiny::getDefaultReactiveDomain(),
         title = "Warning: knowledge file not formatted properly",
         text = "Attempting to fix header and assign columns.
-        Please fix knowledge file formatting to ensure proper functionality.",
+                Please fix knowledge file formatting to ensure proper functionality.",
         type = "warning",
         btn_labels = "Continue"
-      )    
+      )
     }
-    fixed <- fix_knowledge(knowledge_in)  
+
+    fixed <- fix_knowledge(knowledge_in)
 
     shiny::validate(
-      shiny::need(all(c("level","variable") %in% names(fixed)),
+      shiny::need(all(c("level", "variable") %in% names(fixed)),
                   "Knowledge file must have ‘level’ and ‘variable’ columns")
     )
 
     if (is.character(fixed)) {
-      sendSweetAlert(...); return(NULL)
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "Upload Failed",
+        text = "An error occurred while fixing the knowledge file.",
+        type = "error",
+        btn_labels = "Continue"
+      )
+      return(NULL)
     }
 
     log_debug("Knowledge file names: {msg}", msg = fixed$variable)
     log_debug("Knowledge file levels: {lvl}", lvl = fixed$level)
     file_check(TRUE)
+
     fixed
   }, error = function(e) {
     log_debug("Error in knowledge(): {msg}", msg = conditionMessage(e))
