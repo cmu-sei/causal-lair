@@ -2630,6 +2630,16 @@ uiOutput("log_table")
 ```{r backend-compute}
 #| context: server
 
+### file input text --------------------------------------
+output$file1_txt <- renderUI({
+  req(input$file1)
+  HTML(paste0("<i>Found ", nrow(df()), " instances of ", ncol(df()), " variables</i>"))
+})
+
+output$file2_txt <- renderUI({
+  req(input$file2)
+  HTML(paste0("<i>Found ", nrow(knowledge()), " variables with ", length(unique(knowledge()$level)), " knowledge tiers</i>"))
+})
 ### log table stuff -----------------------------------
   log_root   <- "/workspace/logs"          # parent dir of run-stamped folders
   display_tz <- "America/Pittsburgh"          # adjust if desired
@@ -3887,7 +3897,17 @@ output$ui_threshold_y <- renderUI({
 output$ui_file1 <- renderUI({
   if (!locked()) {
     # Show fileInput before locking
-    fileInput("file1", "Upload data file:", accept = ".csv")
+  div(
+    style = "
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 15px;
+      background-color: #f9f9f9;
+      margin-bottom: 10px;
+    ",
+    fileInput("file1", "Upload data file:", accept = ".csv"),
+    uiOutput("file1_txt")  # this will show your italic text
+  )
   } else {
     # Show locked/greyed label after "Conduct Experiment"
     fname <- if (!is.null(input$file1)) input$file1$name else "<none selected>"
@@ -3902,7 +3922,17 @@ output$ui_file1 <- renderUI({
 output$ui_file2 <- renderUI({
   req(input$file1)  # Only show after file1 is uploaded
   if (!locked()) {
-    fileInput("file2", "Upload knowledge file:", accept = ".csv")
+    div(
+      style = "
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      padding: 15px;
+      background-color: #f9f9f9;
+      margin-bottom: 10px;
+      ",
+      fileInput("file2", "Upload knowledge file:", accept = ".csv"),
+      uiOutput("file2_txt")  # this will show your italic text
+    )
   } else {
     fname <- if (!is.null(input$file2)) input$file2$name else "<none selected>"
     tags$div(
