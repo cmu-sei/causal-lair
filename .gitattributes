@@ -2,16 +2,21 @@
 * text=auto eol=lf
 
 # Optional: Explicit rules for common file types
-*.sh     text eol=lf
-*.rs     text eol=lf
-*.toml   text eol=lf
-*.qmd    text eol=lf
-*.md     text eol=lf
-*.yml    text eol=lf
-*.json   text eol=lf
+*.R      text eol=lf
+*.css    text eol=lf
 *.csv    text eol=lf
 *.html   text eol=lf
-*.css    text eol=lf
+*.jpg    binary
 *.js     text eol=lf
-*.R      text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.pdf    binary
+*.png    binary
+*.qmd    text eol=lf
+*.rs     text eol=lf
+*.sh     text eol=lf
 *.tex    text eol=lf
+*.toml   text eol=lf
+*.txt    text eol=lf
+*.xlsx   binary
+*.yml    text eol=lf

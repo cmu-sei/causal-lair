@@ -3809,8 +3809,10 @@ make_threshold_ui <- function(id, vec, n_bins = 30) {
 output$ui_threshold_x <- renderUI({
   req(vars_sel()$x)
   vec <- df()[[vars_sel()$x]]
-  val <- if (locked() && !is.null(input$tv_threshold))
-           isolate(tv_val()) else default_split(vec)
+  val <- {
+          prev <- isolate(input$tv_threshold)
+          if (!is.null(prev) && !is.na(prev)) prev else default_split(vec)
+          }
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
