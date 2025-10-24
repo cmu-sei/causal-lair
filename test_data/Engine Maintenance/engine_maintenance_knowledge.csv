@@ -1,0 +1,9 @@
+﻿level,variable
+0,MissionCritical
+0,Environment
+1,FrequencyOfDeployments
+1,Heatwave
+2,Coolant
+3,EngineHealth
+4,Inspection
+5,EngineFailure
