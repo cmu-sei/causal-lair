@@ -145,6 +145,10 @@ before using the tool.
         they aren’t independent entities. Where one may be a deterministic
         function of the other, including both introduces circular
         dependencies and destroys the causal meaning of the relationships. 
+
+    -   Double check that all variables you expect to be numeric are still
+        numeric in the final .csv file and have not been altered by excel
+        (e.g., excel didn't convert your value to something like 1E-17)
     
 ### Installation Instructions
 
