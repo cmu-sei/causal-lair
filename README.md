@@ -244,6 +244,12 @@ algorithms to build your causal graph and display it in the main panel
 your data and/or knowledge file might help, you can select new files and
 re-build your graph until satisfied.
 
+_Note: if your graph contains any undirected edges (i.e., those without
+arrowheads) it will likely crash the AIR Tool. To resolve this issue:
+please adjust your knowledge file by placing affected nodes on different
+knowledge tiers. Doing so will effectively 'choose' a direction, thus
+resolving the issue of undirected edges._
+
 **Step 2: Identifying potential sources of bias**
 
 ![Chart Description automatically
