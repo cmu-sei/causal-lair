@@ -1079,7 +1079,6 @@ processResults <- function(settings,
   log_debug("Settings: {line}",
     line = paste(c(settings, AIRHome, tv_dir, ov_dir, tv_threshold, ov_threshold, model_yn,  model_ate), collapse = ", "))
 
-
   treatment <- as.character(settings$varName)
   outcome <- as.character(df_vars[df_vars$var == "OV", ]$val)
   confounders <- as.character(unique(Zvars$Z))
@@ -2828,7 +2827,9 @@ model_in <- reactive({
   ## use the original filename to preserve the extension
   ext <- tolower(tools::file_ext(input$model_in$name))
 
-  log_debug("Upload received: {b} → {c}  (ext = {d})", b=input$model_in$name, c=input$model_in$datapath, d=ext)
+  log_debug("Upload received: {b} → {c}  (ext = {d})",
+            b=input$model_in$name, c=input$model_in$datapath, d=ext)
+
   tryCatch({
 
     mdl <- switch(
@@ -2871,17 +2872,48 @@ model_in <- reactive({
       stop(sprintf("Unsupported model file extension: %s", ext))
     )
 
+    log_debug("Loaded object of class {cls}: {nm}  (ext = {ext})",
+              cls = paste(class(mdl), collapse = ", "),
+              nm  = input$model_in$name,
+              ext = ext)
+
     ## ------- basic sanity-check: does it respond to predict() ? ----------
-    shiny::validate(
-                    shiny::need(is.function(tryCatch(predict(mdl, head(mtcars)), error = function(e) NULL)),
-           "Loaded object does not appear to have a usable predict() method."),
-                    shiny::need(is.numeric(tryCatch(predict(mdl, head(df() %||% mtcars)),
-                               error = function(e) NA)),
-           "Model must return numeric predictions.")
-    )
+    safe_data <- tryCatch({
+      d <- head(df() %||% data.frame())
+      if (!is.null(input$yvar) && input$yvar %in% names(d)) {
+        d <- d[setdiff(names(d), input$yvar)]
+      }
+      d
+    }, error = function(e) data.frame())
+
+    log_debug("Testing predict() using columns: {cols}",
+              cols = paste(names(safe_data), collapse = ", "))
+
+    pred_test <- tryCatch(predict(mdl, safe_data), error = function(e) e)
+
+    if (inherits(pred_test, "error")) {
+      log_debug("Predict() failed during validation: {msg}",
+                msg = conditionMessage(pred_test))
+      shiny::validate(
+        shiny::need(FALSE,
+                    "Loaded model could not generate predictions with the uploaded data.")
+      )
+    } else if (is.factor(pred_test) || is.character(pred_test)) {
+      log_debug("Predict() returned factor/character output; treating as classification model.")
+    } else if (!is.numeric(pred_test)) {
+      log_debug("Predict() returned unsupported output of class: {cls}",
+                cls = paste(class(pred_test), collapse = ", "))
+      shiny::validate(
+        shiny::need(FALSE,
+                "Model predictions must be numeric, factor, or character.")
+      )
+    } else {
+      log_debug("Predict() validation succeeded; numeric output confirmed.")
+    }
 
     log_debug("Model loaded ({a}): {b}", a=ext, b=input$model_in$name)
     mdl
+
   }, error = function(e) {
     log_debug("Error reading model: {a}", a=conditionMessage(e))
     NULL
