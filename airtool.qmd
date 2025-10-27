@@ -1267,12 +1267,30 @@ processResults <- function(settings,
         return(invisible(NULL))            # bail out, nothing downstream to do
       }
   
-      pred_m0 <- predict(model_in, xtest_0)
-      pred_m1 <- predict(model_in, xtest_1)
-      m_ate   <- mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
-    } else if (model_yn == "ATE") {
-      m_ate <- model_ate
-    }
+      # pred_m0 <- predict(model_in, xtest_0)
+      # pred_m1 <- predict(model_in, xtest_1)
+      # m_ate   <- mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
+      pred_m0 <- tryCatch(predict(model_in, xtest_0, type = "prob"), error = function(e) NULL)
+      pred_m1 <- tryCatch(predict(model_in, xtest_1, type = "prob"), error = function(e) NULL)
+
+      if (!is.null(pred_m0) && is.matrix(pred_m0)) {
+        # use the probability of the "positive" class (last column by convention)
+        pred_m0 <- pred_m0[, ncol(pred_m0)]
+        pred_m1 <- pred_m1[, ncol(pred_m1)]
+        log_debug("Using predicted probabilities from classification model.")
+      } else {
+        # fallback for regression-style models
+        pred_m0 <- predict(model_in, xtest_0)
+        pred_m1 <- predict(model_in, xtest_1)
+      }
+      m_ate <- mean(as.numeric(pred_m1)) - mean(as.numeric(pred_m0))
+      log_debug("ATE: mean(pred_m1)={p1}, mean(pred_m0)={p0}, diff={d}",
+            p1 = mean(as.numeric(pred_m1)),
+            p0 = mean(as.numeric(pred_m0)),
+            d  = m_ate)
+      } else if (model_yn == "ATE") {
+        m_ate <- model_ate
+      }
 
     ate_df <- data.frame(
       algorithm = "Existing Model",
