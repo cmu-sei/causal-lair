@@ -334,9 +334,9 @@ This page requires no input from the user but will display the entire
 health report. It contains the following contents:
 
 -   (Left) -- the user can find their causal graph with both x and y
-    variables highlighted in yellow. If additional nodes are found to be
+    variables highlighted in blues. If additional nodes are found to be
     contributing significant bias to the results, they will also be
-    highlighted in red (their inclusion will be discussed later in the
+    highlighted in red or yellow (their inclusion will be discussed later in the
     "Interpreting your results" section).
 
 -   (Top Right) -- the user can find a 'ribbon plot' that displays a

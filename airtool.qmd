@@ -1891,7 +1891,14 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
                                   inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
                                   TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
   )
-  return(result_text)
+
+  results_text <- paste0("The estimated treatment effects and causal metrics are based on the variables
+  included in the provided causal graph. If relevant nodes are omitted, the results may bot reflect
+  true causal relationships. When nodes are excluded, the system assumes conditional independence
+  between missing variables and those in the model, which may not hold place in practice. Interpret
+  estimates accordingly, and consider revising the causal graph if key relationships are unknown or
+  uncertain. ", result_text)
+  return(results_text)
 }
 
 # ──────────────────────────────────────────────────────────────
