@@ -811,6 +811,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     #   involved.
     log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges.")
     flag_no_adjustment_set_found = TRUE    
+    return(list("error","edges"))
   } else if (length(union_of_two_lists)==1) {
     # Only one adjustment set is found altogether, and so we set the corresponding flag:
     flag_only_one_adjustment_set_found = TRUE
@@ -2039,7 +2040,7 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   dot <- paste(lines, collapse = "\n")
   dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Updated Causal graph\"]", 
            dot, perl = TRUE)
- return(dot)
+  return(dot)
 }
 
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
@@ -2830,6 +2831,7 @@ graph_complete <- reactiveVal(FALSE)
 graph_ready <- reactive({
   vars_ready()
 })
+graph_updated <- reactiveVal(FALSE)
 file_check <- reactiveVal(FALSE)
 
 
@@ -3394,44 +3396,54 @@ shiny::validate({
 
   if (identical(adj_list, NULL)){
     sendSweetAlert(
-      session,
+      session = shiny::getDefaultReactiveDomain(),
       title = "Graph Error",
       text = "Adjustment sets could not be calculated because the graph estimated from your data does not satisfy the statistical conditions needed for this step.",
       type = "error"
       )
-    break()
+    
+  } else if (adj_list[1] == "error"){
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "No adjustment set found",
+      text  = "Revise knowledge (see AIR job aid) so search result has no undirected edges.",
+      type  = "error"
+    )
+    
+  } else {
+    Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
+    Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
+  
+    Zvars_loc <- rbind(
+      data.frame(name = vars_sel()$x, grp = "Z1", Z = Z1),
+      data.frame(name = vars_sel()$x, grp = "Z2", Z = Z2)
+    )
+  
+    rv$Zvars <- Zvars_loc
+    assign("Zvars", Zvars_loc, envir = .GlobalEnv)
+  
+    ## ---------- 2. logging (unchanged) ---------------------------------------
+    log_debug("Graph Updated.")
+    log_debug("Selected X variable: {msg}", msg = vars_sel()$x)
+    log_debug("Selected Y variable: {msg}", msg = vars_sel()$y)
+    if (!is.null(input$tv_threshold))
+      log_debug("Selected X threshold: {msg}", msg = tv_val())
+    if (!is.null(input$ov_threshold))
+      log_debug("Selected Y threshold: {msg}", msg = ov_val())
+  
+    ## ---------- 3. re-render the graph ---------------------------------------
+    output$blankGraph <- renderGrViz({
+      req(graph_complete())
+      #input$xvar; input$yvar
+      #highlighted_graph()
+      grViz(get_updated_graph(
+                              rv$dot,
+                              vars_sel()$x,
+                              vars_sel()$y,
+                              rv$Zvars))    # highlighted_graph() already reacts                       
+    })
+    graph_updated(TRUE)    
   }
-  Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
-  Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
-
-  Zvars_loc <- rbind(
-    data.frame(name = vars_sel()$x, grp = "Z1", Z = Z1),
-    data.frame(name = vars_sel()$x, grp = "Z2", Z = Z2)
-  )
-
-  rv$Zvars <- Zvars_loc
-  assign("Zvars", Zvars_loc, envir = .GlobalEnv)
-
-  ## ---------- 2. logging (unchanged) ---------------------------------------
-  log_debug("Graph Updated.")
-  log_debug("Selected X variable: {msg}", msg = vars_sel()$x)
-  log_debug("Selected Y variable: {msg}", msg = vars_sel()$y)
-  if (!is.null(input$tv_threshold))
-    log_debug("Selected X threshold: {msg}", msg = tv_val())
-  if (!is.null(input$ov_threshold))
-    log_debug("Selected Y threshold: {msg}", msg = ov_val())
-
-  ## ---------- 3. re-render the graph ---------------------------------------
-  output$blankGraph <- renderGrViz({
-    req(graph_complete())
-    #input$xvar; input$yvar
-    #highlighted_graph()
-    grViz(get_updated_graph(
-                            rv$dot,
-                            vars_sel()$x,
-                            vars_sel()$y,
-                            rv$Zvars))    # highlighted_graph() already reacts                       
-  })
 })
 
 observeEvent(input$goButton, {
@@ -4070,6 +4082,7 @@ output$histogram_y <- renderPlot({
 
 output$ui_model_exist <- renderUI({
   req(graph_ready())
+  req(graph_updated())
   selected_val <- if (locked()) isolate(input$model_exist) else "ATE"
   tagList(
     selectInput(
@@ -4155,6 +4168,7 @@ output$ui_model_upload = renderUI({
 
 output$step4 = renderUI({
   req(graph_ready())
+  req(graph_updated())
   tagList(
     hr(),
     h5("Step 3- About the model:")
@@ -4227,6 +4241,7 @@ output$ui_figurecaption = renderUI({
 
 output$ui_goButton = renderUI({
   req(graph_ready())
+  req(graph_updated())
   tagList(
     actionBttn(
       inputId = "goButton",

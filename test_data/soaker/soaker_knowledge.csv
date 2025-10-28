@@ -1,26 +1,28 @@
-level, variable
-0, product_code
-1, loading
-2, attribute_0
-2, attribute_1
-2, attribute_2
-2, attribute_3
-3, measurement_0
-3, measurement_1
-3, measurement_2
-3, measurement_3
-3, measurement_4
-3, measurement_5
-3, measurement_6
-3, measurement_7
-3, measurement_8
-3, measurement_9
-3, measurement_10
-3, measurement_11
-3, measurement_12
-3, measurement_13
-3, measurement_14
-3, measurement_15
-3, measurement_16
-3, measurement_17
-4, failure
+level,variable
+0,product_code
+1,loading
+2,attribute_0
+2,attribute_1
+2,attribute_2
+2,attribute_3
+3,measurement_0
+3,measurement_1
+3,measurement_2
+3,measurement_3
+3,measurement_4
+3,measurement_5
+3,measurement_6
+3,measurement_7
+3,measurement_8
+3,measurement_9
+3,measurement_10
+3,measurement_11
+3,measurement_12
+3,measurement_13
+3,measurement_14
+3,measurement_15
+3,measurement_16
+3,measurement_17
+4,failure
+
+
