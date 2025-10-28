@@ -2979,7 +2979,8 @@ df <- reactive({
         title = "Unsupported file type",
         text = "Only .csv files are supported.",
         type = "error",
-        btn_labels = "Continue"
+        btn_labels = "Continue",
+        closeOnClickOutside = FALSE
       )
       return(NULL)
     }
@@ -3031,7 +3032,8 @@ knowledge <- reactive({
         title = "Unsupported file type",
         text = "Only .csv files are supported.",
         type = "error",
-        btn_labels = "Continue"
+        btn_labels = "Continue",
+        closeOnClickOutside = FALSE
       )
       return(NULL)
     }
@@ -3044,7 +3046,8 @@ knowledge <- reactive({
         text = "Attempting to fix header and assign columns.
                 Please fix knowledge file formatting to ensure proper functionality.",
         type = "warning",
-        btn_labels = "Continue"
+        btn_labels = "Continue",
+        closeOnClickOutside = FALSE
       )
     }
 
@@ -3061,7 +3064,8 @@ knowledge <- reactive({
         title = "Upload Failed",
         text = "An error occurred while fixing the knowledge file.",
         type = "error",
-        btn_labels = "Continue"
+        btn_labels = "Continue",
+        closeOnClickOutside = FALSE
       )
       return(NULL)
     }
@@ -3078,7 +3082,8 @@ knowledge <- reactive({
       title = "Upload Failed",
       text = "An error occurred while reading the knowledge file.",
       type = "error",
-      btn_labels = "Continue"
+      btn_labels = "Continue",
+      closeOnClickOutside = FALSE
     )
     NULL
   })
@@ -3260,8 +3265,8 @@ run_calc <- function() {
           type = "warning",
           btn_labels = "Continue",
           btn_colors = "#3085d6",
-          closeOnClickOutside = TRUE,
-          showCloseButton = FALSE
+          closeOnClickOutside = FALSE,
+          showCloseButton = TRUE
         )
         stop("Tetrad returned an empty graph string")
       }
@@ -3399,7 +3404,8 @@ shiny::validate({
       session = shiny::getDefaultReactiveDomain(),
       title = "Graph Error",
       text = "Adjustment sets could not be calculated because the graph estimated from your data does not satisfy the statistical conditions needed for this step.",
-      type = "error"
+      type = "error",
+      closeOnClickOutside = FALSE
       )
     
   } else if (adj_list[1] == "error"){
@@ -3411,7 +3417,8 @@ shiny::validate({
               levels in the knowledge file to ensure directionality is enforced.
               Automatic resolution of this issue is not yet supported by the AIR
               Tool, so users must make the choice manually.",
-      type  = "error"
+      type  = "error",
+      closeOnClickOutside = FALSE
     )
     
   } else {
