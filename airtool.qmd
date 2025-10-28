@@ -3406,7 +3406,11 @@ shiny::validate({
     sendSweetAlert(
       session = shiny::getDefaultReactiveDomain(),
       title = "No adjustment set found",
-      text  = "Revise knowledge (see AIR job aid) so search result has no undirected edges.",
+      text  = "Revise knowledge file so that search result has no undirected edges.
+              Ensure that nodes on either side of an undirected edge are on separate
+              levels in the knowledge file to ensure directionality is enforced.
+              Automatic resolution of this issue is not yet supported by the AIR
+              Tool, so users must make the choice manually.",
       type  = "error"
     )
     
