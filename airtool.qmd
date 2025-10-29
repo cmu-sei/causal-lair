@@ -1703,44 +1703,33 @@ get_ribbon_plot <- function(AIRHome) {
   nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
   nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
 
-  # safety check:
-  #  * use new column names after the earlier rename()
-  if (nrow(dfr) == 0 || all(is.na(dfr$z1_ATE)) ) {
+  if (nrow(dfr) == 0 || all(is.na(dfr$z1_ATE))) {
     return(tags$div("No causal estimates available for this run."))
   }
-  
-  # derive *safe* CI bounds up-front (no ±Inf, no NA explosions)
+
+  # --- CI bounds ---
   lo_all     <- nz_min(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
   hi_all     <- nz_max(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
   lo_overlap <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
   hi_overlap <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
+  overlap_exists <- hi_overlap >= lo_overlap && !any(is.na(c(lo_overlap, hi_overlap)))
 
-  # If *everything* is NA we can’t draw a ribbon — tell the user and bail out
-  if (is.na(lo_all) || is.na(hi_all)) {
-    shiny::showNotification(
-      "Both confidence intervals are NA – nothing to plot.",
-      type = "warning", duration = 8
+  # --- Handle no overlap ---
+  if (!overlap_exists) {
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title = "Consensus could not be reached for this scenario",
+      text = "The causal estimates derived from your two models (Z₁ and Z₂) do not agree within their confidence ranges.
+This suggests that the data or model assumptions may not support a consistent causal interpretation for this configuration.",
+      type = "error",
+      btn_labels = "Continue",
+      closeOnClickOutside = FALSE
     )
-    return(tags$div("No confidence intervals to plot."))
   }
 
-  # code for generating ribbon plot
-  if (any(dfr$flag >= dfr$z1_ATE_LCI & dfr$flag <= dfr$z1_ATE_UCI, na.rm = TRUE)) {
-    inZ1 <- TRUE
-  } else { inZ1 <- FALSE }
-  if (any(dfr$flag >= dfr$z2_ATE_LCI & dfr$flag <= dfr$z2_ATE_UCI, na.rm = TRUE)) {
-    inZ2 <- TRUE
-  } else { inZ2 <- FALSE }
-  
-  summary_color <- case_when(
-    inZ1 == TRUE & inZ2 == TRUE ~ "#378855",
-    inZ1 == TRUE | inZ2 == TRUE ~ "#FCB514",
-    inZ1 == FALSE & inZ2 == FALSE ~ "#C00000"
-  )
-  
-  dfr0 <- dfr[1,]
-  p <- ggplot(dfr0, aes(x = Treatment)) +
+  dfr0 <- dfr[1, ]
 
+  p <- ggplot(dfr0, aes(x = Treatment)) +
     ## background
     geom_linerange(aes(ymin = -1.05, ymax = 1.05),
                    lwd = 6,
@@ -1749,54 +1738,18 @@ get_ribbon_plot <- function(AIRHome) {
                    stat = "unique",
                    lineend = "round",
                    position = position_nudge(x = 0)) +
-    ## Annotations for '-' and '+'
-    # annotate("text", x = 0.92, y = -1.07, label = "-", hjust = 0, vjust = 0, size = 5, color = "white") +
-    # annotate("text", x = 0.88, y = 1.025,  label = "+", hjust = 0, vjust = 0, size = 5, color = "white") +
-    annotate("text", 
-             x = 1,  # Position on the left side within the black background
-             y = -1,  # Center vertically within the black background
-             label = "-", 
-             hjust = 2.5, 
-             vjust = 0.25, 
-             size = 5, 
-             color = "white") +
-    annotate("text", 
-             x = 1,  # Position on the right side within the black background (adjust based on x-axis limits)
-             y = 1,  # Center vertically within the black background
-             label = "+", 
-             hjust = -0.35, 
-             vjust = 0.4, 
-             size = 5, 
-             color = "white") +## algorithm estimates
-    ## Z1
-    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
-                   lwd = 3.5,
-                   col = "#9394A2",
-                   alpha = 1,
-                   stat = "unique",
-                   lineend = "round",
-                   position = position_nudge(x = 1)) +
-    geom_point(aes(y = z1_ATE),
-               col = "white",
-               cex = 3,
-               pch = 1,
-               stroke = 1.25,
-               position = position_nudge(x = 1)) +
-    ## Z2
-    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
-                   lwd = 3.5,
-                   col = "#D4C7C7",
-                   alpha = 1,
-                   stat = "unique",
-                   lineend = "round",
-                   position = position_nudge(x = 0.5)) +
-    geom_point(aes(y = z2_ATE),
-               col = "white",
-               cex = 3,
-               pch = 1,
-               stroke = 1.25,
-               position = position_nudge(x = 0.5)) +
-    # creating the ribbon
+
+    ## +/- annotations
+    annotate("text",
+             x = 1, y = -1,
+             label = "-", hjust = 2.5, vjust = 0.25,
+             size = 5, color = "white") +
+    annotate("text",
+             x = 1, y = 1,
+             label = "+", hjust = -0.35, vjust = 0.4,
+             size = 5, color = "white") +
+
+    ## red baseline ribbon (everything outside CIs)
     geom_linerange(aes(ymin = -1, ymax = 1),
                    lwd = 3.5,
                    col = "#C00000",
@@ -1805,29 +1758,52 @@ get_ribbon_plot <- function(AIRHome) {
                    lineend = "round",
                    position = position_nudge(x = 0)) +
 
-                   # full (yellow) ribbon: min of all LCIs → max of all UCIs
-                   geom_linerange(aes(ymin = lo_all, ymax = hi_all),
-
+    ## yellow ribbons for Z1 and Z2 CIs
+    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
                    lwd = 3.5,
                    col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
-                   #lineend = "round",
                    position = position_nudge(x = 0)) +
-
-                   # overlap (green) ribbon: max LCI → min UCI
-                   geom_linerange(aes(ymin = lo_overlap, ymax = hi_overlap),
-
+    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
                    lwd = 3.5,
-                   col = "#378855",
+                   col = "#FCB514",
                    alpha = 1,
                    stat = "unique",
-                   #lineend = "round",
                    position = position_nudge(x = 0)) +
+
+    ## conditional green overlap (only if overlap exists)
+    {if (overlap_exists)
+      geom_linerange(aes(ymin = lo_overlap, ymax = hi_overlap),
+                     lwd = 3.5,
+                     col = "#378855",
+                     alpha = 1,
+                     stat = "unique",
+                     position = position_nudge(x = 0))
+    } +
+
+    ## Z1 range + mean
+    geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
+                   lwd = 3.5, col = "#9394A2",
+                   alpha = 1, stat = "unique",
+                   lineend = "round", position = position_nudge(x = 1)) +
+    geom_point(aes(y = z1_ATE),
+               col = "white", cex = 3, pch = 1, stroke = 1.25,
+               position = position_nudge(x = 1)) +
+
+    ## Z2 range + mean
+    geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
+                   lwd = 3.5, col = "#D4C7C7",
+                   alpha = 1, stat = "unique",
+                   lineend = "round", position = position_nudge(x = 0.5)) +
+    geom_point(aes(y = z2_ATE),
+               col = "white", cex = 3, pch = 1, stroke = 1.25,
+               position = position_nudge(x = 0.5)) +
+
+    ## horizontal zero line
     geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
-    ## algorithm estimates
-    labs(y = "",
-         x = "") +
+
+    ## arrow for algorithm flag
     geom_segment(data = dfr,
                  aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
                  arrow = arrow(length = unit(0.5, "cm")),
@@ -1835,27 +1811,22 @@ get_ribbon_plot <- function(AIRHome) {
                  color = "#0F9ED5") +
     geom_point(data = dfr,
                aes(x = 2.5, y = flag, shape = algorithm),
-               size = 3,  # Adjust size as needed
-               color = "#0F9ED5") +  # Or any desired color
+               size = 3, color = "#0F9ED5") +
+
     coord_flip(clip = "off") +
-    ## Adjust Scales to Remove Expansion and Compress Vertically
     scale_x_discrete(expand = c(0, 0)) +
-    scale_y_continuous(expand = c(0, 0),
-                       limits = c(-1.1, 1.1)) +  # Tighten y-axis limits
-    ## Theme Adjustments to Minimize White Space
+    scale_y_continuous(expand = c(0, 0), limits = c(-1.1, 1.1)) +
+    labs(y = "", x = "") +
     theme_void(base_size = 10) +
-    # theme(
-    #   # panel.spacing = unit(0, "pt"),
-    #   panel.background = element_rect(fill = "transparent", color = NA),
-    #   plot.background = element_rect(fill = "transparent", color = NA),
-    #   aspect.ratio = 0.2
-    # )
     theme(
       panel.background = element_rect(fill = "transparent", color = NA),
-      plot.background = element_rect(fill = "transparent", color = NA),
-      aspect.ratio = 0.2
+      plot.background  = element_rect(fill = "transparent", color = NA),
+      aspect.ratio     = 0.2
     )
+
+  p
 }
+
 
 get_figure_caption <- function(AIRHome, df_vars) {
   caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to 'no significant effect.")
@@ -1869,92 +1840,128 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
     return(tags$em("No results – model fitting failed. Check the log."))
   }
 
-  interpretation <- "What we can learn from these results"
+  # helper functions
+  nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+  nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
+
+  # --- check for confidence interval overlap ---
+  lo_overlap <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
+  hi_overlap <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
+  overlap_exists <- hi_overlap >= lo_overlap && !any(is.na(c(lo_overlap, hi_overlap)))
+
+  # --- special message when no overlap exists ---
+  if (!overlap_exists) {
+    return(paste0(
+      "<strong>Consensus Could Not Be Reached for This Scenario.</strong> ",
+      "The two causal analyses do not agree within their confidence ranges. ",
+      "This suggests that the data or model assumptions may not support a stable or consistent causal conclusion for this scenario."
+    ))
+  }
+
+  # --- continue with standard interpretation logic ---
   dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
   dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
   
   if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
       (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
-    interpretation <- "Inconsistent Causal ATE suggests not enough information to properly train a model."
+    interpretation <- "The causal estimates appear inconsistent, suggesting there may not be enough information to train a reliable model."
   } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
-    interpretation <- "Predictions match Causally-Derived ATE estimates. Your model is healthy!"
+    interpretation <- "Your model’s predictions align with the causal estimates. This indicates healthy model performance."
   } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
-    interpretation <- "Predictions do not match Causally-Derived ATE estimates. Your model is to be considered unreliable. Consider looking into why this might be."
+    interpretation <- "Your model’s predictions diverge from the causal estimates, suggesting potential reliability issues. Investigate possible causes for this mismatch."
   } else {
-    interpretation <- "Predictions are mixed with respect to Causally-Derived ATE estimates. Use with caution and consider looking into why."
+    interpretation <- "Your model partly agrees with the causal estimates but shows inconsistencies. Interpret these results with caution."
   }
-  
-  
-  if (any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]), na.rm = TRUE)) {
-    inZ1 <- TRUE
-  } else { inZ1 <- FALSE }
-  if (any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), na.rm = TRUE)) {
-    inZ2 <- TRUE
-  } else { inZ2 <- FALSE }
+
+  # --- determine relative bias direction ---
+  inZ1 <- any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]), na.rm = TRUE)
+  inZ2 <- any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), na.rm = TRUE)
   
   maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
   minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
-  flagdir <- case_when(maxflag < 0 ~ "a negative",
-                       minflag > 0 ~ "a positive",
-                       TRUE ~ "no")
-  effect_estimation <- case_when(any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
-                                 any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
-                                 TRUE ~ "correctly estimating")
-  effect_percent <- case_when(effect_estimation == "underestimating" ~ paste0(" by ", round(abs(maxflag) - abs(mean(dfr$flag)), 2)*100, "-",round(abs(minflag) - abs(mean(dfr$flag)), 2)*100, "%"),
-                              effect_estimation == "overestimating" ~ paste0(" by ", round(abs(mean(dfr$flag)) - abs(minflag), 2)*100, "-",round(abs(mean(dfr$flag)) - abs(maxflag), 2)*100, "%"),
-                              TRUE ~ "")
-  effect_fortune <- case_when(inZ1 & inZ2 ~ "Fortunately",
-                              TRUE ~ "Unfortunately")
   
-  result_text <- paste0("Your model is ",
-                        effect_estimation, 
-                        " the effect that ", 
-                        df_vars[1,][[2]], 
-                        " is having on ", 
-                        df_vars[2,][[2]], 
-                        effect_percent, 
-                        ". AIR predicts that ", 
-                        df_vars[1,][[2]], 
-                        " should be having ", 
-                        flagdir, 
-                        " effect on ", 
-                        df_vars[2,][[2]],
-                        ". As ", 
-                        df_vars[1,][[2]], 
-                        " changes, the outcome of ", 
-                        df_vars[2,][[2]], 
-                        " is ", 
-                        case_when(flagdir == "a negative" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% less likely to occur. "),
-                                  flagdir == "a positive" ~ paste0("between ", round(min(abs(minflag),abs(maxflag)), 2)*100,"-",round(max(abs(minflag),abs(maxflag)), 2)*100,"% more likely to occur. "),
-                                  TRUE ~ "unlikely to change. "),
-                        effect_fortune,
-                        ", your model is producing ",
-                        case_when(inZ1 & inZ2 ~ "un",
-                                  inZ1 | inZ2 ~ "potentially-",
-                                  TRUE ~ ""),
-                        "biased results, suggesting ",
-                        case_when(effect_estimation == "underestimating" ~ "a decreased ",
-                                  effect_estimation == "overestimating" ~ "an increased ",
-                                  TRUE ~ "an appropriate "),
-                        "change in likelihood of ", 
-                        df_vars[2,][[2]],
-                        " as ",
-                        df_vars[1,][[2]],
-                        " changes. ",
-                        case_when(inZ1 & inZ2 ~ "No bias is detected at this time.",
-                                  inZ1 == TRUE & inZ2 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[2], collapse = ", "), " (see graph)."),
-                                  inZ2 == TRUE & inZ1 == FALSE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " (see graph)."),
-                                  TRUE ~ paste0("Bias is likely being introduced into the training process at variable(s): ", paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")," (see graph)."))
+  flagdir <- case_when(
+    maxflag < 0 ~ "a negative",
+    minflag > 0 ~ "a positive",
+    TRUE ~ "no"
   )
 
-  results_text <- paste0("The estimated treatment effects and causal metrics are based on the variables
-  included in the provided causal graph. If relevant nodes are omitted, the results may bot reflect
-  true causal relationships. When nodes are excluded, the system assumes conditional independence
-  between missing variables and those in the model, which may not hold place in practice. Interpret
-  estimates accordingly, and consider revising the causal graph if key relationships are unknown or
-  uncertain. ", result_text)
+  effect_estimation <- case_when(
+    any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
+    any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+    TRUE ~ "accurately estimating"
+  )
+
+  effect_percent <- case_when(
+    effect_estimation == "underestimating" ~ paste0(" by roughly ",
+      round(abs(maxflag) - abs(mean(dfr$flag)), 2) * 100, "–",
+      round(abs(minflag) - abs(mean(dfr$flag)), 2) * 100, "%"),
+    effect_estimation == "overestimating" ~ paste0(" by roughly ",
+      round(abs(mean(dfr$flag)) - abs(minflag), 2) * 100, "–",
+      round(abs(mean(dfr$flag)) - abs(maxflag), 2) * 100, "%"),
+    TRUE ~ ""
+  )
+
+  effect_fortune <- if (inZ1 & inZ2) "Fortunately" else "Unfortunately"
+
+  # --- simplified, human-readable result narrative ---
+  result_text <- paste0(
+    "Your model appears to be ", effect_estimation, " the effect that ",
+    df_vars[1, ][[2]], " has on ", df_vars[2, ][[2]], effect_percent, ". ",
+    "Based on the causal analysis, ", df_vars[1, ][[2]], 
+    " is expected to have ", flagdir, " effect on ", df_vars[2, ][[2]], ". ",
+    "As ", df_vars[1, ][[2]], " changes, the likelihood of ", df_vars[2, ][[2]], " ",
+    case_when(
+      flagdir == "a negative" ~ paste0("decreases by about ",
+        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
+        round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
+      flagdir == "a positive" ~ paste0("increases by about ",
+        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
+        round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
+      TRUE ~ "is unlikely to change."
+    ), " ",
+    effect_fortune, ", your model is producing ",
+    case_when(
+      inZ1 & inZ2 ~ "unbiased",
+      inZ1 | inZ2 ~ "partially biased",
+      TRUE ~ "biased"
+    ), " results, suggesting ",
+    case_when(
+      effect_estimation == "underestimating" ~ "a smaller than expected ",
+      effect_estimation == "overestimating" ~ "a larger than expected ",
+      TRUE ~ "an appropriate "
+    ),
+    "change in ", df_vars[2, ][[2]], " as ", df_vars[1, ][[2]], " varies. ",
+    case_when(
+      inZ1 & inZ2 ~ "No evidence of bias is detected at this time.",
+      inZ1 == TRUE & inZ2 == FALSE ~ paste0(
+        "Bias may be introduced through variable(s): ",
+        paste0(Zvars$Z[2], collapse = ", "), " (see causal graph)."
+      ),
+      inZ2 == TRUE & inZ1 == FALSE ~ paste0(
+        "Bias may be introduced through variable(s): ",
+        paste0(Zvars$Z[1], collapse = ", "), " (see causal graph)."
+      ),
+      TRUE ~ paste0(
+        "Bias may be introduced through variable(s): ",
+        paste0(Zvars$Z[1], collapse = ", "), " and/or ",
+        paste0(Zvars$Z[2], collapse = ", "), " (see causal graph)."
+      )
+    )
+  )
+
+  # --- improved, cleaner disclaimer text ---
+  results_text <- paste0(
+    "These treatment effect estimates are based on the variables included in your causal graph. ",
+    "If important factors are missing, the results may not represent true causal relationships. ",
+    "The system assumes that any missing variables are independent of those included, which may not hold in practice. ",
+    "Interpret these estimates carefully and consider updating your graph if key relationships are uncertain. ",
+    result_text
+  )
+
   return(results_text)
 }
+
 
 # ──────────────────────────────────────────────────────────────
 #  Histogram for the experimental (X) variable
@@ -3695,7 +3702,7 @@ shiny::validate({
         log_debug("Fatal error during ATE estimation: {msg}", msg = conditionMessage(e))
       })
 
-      calc_complete(TRUE)
+     calc_complete(TRUE)
 
       output$blankGraph <- renderGrViz({
         dot <- get_final_graph(rv$dot, vars_sel()$x, vars_sel()$y, rv$Zvars)
