@@ -39,7 +39,7 @@ function display_rg_piped_fzf --description="Pipe ripgrep output into fzf"
 end
 
 function export --description="Emulates the bash export command"
-    if [ $argv ] 
+    if [ $argv ]
         set var (echo $argv | cut -f1 -d=)
         set val (echo $argv | cut -f2 -d=)
         set -gx $var $val
@@ -53,7 +53,7 @@ function fd_fzf --description="Pipe fd output to fzf"
     if test -z "$fd_exists"
         return
     end
-    if test (is_valid_dir $argv) = "true"
+    if test (is_valid_dir $argv) = true
         set go_to (fd -t d . $argv | fzf)
         if test -z "$go_to"
             return
@@ -97,15 +97,21 @@ function fish_greeting --description="Displays the Fish logo and some other init
     set_color normal
     echo 'The license for this container can be found in /root/license.txt'
     echo "Welcome to the AIR Shell." | figlet
-    
+    echo ""
+    echo "if tool does not load automatically, run:"
+    echo "   ./scripts/run_quarto.sh"
+    echo ""
+
     # Array of funny phrases
-    set phrases "Coding with AIR: It’s a breeze!" "Let’s give your ideas some lift!" "Where bugs get blown away in a gust of genius!" "Catch your second wind of inspiration!" "Time to take off into coding greatness!" "We keep your code light as AIR!" "AIR: Where bugs don’t stand a draft!" "Blow the cobwebs off your old code!" "Let your code soar to new heights!" "Why walk when you can fly through development?" "Take a deep breath and exhale excellence!" "We make coding look plane and simple!" "No hot AIR, just cool code!" "Put your bugs on standby—this is a no-fly zone!" "AIR: Propelling your projects forward!" "Don’t just code, hover above the competition!" "Our code? It’s on cloud nine!" "When the winds of bugs blow, we stay grounded!" "Ready to take off into bug-free skies?" "AIR: Because your code deserves a tailwind!" "No updrafts, only upgrades!" "Make your code so good it takes your breath away!" "AIR: Where every bug goes down the vent!" "AIR: The gust of genius your code needs!" "With AIR, your code is never up in the air!"
+    set phrases "Coding with AIR: It’s a breeze!" "Let’s give your ideas some lift!" "Where bugs get blown away in a gust of genius!" "Catch your second wind of inspiration!" "Time to take off into coding greatness!" "We keep your code light as AIR!" "AIR: Where bugs don’t stand a draft!" "Blow the cobwebs off your old code!" "Let your code soar to new heights!" "Why walk when you can fly through development?" "Take a deep breath and exhale excellence!" "We make coding look plane and simple!" "No hot AIR, just cool code!" "Put your bugs on standby—this is a no-fly zone!" "AIR: Propelling your projects forward!" "Don’t just code, hover above the competition!" "Our code? It’s on cloud nine!" "When the winds of bugs blow, we stay grounded!" "Ready to take off into bug-free skies?" "AIR: Because your code deserves a tailwind!" "No updrafts, only upgrades!" "Make your code so good it takes your breath away!" "AIR: Where every bug goes down the vent!" "AIR: The gust of genius your code needs!" "With AIR, your code is never up in the air!" "Calling in AIR support!" "Giving your data the AIR time is deserves" "I can assure you that there is absolutely no AIR shortage whatsoever"
+
 
     # Select a random funny phrase
     set random_index (random 1 (count $phrases))
     set phrase $phrases[$random_index]
 
     echo $phrase
+
 end
 
 function hash_get --description="Return a hash of the input string."
@@ -116,7 +122,7 @@ function json_validate --description="Validate provided json against provided sc
     # jsonschema only operates via file input, which is inconvenient.
     if ! isatty stdin
         set -l tmp_file get_random_filename
-        read > /tmp/$tmp_file; or exit -1
+        read >/tmp/$tmp_file; or exit -1
         jsonschema -F "{error.message}" -i /tmp/$tmp_file $argv[1]
         rm -f /tmp/$tmp_file
     else
@@ -155,7 +161,7 @@ function nvim_goto_line --description="ripgrep to find contents, search results 
     set selection (display_rg_piped_fzf)
     if test -z "$selection"
         return
-    else 
+    else
         set filename (echo $selection | awk -F ':' '{print $1}')
         set line (echo $selection | awk -F ':' '{print $2}')
         nvim +$line $filename
@@ -163,37 +169,37 @@ function nvim_goto_line --description="ripgrep to find contents, search results 
 end
 
 function is_valid_dir --description="Checks if the argument passed is a valid directory path"
-    if test (is_valid_argument $argv) = "true" -a (path_exists $argv) = "true" -a (is_a_directory $argv) = "true"
-        echo "true"
+    if test (is_valid_argument $argv) = true -a (path_exists $argv) = true -a (is_a_directory $argv) = true
+        echo true
     else
-        echo "false"
+        echo false
     end
 end
 
 function is_valid_argument --description="Checks if it has been passed a valid argument"
     # Is there a valid argument?
     if test (count $argv) -gt 0
-        echo "true"
+        echo true
     else
-        echo "false"
+        echo false
     end
 end
 
 function path_exists --description="Checks if the path exists"
     # Does it exist?
     if test -e $argv[1]
-        echo "true"
+        echo true
     else
-        echo "false"
+        echo false
     end
 end
 
 function is_a_directory --description="Checks if the path is a directory"
     # Is it a directory?
     if test -d $argv[1]
-        echo "true"
+        echo true
     else
-        echo "false"
+        echo false
     end
 end
 
@@ -223,7 +229,7 @@ function code_server --description="Starts code-server in the background."
     # Create a log file for the code-server instance.
     set -l log_file /tmp/log/code-server-$(date +%s).log
     # Run code-server in the background and redirect output to the log file.
-    code-server --auth none --bind-addr 0.0.0.0:8080 --disable-telemetry --disable-update-check --disable-workspace-trust /workspace > $log_file 2>&1 &
+    code-server --auth none --bind-addr 0.0.0.0:8080 --disable-telemetry --disable-update-check --disable-workspace-trust /workspace >$log_file 2>&1 &
     echo "code-server started on port 8080. Log file: $log_file"
 end
 
@@ -267,8 +273,8 @@ set -gx theme_nerd_fonts yes
 
 # Gruvbox Color Palette
 set -l foreground ebdbb2
-set -l selection 282828 
-set -l comment 928374 
+set -l selection 282828
+set -l comment 928374
 set -l red fb4934
 set -l orange fe8019
 set -l yellow fabd2f
@@ -366,26 +372,26 @@ end
 
 # add completions generated by NixOS to $fish_complete_path
 begin
-  # joins with null byte to accommodate all characters in paths, then
-  # respectively gets all paths before (exclusive) / after (inclusive) the
-  # first one including "generated_completions",
+    # joins with null byte to accommodate all characters in paths, then
+    # respectively gets all paths before (exclusive) / after (inclusive) the
+    # first one including "generated_completions",
 
-  # splits by null byte, and then removes all empty lines produced by using
-  # 'string'
-  set -l prev (string join0 $fish_complete_path | \
+    # splits by null byte, and then removes all empty lines produced by using
+    # 'string'
+    set -l prev (string join0 $fish_complete_path | \
       string match --regex "^.*?(?=\x00[^\x00]*generated_completions.*)" | \
       string split0 | string match -er ".")
 
-  set -l post (string join0 $fish_complete_path | \
+    set -l post (string join0 $fish_complete_path | \
       string match --regex "[^\x00]*generated_completions.*" | \
       string split0 | string match -er ".")
 
-  set fish_complete_path $prev "/etc/fish/generated_completions" $post
+    set fish_complete_path $prev /etc/fish/generated_completions $post
 end
 # prevent fish from generating completions on first run
 if not test -d $__fish_user_data_dir/generated_completions
-  $COREUTILS/bin/mkdir \
-      $__fish_user_data_dir/generated_completions
+    $COREUTILS/bin/mkdir \
+        $__fish_user_data_dir/generated_completions
 end
 
 if test -n "$__NIXOS_SET_ENVIRONMENT_DONE"
