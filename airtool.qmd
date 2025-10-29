@@ -2702,7 +2702,15 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
     -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
     -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
 
-# Logs {layout-ncol=1}
+# Logs {layout-ncol=2}
+:::: {.columns}
+::: {.column width=100%}
+```{r running-log, echo=FALSE}
+uiOutput("live_log_tail")
+```
+:::
+
+
 ::: {.column width=100%}
 ```{r logs-dl, echo=FALSE}
 uiOutput("selected_run")
@@ -2712,10 +2720,43 @@ uiOutput("log_table")
 
 ```
 :::
+::::
 
 ```{r backend-compute}
 #| context: server
 
+# Live log tail tracker ----
+output$live_log_tail <- renderUI({
+  # retrieve the active logfile from the global environment
+  logfile <- tryCatch({
+    get(".airtool_log_file", envir = .GlobalEnv)
+  }, error = function(e) NULL)
+
+  invalidateLater(1000)  # refresh every second
+
+  if (is.null(logfile) || !file.exists(logfile)) {
+    return(pre("No active log file found."))
+  }
+
+  # read the most recent lines
+  log_tail <- tryCatch({
+    tail(readLines(logfile, warn = FALSE), n = 10)
+  }, error = function(e) "<unable to read log file>")
+
+  # optionally highlight keywords
+  msg <- paste(log_tail, collapse = "\n")
+  msg <- gsub("ERROR", "<b style='color:red'>ERROR</b>", msg)
+  msg <- gsub("WARN",  "<b style='color:orange'>WARN</b>", msg)
+  msg <- gsub("INFO",  "<b style='color:green'>INFO</b>", msg)
+
+  # Display as preformatted HTML
+  HTML(paste0(
+    "<div style='font-family:monospace; font-size:0.9em; background-color:#ddd; color:#111; ",
+    "padding:10px; border-radius:6px; height:400px; overflow-y:auto;'>",
+    "<strong>Live log:</strong><br><br>",
+    "<pre style='white-space:pre-wrap;'>", msg, "</pre></div>"
+  ))
+})
 ### file input text --------------------------------------
 output$file1_txt <- renderUI({
   req(input$file1)
