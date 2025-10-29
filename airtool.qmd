@@ -132,7 +132,62 @@ document.addEventListener("DOMContentLoaded", () => {
 #| echo: false
 #| include: false
 
-options(shiny.maxRequestSize = Inf) # 200 * 1024^2) # sets max upload to 200MB
+# Choose conservative defaults for general users
+DEFAULT_XMS_GB <- 1   # 1g initial heap
+DEFAULT_XMX_GB <- 4   # 4g max heap
+
+# Hard safety ceilings so some lunatic doesn't ask for 5000g on a ThinkPad
+MAX_ALLOWED_GB <- 256  # tune this to whatever you consider sane
+
+read_heap_gb <- function(var, default_val) {
+  raw <- Sys.getenv(var, unset = "")
+  if (!nzchar(raw)) {
+    return(default_val)
+  }
+
+  # numeric conversion with basic sanity checks
+  val <- suppressWarnings(as.numeric(raw))
+
+  if (is.na(val)) {
+    return(default_val)
+  }
+
+  # must be positive
+  if (val <= 0) {
+    return(default_val)
+  }
+
+  # cap outrageous requests
+  val <- min(val, MAX_ALLOWED_GB)
+
+  # floor to integer GB (JVM wants clean "16g", not "16.2g")
+  floor(val)
+}
+
+calc_heap_settings <- function() {
+  xms_gb <- read_heap_gb("AIR_JAVA_XMS_GB", DEFAULT_XMS_GB)
+  xmx_gb <- read_heap_gb("AIR_JAVA_XMX_GB", DEFAULT_XMX_GB)
+
+  # ensure logical ordering: Xms <= Xmx
+  if (xms_gb > xmx_gb) {
+    # if user fat-fingered it, bump max up to match min
+    xmx_gb <- xms_gb
+  }
+
+  list(
+    xms_gb = xms_gb,
+    xmx_gb = xmx_gb
+  )
+}
+
+heap <- calc_heap_settings()
+
+params <- c(
+  paste0("-Xms", heap$xms_gb, "g"),
+  paste0("-Xmx", heap$xmx_gb, "g")
+)
+
+options(shiny.maxRequestSize = Inf)
 
 suppressMessages({
   library(AIPW)
@@ -303,8 +358,7 @@ assign("safe_jcall", safe_jcall, envir = .GlobalEnv)
 
 # ----- Initialize Java and Check Version -----
 initialize_java <- function() {
-  
-  .jinit()
+  .jinit(parameters = params)
   .jaddClassPath(get_tetrad_path())
 
   java_version <- safe_jcall("java/lang/System", "S", "getProperty", "java.version")
@@ -2845,7 +2899,7 @@ model_in <- reactive({
   shiny::validate(
     shiny::need(tools::file_ext(input$model_in$name) %in% c("rds","rda","RData"),
                 "Model must be .rds or .rda/.RData"),
-    shiny::need(file.size(input$model_in$datapath) < 100*1024^2,
+    shiny::need(file.size(input$model_in$datapath) < 1000*1024^2,
                 "Model file too large (100 MB limit)")
   )
 
@@ -2955,7 +3009,7 @@ df <- reactive({
   shiny::validate(
     shiny::need(ext %in% c("csv", "xlsx"),
                 "Data file must be .csv or .xlsx"),
-    shiny::need(file.size(input$file1$datapath) < 500 * 1024^2,
+    shiny::need(file.size(input$file1$datapath) < 5000 * 1024^2,
                 "File too large (500 MB limit)")
   )
 
