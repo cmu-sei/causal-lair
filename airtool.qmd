@@ -4066,6 +4066,11 @@ output$ui_threshold_x <- renderUI({
           prev <- isolate(input$tv_threshold)
           if (!is.null(prev) && !is.na(prev)) prev else default_split(vec)
           }
+  dir_val <- {
+          prev <- isolate(input$tv_dir_in)
+          if (!is.null(prev) && !is.na(prev)) prev else TRUE
+          }
+ 
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
     tags$div(
@@ -4077,7 +4082,7 @@ output$ui_threshold_x <- renderUI({
     switchInput(
       inputId  = "tv_dir_in",
       label    = NULL,
-      value    = TRUE,
+      value    = dir_val,
       onLabel  = HTML("<span class='op-mono'>&ge;</span>"),
       offLabel = HTML("<span class='op-mono'>&le;</span>"),
       inline   = TRUE
