@@ -845,7 +845,23 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   union_of_two_lists = union(adj_sets_treatment, adj_sets_response)
   near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
   near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
-  
+  len_adj_sets_t <- 0
+  for (i in seq_along(adj_sets_treatment)) {
+       set <- adj_sets_treatment[[i]]
+      
+       if (length(set) != 0) {
+        len_adj_sets_t <- len_adj_sets_t + 1
+       }
+   }
+  len_adj_sets_r <- 0      
+  for (i in seq_along(adj_sets_response)) {
+       set <- adj_sets_response[[i]]
+      
+       if (length(set) != 0) {
+        len_adj_sets_r <- len_adj_sets_r + 1
+       }
+   }
+   
   log_debug("Total number of adjustment sets encountered (ignoring duplicates) = {msg}", msg = length(union_of_two_lists))
   log_debug("Size of Treatment - Response adjustment sets = {msg}", msg = length(near_treatment_not_near_response))
   log_debug("Size of Response - Treatment adjustment sets = {msg}", msg = length(near_response_not_near_treatment))
@@ -853,11 +869,12 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     union_of_two_lists <- NULL
     log_debug("MC_passing_cpdag_already_found = FALSE")
   } 
+  log_debug("Length of non-zero adjustment sets for treatment {set}", set = len_adj_sets_t)
+  log_debug("Length of non-zero adjustment sets for response {set}", set = len_adj_sets_r)
   
- 
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
-  if (length(union_of_two_lists) == 0) {
+  if (length(union_of_two_lists) == 0 | (len_adj_sets_t + len_adj_sets_r == 0)) {
     # Then no adjustment sets and we must be working with a cpdag (at least one undirected
     #   edge) rather than a DAG. (For a DAG, there's always an adjustment set--namely the
     #   set of parents of the treatment variable, which can be empty, but that's still
