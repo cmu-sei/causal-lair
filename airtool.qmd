@@ -2672,7 +2672,6 @@ TetradSearch <- setRefClass(
 ```{r shinyjs-init, context="ui", echo=FALSE}
 useShinyjs()
 ```
-
 # Analysis of Bias
 
 ##  {.sidebar}
@@ -2695,6 +2694,104 @@ uiOutput('ui_ate_upload')
 uiOutput('ui_goButton')
 br()
 uiOutput('ui_dl_btn')
+
+br()
+
+tagList(
+  # 1) Normal Shiny button lives in the sidebar
+  div(
+    id = "reload_slot",
+    actionButton(
+      "reload_btn", "↻ Reload",
+      onclick = "location.reload();",
+      class = "btn btn-light btn-sm",
+      style = "width:100%; color:#212529;"
+    )
+  ),
+
+  # 2–3) JS: switch between fixed-at-bottom (no scroll) and sticky (when scroll shows up)
+  tags$script(HTML("
+    (function () {
+      const slot = document.getElementById('reload_slot');
+      if (!slot) return;
+
+      // placeholder preserves original position for 'sticky' mode
+      const ph = document.createElement('span');
+      ph.id = 'reload_slot_ph';
+      slot.parentNode.insertBefore(ph, slot);
+
+      function getSidebar() {
+        // Quarto dashboard sidebar container
+        return document.querySelector('.quarto-dashboard-sidebar')
+            || document.querySelector('.sidebar')
+            || document.querySelector('[class*=sidebar]');
+      }
+
+      function getScrollEl(sidebar) {
+        // find the actual scrolling element inside the sidebar
+        const nodes = [sidebar, ...sidebar.querySelectorAll('*')];
+        for (const n of nodes) {
+          const cs = getComputedStyle(n);
+          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
+              n.scrollHeight > n.clientHeight + 1) return n;
+        }
+        return sidebar;
+      }
+
+      function placeFixed() {
+        const sb = getSidebar();
+        if (!sb) return;
+        const rect = sb.getBoundingClientRect();
+        // move slot to body so overflow clipping won't affect it
+        if (slot.parentNode !== document.body) document.body.appendChild(slot);
+        Object.assign(slot.style, {
+          position: 'fixed',
+          bottom: '12px',
+          left: (rect.left + 12) + 'px',
+          width: (rect.width - 24) + 'px',
+          zIndex: 10000,
+          background: 'transparent'
+        });
+      }
+
+      function placeSticky() {
+        // move slot back under the placeholder, full-width of sidebar content
+        if (slot.parentNode !== ph.parentNode) {
+          ph.parentNode.insertBefore(slot, ph.nextSibling);
+        }
+        Object.assign(slot.style, {
+          position: 'sticky',
+          bottom: '12px',
+          left: '',
+          width: '100%',
+          zIndex: 1,
+          background: 'transparent'
+        });
+      }
+
+      function refreshPlacement() {
+        const sb = getSidebar();
+        if (!sb) return;
+        const scroller = getScrollEl(sb);
+        const needsScroll = scroller.scrollHeight > scroller.clientHeight + 1;
+        if (needsScroll) placeSticky(); else placeFixed();
+      }
+
+      // run now and on likely changes
+      setTimeout(refreshPlacement, 0);
+      window.addEventListener('resize', refreshPlacement);
+      document.addEventListener('shiny:value', refreshPlacement);
+      document.addEventListener('shiny:outputinvalidated', refreshPlacement);
+
+      const sb = getSidebar();
+      if (sb) {
+        new MutationObserver(refreshPlacement)
+          .observe(sb, { childList: true, subtree: true });
+      }
+    })();
+  "))
+)
+
 ```
 
 ## Column {width = "40%"}
@@ -3325,6 +3422,10 @@ observeEvent(input$disconnect, {
   }, error = function(e) {
     log_debug("Error in disconnect observer: {msg}", msg =conditionMessage(e))
   })
+})
+
+observeEvent(input$reload_btn, {
+  session$reload()
 })
 
 # File input triggers reactive evaluation
