@@ -815,8 +815,12 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   log_debug("maximum number of adjustment sets = {p}", p = MAX_NUM_SETS)
   log_debug("maximum distance from target endpoint (TREATMENT or RESPONSE) = {p}", p = MAX_DISTANCE_FROM_POINT)
   log_debug("maximum path length = {p}", p = MAX_PATH_LENGTH)
-  
-  if (MC_passing_cpdag_already_found == TRUE) {
+
+  len_adj_sets_t <- 0
+  len_adj_sets_r <- 0        
+  union_of_two_lists <- NULL
+
+    #if (MC_passing_cpdag_already_found == TRUE) {
     log_debug("Searching for adjustment set(s) on the *** Treatment *** side:")
 
     # Z1
@@ -837,6 +841,11 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
                                                 MAX_PATH_LENGTH)
     
     ts$print_adjustment_sets(adj_sets_response)
+
+    log_debug("adj_sets_treatment type: {type_t}, length: {len_t}",
+          type_t = typeof(adj_sets_treatment), len_t = length(adj_sets_treatment))
+    log_debug("adj_sets_response type: {type_r}, length: {len_r}",
+          type_r = typeof(adj_sets_response), len_r = length(adj_sets_response))
   ## Initialize flag variables to indicate to AIR Step 3 that no/only one adjustment set is yet found
   flag_no_adjustment_set_found = FALSE
   flag_only_one_adjustment_set_found = FALSE
@@ -845,7 +854,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   union_of_two_lists = union(adj_sets_treatment, adj_sets_response)
   near_treatment_not_near_response = setdiff(adj_sets_treatment, adj_sets_response)
   near_response_not_near_treatment = setdiff(adj_sets_response, adj_sets_treatment)
-  len_adj_sets_t <- 0
+
   for (i in seq_along(adj_sets_treatment)) {
        set <- adj_sets_treatment[[i]]
       
@@ -853,7 +862,10 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
         len_adj_sets_t <- len_adj_sets_t + 1
        }
    }
-  len_adj_sets_r <- 0      
+   log_debug("Length of non-zero adjustment sets for treatment {set}", set = len_adj_sets_t)
+
+    
+
   for (i in seq_along(adj_sets_response)) {
        set <- adj_sets_response[[i]]
       
@@ -861,17 +873,25 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
         len_adj_sets_r <- len_adj_sets_r + 1
        }
    }
-   
+   log_debug("Length of non-zero adjustment sets for response {set}", set = len_adj_sets_r)  
+
+  
   log_debug("Total number of adjustment sets encountered (ignoring duplicates) = {msg}", msg = length(union_of_two_lists))
   log_debug("Size of Treatment - Response adjustment sets = {msg}", msg = length(near_treatment_not_near_response))
   log_debug("Size of Response - Treatment adjustment sets = {msg}", msg = length(near_response_not_near_treatment))
-   } else {
-    union_of_two_lists <- NULL
+
+
+   #} 
+   if (MC_passing_cpdag_already_found == FALSE) {
+    #union_of_two_lists <- NULL
     log_debug("MC_passing_cpdag_already_found = FALSE")
+    log_debug("*** WARNING: Markov Condition not satisfied for current graph! Proceed with caution. ***")
   } 
-  log_debug("Length of non-zero adjustment sets for treatment {set}", set = len_adj_sets_t)
-  log_debug("Length of non-zero adjustment sets for response {set}", set = len_adj_sets_r)
+ 
   
+  log_debug("union of two lists = {union}", union = paste(capture.output(str(union_of_two_lists)), collapse = "\n"))
+  log_debug("target adjustment sets: {tar}", tar = len_adj_sets_t)
+  log_debug("response adjustment sets: {res}", res = len_adj_sets_r)
   ## Now consider all cases where either set (or both sets) of adjustment sets is (are) empty.
   # if both empty, we need to set the corresponding flag:
   if (length(union_of_two_lists) == 0 | (len_adj_sets_t + len_adj_sets_r == 0)) {
@@ -880,7 +900,8 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     #   set of parents of the treatment variable, which can be empty, but that's still
     #   a valid adjustment set.) There are multiple solutions here, but get the end-user
     #   involved.
-    log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges.")
+    log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges")
+  
     flag_no_adjustment_set_found = TRUE    
     return(list("error","edges"))
   } else if (length(union_of_two_lists)==1) {
@@ -912,7 +933,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     }
   }
   
-  if (MC_passing_cpdag_already_found == TRUE) {
+  #if (MC_passing_cpdag_already_found == TRUE) {
    log_debug("Summary of results:")
    log_debug("First adjustment set to return: {msg}", msg = return_first_adj_set)
    log_debug("Second adjustment set to return: {msg}", msg = return_second_adj_set)
@@ -921,7 +942,7 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   
    ### return the two adjustment sets plus the two flags instead.
    return(list(return_first_adj_set, return_second_adj_set))
-  } else {return(NULL)}
+  #} else {return(NULL)}
 }
 
 scale_ <- function(x){
@@ -1969,12 +1990,11 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
 
   # --- improved, cleaner disclaimer text ---
   results_text <- paste0(
-    "These treatment effect estimates are based on the variables included in your causal graph. ",
+    result_text, "\n These treatment effect estimates are based on the variables included in your causal graph. ",
     "If important factors are missing, the results may not represent true causal relationships. ",
     "The system assumes that any missing variables are independent of those included, which may not hold in practice. ",
-    "Interpret these estimates carefully and consider updating your graph if key relationships are uncertain. ",
-    result_text
-  )
+    "Interpret these estimates carefully and consider updating your graph if key relationships are uncertain. "
+    )
 
   return(results_text)
 }
@@ -2757,7 +2777,7 @@ output$live_log_tail <- renderUI({
 
   # read the most recent lines
   log_tail <- tryCatch({
-    tail(readLines(logfile, warn = FALSE), n = 10)
+    tail(readLines(logfile, warn = FALSE), n = 25)
   }, error = function(e) "<unable to read log file>")
 
   # optionally highlight keywords
