@@ -3185,32 +3185,30 @@ model_in <- reactive({
 
 df <- reactive({
   req(input$file1)
-
   ext <- tolower(tools::file_ext(input$file1$name))
 
   shiny::validate(
-    shiny::need(ext %in% c("csv", "xlsx"),
-                "Data file must be .csv or .xlsx"),
-    shiny::need(file.size(input$file1$datapath) < 5000 * 1024^2,
-                "File too large (500 MB limit)")
+    shiny::need(ext %in% c("csv", "xlsx"), "Data file must be .csv or .xlsx"),
+    shiny::need(file.size(input$file1$datapath) < 5000 * 1024^2, "File too large (500 MB limit)")
   )
 
   tryCatch({
     if (ext == "csv") {
-      # --- Detect delimiter from first line ---
       first_line <- readLines(input$file1$datapath, n = 1)
       delim <- if (grepl("\t", first_line)) "\t" else ","
 
+      # ← IMPORTANT: don’t force .default = col_number()
       df <- readr::read_delim(
         input$file1$datapath,
         delim = delim,
-        col_types = readr::cols(.default = readr::col_number())
+        guess_max = 10000,         # improve type guessing on wide/long files
+        show_col_types = FALSE
       )
 
       log_debug("Read in CSV file: {msg}", msg = input$file1$datapath)
       log_debug("Detected delimiter: '{delim}'", delim = ifelse(delim == "\t", "tab", delim))
-    } else  {
-      sendSweetAlert(
+    } else {
+      shinyalert::sendSweetAlert(
         session = shiny::getDefaultReactiveDomain(),
         title = "Unsupported file type",
         text = "Only .csv files are supported.",
@@ -3223,9 +3221,8 @@ df <- reactive({
 
     log_debug("Column names: {names}", names = names(df))
 
-    # --- Optionally coerce first and last columns to numeric (if numeric-like) ---
-    continuous_columns <- c(1, ncol(df))
-    df[continuous_columns] <- lapply(df[continuous_columns], function(x) suppressWarnings(as.numeric(x)))
+    # If you truly need to coerce only specific columns, do it TARGETED, not blanket:
+    # df[c(1, ncol(df))] <- lapply(df[c(1, ncol(df))], readr::parse_number)
 
     df
   }, error = function(e) {
@@ -3233,6 +3230,105 @@ df <- reactive({
     NULL
   })
 })
+
+high_corr_pairs <- reactive({
+  d <- df()
+  req(!is.null(d))
+
+  # keep only truly numeric columns
+  num <- d[, vapply(d, is.numeric, logical(1)), drop = FALSE]
+
+  # need at least 2 numeric columns
+  if (ncol(num) < 2) {
+    return(data.frame(var1 = character(), var2 = character(), r = numeric()))
+  }
+
+  # drop constant / all-NA columns (cor() would return NA)
+  keep <- vapply(num, function(x) {
+    x2 <- stats::na.omit(x)
+    length(unique(x2)) > 1
+  }, logical(1))
+  num <- num[, keep, drop = FALSE]
+  if (ncol(num) < 2) {
+    return(data.frame(var1 = character(), var2 = character(), r = numeric()))
+  }
+
+  # compute correlation
+  cm <- stats::cor(num, use = "pairwise.complete.obs", method = "pearson")
+  # keep only upper triangle (no dupes, no diagonal)
+  cm[lower.tri(cm, diag = TRUE)] <- NA
+
+  thr <- 0.9  # make this an input if you want
+  idx <- which(abs(cm) >= thr, arr.ind = TRUE)
+  if (!nrow(idx)) {
+    return(data.frame(var1 = character(), var2 = character(), r = numeric()))
+  }
+
+  data.frame(
+    var1 = rownames(cm)[idx[, 1]],
+    var2 = colnames(cm)[idx[, 2]],
+    r    = cm[idx],
+    row.names = NULL,
+    stringsAsFactors = FALSE
+  )[order(-abs(cm[idx])), ]
+})
+
+observe({
+  pairs <- high_corr_pairs()
+  req(nrow(pairs) > 0)
+
+  # Nice HTML list for readability inside SweetAlert
+  items <- paste0(
+    "<ul>",
+    paste(sprintf("<li><b>%s</b> &amp; <b>%s</b> (r = %.2f)</li>", pairs$var1, pairs$var2, pairs$r),
+          collapse = ""),
+    "</ul>"
+  )
+
+if (nrow(pairs) > 0) {
+  # Sort and format nicely
+  pairs <- pairs[order(-abs(pairs$r)), ]
+  
+  fmt_num <- function(x) formatC(x, format = "f", digits = 4)
+  esc      <- function(x) htmltools::htmlEscape(x)
+  
+  items <- paste0(
+    "<ul style='text-align:left;
+                list-style-type:disc;
+                font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 
+                             \"Liberation Mono\", \"Courier New\", monospace;
+                line-height:1.3;'>",
+    paste(
+      sprintf(
+        "<li><span style='display:inline-block; width:4.5em; text-align:right;'><b>%s</b></span>  [%s -- %s]</li>",
+        fmt_num(pairs$r),
+        esc(pairs$var1),
+        esc(pairs$var2)
+      ),
+      collapse = ""
+    ),
+    "</ul>"
+  )
+  shinyWidgets::sendSweetAlert(
+    session = shiny::getDefaultReactiveDomain(),
+    title   = "⚠️ High Correlation Detected",
+    text    = htmltools::HTML(paste0(
+      "<p><b>Some variables in your dataset are strongly correlated (|r| ≥ 0.90).</b></p>",
+      "<p>This may indicate redundant information and can affect downstream analyses such as regression or causal estimation.</p>",
+      "<hr style='margin:8px 0;'>",
+      "<p><b>Highly correlated pairs:</b></p>",
+      items
+    )),
+    type = "warning",
+    btn_labels = "OK",
+    html = TRUE
+  )
+}
+
+
+
+})
+
 
 knowledge <- reactive({
   req(input$file2)
