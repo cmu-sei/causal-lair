@@ -1399,6 +1399,8 @@ processResults <- function(settings,
             d  = m_ate)
       } else if (model_yn == "ATE") {
         m_ate <- model_ate
+      } else if (model_yn == "null"){
+        m_ate <- 0
       }
 
     ate_df <- data.frame(
@@ -1857,16 +1859,6 @@ This suggests that the data or model assumptions may not support a consistent ca
     ## horizontal zero line
     geom_segment(aes(x = 0.6, xend = 1.35, y = 0, yend = 0), lwd = 1.2) +
 
-    ## arrow for algorithm flag
-    geom_segment(data = dfr,
-                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
-                 arrow = arrow(length = unit(0.5, "cm")),
-                 lwd = 1.2,
-                 color = "#0F9ED5") +
-    geom_point(data = dfr,
-               aes(x = 2.5, y = flag, shape = algorithm),
-               size = 3, color = "#0F9ED5") +
-
     coord_flip(clip = "off") +
     scale_x_discrete(expand = c(0, 0)) +
     scale_y_continuous(expand = c(0, 0), limits = c(-1.1, 1.1)) +
@@ -1877,8 +1869,21 @@ This suggests that the data or model assumptions may not support a consistent ca
       plot.background  = element_rect(fill = "transparent", color = NA),
       aspect.ratio     = 0.2
     )
+  if (rv$model_yn != "null") {
+     p +
+      ## arrow for algorithm flag
+    geom_segment(data = dfr,
+                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
+                 arrow = arrow(length = unit(0.5, "cm")),
+                 lwd = 1.2,
+                 color = "#0F9ED5") +
+    geom_point(data = dfr,
+               aes(x = 2.5, y = flag, shape = algorithm),
+               size = 3, color = "#0F9ED5")
+  } else {
+    p
+  }
 
-  p
 }
 
 
@@ -1964,7 +1969,8 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
     df_vars[1, ][[2]], " has on ", df_vars[2, ][[2]], effect_percent, ". ",
     "Based on the causal analysis, ", df_vars[1, ][[2]], 
     " is expected to have ", flagdir, " effect on ", df_vars[2, ][[2]], ". ",
-    "As ", df_vars[1, ][[2]], " changes, the likelihood of ", df_vars[2, ][[2]], " ",
+    "As ", df_vars[1, ][[2]], " changes from baseline to experimental values,
+    the likelihood of ", df_vars[2, ][[2]], " ",
     case_when(
       flagdir == "a negative" ~ paste0("decreases by about ",
         round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
@@ -4464,7 +4470,7 @@ output$histogram_y <- renderPlot({
 output$ui_model_exist <- renderUI({
   req(graph_ready())
   req(graph_updated())
-  selected_val <- if (locked()) isolate(input$model_exist) else "ATE"
+  selected_val <- if (locked()) isolate(input$model_exist) else "null"
   tagList(
     selectInput(
       inputId  = "model_exist",
@@ -4472,7 +4478,8 @@ output$ui_model_exist <- renderUI({
       choices  = c(
         "Yes: I can upload it"      = "Yes",
         "Yes: I can provide an ATE" = "ATE",
-        "No: Do it all for me"      = "No"
+        "No: Do it all for me"      = "No",
+        "No: Just show me the effect" = "null"
       ),
       selected = selected_val,
       width    = "100%"
