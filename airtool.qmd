@@ -820,6 +820,14 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
   len_adj_sets_r <- 0        
   union_of_two_lists <- NULL
 
+  count_undirected_from_dot <- function(dot_text) {
+    lines <- strsplit(dot_text, "\n")[[1]]
+    undirected <- grep("arrowtail=none[^]]*arrowhead=none", lines, value = TRUE)
+    length(undirected)
+  }
+  undirected_edges <- count_undirected_from_dot(rv$dot)
+  log_debug("Number of undirected edges found: {ue}", ue = undirected_edges)
+
     #if (MC_passing_cpdag_already_found == TRUE) {
     log_debug("Searching for adjustment set(s) on the *** Treatment *** side:")
 
@@ -900,10 +908,18 @@ AIR_getAdjSets <- function(ts, tv, ov, MC_passing_cpdag_already_found, best_cpda
     #   set of parents of the treatment variable, which can be empty, but that's still
     #   a valid adjustment set.) There are multiple solutions here, but get the end-user
     #   involved.
-    log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges")
+    if (undirected_edges == 0){
+      log_debug("No adjustment set found. The structure of this data is not amenable to causal inference as no adjustment sets can be found.")
   
-    flag_no_adjustment_set_found = TRUE    
-    return(list("error","edges"))
+      flag_no_adjustment_set_found = TRUE    
+      return(list("error","structure"))
+    } else if (undirected_edges > 0){
+      log_debug("No adjustment set found. Revise knowledge (see AIR job aid) so search result has no undirected edges")
+  
+      flag_no_adjustment_set_found = TRUE    
+      return(list("error","edges"))
+    }
+
   } else if (length(union_of_two_lists)==1) {
     # Only one adjustment set is found altogether, and so we set the corresponding flag:
     flag_only_one_adjustment_set_found = TRUE
@@ -2599,7 +2615,7 @@ TetradSearch <- setRefClass(
         mc = mc
       ))
     },
-    
+
     # Converts the given R data frame to a (possibly mixed) Tetrad DataSet.
     #
     # @param df The R data frame to translate. Continuous columns should be of type 'numeric' and the
@@ -3745,18 +3761,31 @@ shiny::validate({
       )
     
   } else if (adj_list[1] == "error"){
-    sendSweetAlert(
-      session = shiny::getDefaultReactiveDomain(),
-      title = "No adjustment set found",
-      text  = "Revise knowledge file so that search result has no undirected edges.
-              Ensure that nodes on either side of an undirected edge are on separate
-              levels in the knowledge file to ensure directionality is enforced.
-              Automatic resolution of this issue is not yet supported by the AIR
-              Tool, so users must make the choice manually.",
-      type  = "error",
-      closeOnClickOutside = FALSE
-    )
-    
+    if (adj_list[2] == "edges"){
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "No adjustment set found",
+        text  = "Undirected edges detected in graph. Adjustment sets may or may not be missing
+                due to undirected edges. If undirected edges exist near your variables of interest,
+                consider revising knowledge file so that search result has no undirected edges
+                and try again. Ensure that nodes on either side of an undirected edge are on
+                separate levels in the knowledge file to ensure directionality is enforced.
+                If this does not resolve the issue, there may simply be no valid adjustment
+                sets (in this case, the undirected edges are likely a red herring).
+                Automatic resolution of this issue is not yet supported by the AIR
+                Tool, so users must resolve this issue manually.",
+        type  = "error",
+        closeOnClickOutside = FALSE
+      )
+    } else if (adj_list[2] == "structure"){
+      sendSweetAlert(
+        session = shiny::getDefaultReactiveDomain(),
+        title = "No adjustment set found",
+        text  = "The structure of this data is not amenable to causal inference as no adjustment sets can be found.",
+        type  = "error",
+        closeOnClickOutside = FALSE
+      )
+    }
   } else {
     Z1 <- strsplit(gsub("[{}']", "", toString(adj_list[[1]])), ", ")[[1]]
     Z2 <- strsplit(gsub("[{}']", "", toString(adj_list[[2]])), ", ")[[1]]
