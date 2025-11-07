@@ -2571,13 +2571,13 @@ TetradSearch <- setRefClass(
       
       dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
-      test_ <- safe_jcall(.self$mc_test, "Ledu/cmu/tetrad/search/IndependenceTest;",
+      test_ <- safe_jcall(.self$mc_test, "Ledu/cmu/tetrad/search/test/IndependenceTest;",
                       "getTest", dataModel, .self$params)
       
       mc <- .jnew("edu.cmu.tetrad.search.MarkovCheck", graph, test_, condition_set_type_)
       
       # Configure it
-      safe_jcall(mc, "V", "setPercentResample", as.double(percent_resample))
+      safe_jcall(mc, "V", "setFractionResample", as.double(percent_resample))
       safe_jcall(mc, "V", "setFindSmallestSubset", find_smallest_subset)
       safe_jcall(mc, "V", "setParallelized", parallelized)
       
