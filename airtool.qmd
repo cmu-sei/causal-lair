@@ -1985,7 +1985,7 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
       inZ1 & inZ2 ~ "unbiased",
       inZ1 | inZ2 ~ "partially biased",
       TRUE ~ "biased"
-    ), " results, suggesting ",
+    ), " results. Your model's effect is: ",rv$model_ate,". Overall, this suggests your seeing ",
     case_when(
       effect_estimation == "underestimating" ~ "a smaller than expected ",
       effect_estimation == "overestimating" ~ "a larger than expected ",
@@ -2004,8 +2004,11 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
       ),
       TRUE ~ paste0(
         "Bias may be introduced through variable(s): ",
-        paste0(Zvars$Z[1], collapse = ", "), " and/or ",
-        paste0(Zvars$Z[2], collapse = ", "), " (see causal graph)."
+          case_when(
+            identical(Zvars$Z[1], Zvars$Z[2]) ~ Zvars$Z[1],
+            TRUE ~ paste0(paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")) 
+          ),
+          " (see causal graph)."
       )
     )
   )
