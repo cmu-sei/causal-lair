@@ -2857,7 +2857,9 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
     -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
     -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
     -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
-
+    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the first identified adjustment set in your data. 
+    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the second identified adjustment set in your data. 
+ 
 # Logs {layout-ncol=2}
 :::: {.columns}
 ::: {.column width=100%}
