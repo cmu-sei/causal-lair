@@ -400,6 +400,7 @@ graph_to_dot <- function(graph) {
 
 # make it visible to Reference-class methods & parallel workers
 assign("graph_to_dot", graph_to_dot, envir = .GlobalEnv)
+
 ```
 
 ```{r session-setup}
@@ -664,8 +665,155 @@ paint_nodes <- function(dot, nodes, col) {
 AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
   headers_string <- "PD\tfrac_ind\tfrac_dep\tunif\t \tBIC\t \t#edges\tn_tests_ind\tn_tests_dep"
   log_debug(headers_string)
-  
 
+
+r_df_to_tetrad <- function(df) {
+  require(rJava)
+
+  log_debug("r_df_to_tetrad(): START")
+
+  n_rows <- nrow(df)
+  n_cols <- ncol(df)
+  log_debug("Rows: {r}, Cols: {c}", r = n_rows, c = n_cols)
+
+  # ------------------ VARS LIST ------------------
+  log_debug("Constructing vars ArrayList...")
+  vars <- .jnew("java.util.ArrayList")
+  log_debug("vars class = {cls}", cls = .jclass(vars))
+
+  log_debug("Adding ContinuousVariables...")
+  for (name in names(df)) {
+    log_debug("  Creating variable for column '{nm}'", nm = name)
+    v <- .jnew("edu.cmu.tetrad.data.ContinuousVariable", as.character(name))
+    log_debug("   OK: created; class={cls}", cls = .jclass(v))
+
+    vars$add(v)
+    log_debug("   OK: added to list")
+  }
+
+  log_debug("Casting vars → java.util.List...")
+  vars_list <- .jcast(vars, "java.util.List")
+  log_debug("vars_list class = {cls}", cls = .jclass(vars_list))
+
+  # ------------------ DATA BOX ------------------
+  log_debug("Constructing DoubleDataBox...")
+  dbox <- .jnew(
+    "edu.cmu.tetrad.data.DoubleDataBox",
+    as.integer(n_rows),
+    as.integer(n_cols)
+  )
+  log_debug("dbox class = {cls}", cls = .jclass(dbox))
+
+  log_debug("Setting DoubleDataBox values...")
+  for (j in seq_len(n_cols)) {
+    col <- as.numeric(df[[j]])
+    log_debug("  Column {j}: length={len}", j = j, len = length(col))
+
+    for (i in seq_len(n_rows)) {
+      # Create a java.lang.Double
+      dbl <- .jnew("java.lang.Double", col[i])
+      dbox$set(
+        as.integer(i - 1L),
+        as.integer(j - 1L),
+        dbl
+      )
+    }
+  }
+  log_debug("Finished populating DoubleDataBox.")
+
+  log_debug("Casting dbox → DataBox...")
+  dbox_cast <- .jcast(dbox, "edu.cmu.tetrad.data.DataBox")
+  log_debug("dbox_cast class = {cls}", cls = .jclass(dbox_cast))
+
+  # ------------------ DATASET ------------------
+  log_debug("Constructing BoxDataSet...")
+  dataset <- .jnew(
+    "edu.cmu.tetrad.data.BoxDataSet",
+    dbox_cast,
+    vars_list
+  )
+  log_debug("dataset created; class = {cls}", cls = .jclass(dataset))
+
+  log_debug("Casting dataset → DataSet interface...")
+  dataset_cast <- .jcast(dataset, "edu.cmu.tetrad.data.DataSet")
+  log_debug("dataset_cast class = {cls}", cls = .jclass(dataset_cast))
+
+  log_debug("r_df_to_tetrad(): SUCCESS")
+  return(dataset_cast)
+}
+
+np_dataset_to_df <- function(j_np_dataset, orig_names = NULL) {
+  require(rJava)
+
+  log_debug("np_dataset_to_df(): START")
+
+  # Get the underlying Matrix: dataSet.getDoubleData()
+  j_mat <- .jcall(
+    j_np_dataset,
+    "Ledu/cmu/tetrad/util/Matrix;",
+    "getDoubleData"
+  )
+  log_debug("np_dataset_to_df(): got Matrix; class={cls}", cls = .jclass(j_mat))
+
+  n_rows <- .jcall(j_mat, "I", "getNumRows")
+  n_cols <- .jcall(j_mat, "I", "getNumColumns")
+  log_debug("np_dataset_to_df(): rows={r}, cols={c}", r = n_rows, c = n_cols)
+
+  # Pull values via Matrix.get(int row, int col)
+  mat <- matrix(NA_real_, n_rows, n_cols)
+
+  for (i in seq_len(n_rows)) {
+    for (j in seq_len(n_cols)) {
+      mat[i, j] <- .jcall(
+        j_mat,
+        "D",
+        "get",
+        as.integer(i - 1L),
+        as.integer(j - 1L)
+      )
+    }
+  }
+
+  df <- as.data.frame(mat)
+
+  if (!is.null(orig_names) && length(orig_names) == n_cols) {
+    colnames(df) <- orig_names
+  }
+
+  log_debug("np_dataset_to_df(): DONE; returning data.frame with names = {n}",
+            n = paste(colnames(df), collapse = ", "))
+
+  df
+}
+
+
+
+
+nonparanormal_transform <- function(j_dataset) {
+  
+  j_dataset <- .jcast(j_dataset, "edu.cmu.tetrad.data.DataSet")
+
+  .jcall(
+    "edu/cmu/tetrad/data/DataTransforms",
+    returnSig = "Ledu/cmu/tetrad/data/DataSet;",
+    method = "getNonparanormalTransformed",
+    j_dataset,
+    sig = "(Ledu/cmu/tetrad/data/DataSet;)Ledu/cmu/tetrad/data/DataSet;"
+  )
+}
+
+# 1. Build Java dataset and NP transform
+j_dataset    <- r_df_to_tetrad(data)
+log_debug("Class after java transform: {cls}", cls = .jclass(j_dataset))
+
+j_np_dataset <- nonparanormal_transform(j_dataset)
+log_debug("Class after NP transform: {cls}", cls = .jclass(j_np_dataset))
+
+# 2. Convert NP dataset back to an R data.frame
+np_df <- np_dataset_to_df(j_np_dataset, orig_names = names(data))
+log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse = ", "))
+# optional:
+# log_debug(paste(capture.output(dplyr::glimpse(np_df)), collapse = "\n")) 
   MC_passing_cpdag_already_found <- FALSE
   best_cpdag_seen_so_far <- NULL
   best_cpdag_seen_so_far_num_edges <- Inf
@@ -683,7 +831,7 @@ AIR_getGraph <- function(data, knowledge, graphtxt_buffer = NULL) {
     pd <- 0.5 + (i * 0.1)
 
     tryCatch({
-      ts <- TetradSearch$new(data)
+      ts <- TetradSearch$new(np_df)
       last_ts <- ts
 
       # Validate and apply knowledge tiers
@@ -2867,7 +3015,9 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 :::: {.columns}
 ::: {.column width=100%}
 ```{r running-log, echo=FALSE}
-uiOutput("live_log_tail")
+uiOutput("live_log_tail", 
+         style = "height: 100%; min-height: 400px; display: flex; flex-direction: column;")
+
 ```
 :::
 
@@ -2888,36 +3038,42 @@ uiOutput("log_table")
 
 # Live log tail tracker ----
 output$live_log_tail <- renderUI({
-  # retrieve the active logfile from the global environment
-  logfile <- tryCatch({
-    get(".airtool_log_file", envir = .GlobalEnv)
-  }, error = function(e) NULL)
+  logfile <- tryCatch(
+    get(".airtool_log_file", envir = .GlobalEnv),
+    error = function(e) NULL
+  )
 
-  invalidateLater(1000)  # refresh every second
+  invalidateLater(1000)
 
   if (is.null(logfile) || !file.exists(logfile)) {
     return(pre("No active log file found."))
   }
 
-  # read the most recent lines
-  log_tail <- tryCatch({
-    tail(readLines(logfile, warn = FALSE), n = 25)
-  }, error = function(e) "<unable to read log file>")
+  log_tail <- tryCatch(
+    tail(readLines(logfile, warn = FALSE), n = 25),
+    error = function(e) "<unable to read log file>"
+  )
 
-  # optionally highlight keywords
   msg <- paste(log_tail, collapse = "\n")
-  msg <- gsub("ERROR", "<b style='color:red'>ERROR</b>", msg)
-  msg <- gsub("WARN",  "<b style='color:orange'>WARN</b>", msg)
-  msg <- gsub("INFO",  "<b style='color:green'>INFO</b>", msg)
+  msg <- gsub("ERROR", "<b style='color:red'>ERROR</b>", msg, fixed = TRUE)
+  msg <- gsub("WARN",  "<b style='color:orange'>WARN</b>", msg, fixed = TRUE)
+  msg <- gsub("INFO",  "<b style='color:green'>INFO</b>", msg, fixed = TRUE)
 
-  # Display as preformatted HTML
   HTML(paste0(
-    "<div style='font-family:monospace; font-size:0.9em; background-color:#ddd; color:#111; ",
-    "padding:10px; border-radius:6px; height:400px; overflow-y:auto;'>",
-    "<strong>Live log:</strong><br><br>",
-    "<pre style='white-space:pre-wrap;'>", msg, "</pre></div>"
+    "<div style='height:100%; min-height:100%; display:flex; flex-direction:column;'>",
+      "<div style='flex:1; height:100%; overflow-y:auto; ",
+                  "background-color:#ddd; color:#111; ",
+                  "font-family:monospace; font-size:0.9em; padding:10px; border-radius:6px;'>",
+        "<strong>Live log:</strong><br><br>",
+        "<pre style='white-space:pre-wrap; margin:0; height:100%;'>",
+           msg,
+        "</pre>",
+      "</div>",
+    "</div>"
   ))
 })
+
+
 ### file input text --------------------------------------
 output$file1_txt <- renderUI({
   req(input$file1)
