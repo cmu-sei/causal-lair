@@ -26,8 +26,8 @@ AIR tool can be installed at a partner site or run in the SEI environment. Class
 - Permissions to run a Docker container and any other supporting tools
 - Local copies of datasets to use with the AIR tool
 
-### Model:
-- Should be an AI/ML model (e.g., classifier) that operates on structured or tabular data, relying on numerical, categorical, or time-series features, rather than unstructured data such as images, audio, or natural language text
+### Model (if AIR analysis is intended for existing model):
+- be an AI/ML model (e.g., classifier) that operates on structured or tabular data, relying on numerical, categorical, or time-series features, rather than unstructured data such as images, audio, or natural language text
 - Should have a single outcome variable that the classifier is predicting. This could be something like mission success, threat assessment, component failure, etc.
 - Should be run against multiple scenarios to predict outcome above. For example, does location affect mission success, does operating system affect threat assessment, does weather affect component failure, etc.
 - Should be compatible with use in an R environment and be able to utilize a predict() function – **OR** - allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE)
@@ -49,28 +49,13 @@ More information about Data Requirements can be found in [AIR Tool Dataset Guide
 
 ## Installation Instructions
 
-Having met the usage requirements above, installation is a matter of copying the container to a location that is accessible from the Docker host. You'll want to have your data and knowledge files accessible to the Docker host as well. A sample run command for using the container would be:
+Having met the usage requirements above, installation is a matter of copying the container to a location that is accessible from the Docker host. Detailed instructions can be found in [AIR Tool Installation Instructions](./Installation_Instructions.md)
 
->_docker run -it -p 4173:4173 -u root --rm --name airtool airtool-image:latest_
-
-### Flag definitions:
-- **4173**: Default port that the development server runs on, it can be re-mapped if this port is inconvenient in your environment by simply changing the docker command.
-- '**-u root**': Indicates what user the process inside the container will think it is running as (Note: Does not mean you need root permissions to run the container)
-- '**--rm**': Indicates to remove the container after you've finished with it. If you wish to keep it around, remove this parameter.
-- '**--name**': provides the name Docker will use to refer to this container. This is important, as if you don't choose a name, a new one will be assigned every time you run the container. If you are not removing the container, you will soon find you are running out of hard drive storage, after a handful of runs.
-- '**airtool-image:latest**': is the tagged name for the container. 
-
-If you loaded the image to a local registry, using:
- > _docker load_ < airtool.tar
-	_docker tag airtool-image:latest_
-
-then the container will be viewable in your local docker registry, using:
-
-docker images
+You'll want to have your data and knowledge files accessible to the Docker host as well.
 
 You may wish to add a data volume to your container. A limitation of the current release is that intermediate products are not stored within the container, i.e., every run starts from a new state.
 
-More detailed instructions can be found in [AIR Tool Installation Instructions](./Installation_Instructions.md)
+
 
 ## Getting Started
 
@@ -78,7 +63,8 @@ More detailed instructions can be found in [AIR Tool Installation Instructions](
 
 Before beginning analysis with the tool, it is useful to carefully consider the causal scenario that the classifier model is used to solve. Understanding the scenario variables to be analyzed and confirming completeness of the data will contribute to gaining insight from the AIR results.
 
-More detailed information about preparing the scenario for analysis can be found in [Scenario Definition Worksheet](./scenario_definition_worksheet.md)
+More detailed information about preparing the scenario and data for analysis can be found in [Scenario Definition Worksheet](./scenario_definition_worksheet.md) and [Dataset Guidelines](./dataset_guidelines.md) 
+
 
 ### Step 1: Building your Causal Graph
 
@@ -112,7 +98,7 @@ The tool will now prompt users for additional information about the problem scen
 In the current version of the tool, both x and y variables must be treated as binary. Users will define what constitutes “baseline” vs. “experimental” and “success” vs. “fail” for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.
 
 Once the user has completed their definitions for experimental (x) and outcome (y) variables, AIR will run the causal identification algorithms, resulting in changes to your causal graph that highlights:
-- both experimental/treatment (x) and outcome (y) variables (in yellow)
+- both experimental/treatment (x) variable (blue) and outcome (y) variable (purple)
 - two separate adjustment sets identified by AIR
 	- potential confounders that are parents of x and y in medium gray
 	- potential confounders that are parents of x and intermediate variables and/or y in light gray.
@@ -128,7 +114,9 @@ The tool will now prompt the user for information about their model that is to b
 
 - Providing an ATE -- if the user can calculate their own average treatment effect (ATE) of their model, they can input that directly here. Once selected, an ATE input box will appear below. See [Calculating ATE](./calculating_ATE.md) for more information.
 
-- No information (Do it all for me) -- this last option is for a user who doesn't have a specific model but would like the tool to generate several commonly-used machine learning models to compare against the causally-derived model of AIR. No additional input required.
+- No: Do it all for me -- this option is for a user who doesn't have a specific model but would like the tool to generate several commonly-used machine learning models to compare against the causally-derived model of AIR. No additional input required.
+
+- No: Just show me the effect --  this option will allow user to proceed with the AIR analysis without any comparison of the AIR results to a predictive model. 
 
 Once the user has made a selection, you can click the "Calculate Results" button to finish the causal estimation portion of the tool. After this process has started, it cannot be undone, so be careful and make sure you are ready. This process will inevitably take some time to complete. In our trials with a fairly simple model this usually takes 2-10 minutes to run. Once complete, the progress bar will disappear and the results will be displayed.
 
@@ -139,7 +127,7 @@ Once the user has made a selection, you can click the "Calculate Results" button
 
 This page requires no input from the user but will display the entire health report. It contains the following contents:
 
-(Left) -- the user can find their causal graph with both x and y variables highlighted in yellow. If additional nodes are found to be contributing significant bias to the results, they will also be highlighted in red (their inclusion will be discussed later in the "Interpreting your results" section).
+(Left) -- the user can find their causal graph with both x and y variables highlighted in blue/purple. If additional nodes are found to be contributing significant bias to the results, they will also be highlighted in red (their inclusion will be discussed later in the "Interpreting your results" section).
 
 (Top Right) -- the user can find a 'ribbon plot' that displays a summary of the average treatment effect and associated 95% confidence interval associated with both adjustment sets (medium and light grey). Any values inside both sets of 95% confidence intervals are shaded green, values inside only one set of intervals are yellow, and outside both is red, while your classifier's average treatment effect will be indicated by a blue arrow on the line. These causal intervals provide two independent checks on the ATE behavior of the model on the scenario of interest. If one of the two intervals is violated, that might not be statistically relevant but could also a warning to monitor model performance for that use case regularly in the future. If both are violated, the consumer of model predictions should be wary of predictions for that particular scenario. The two adjustment sets that are output provide recommendations of what variables/features to focus on for subsequent classifier retraining. Below the plot will be a figure caption describing how to interpret this particular plot and what each of the values means.
 
@@ -149,7 +137,8 @@ The blue Download button on the lower left will allow users to download a PDF su
 
 More detailed information about interpreting AIR results can be found in: [Interpreting AIR Results]("./interpreting_results.md)  
 
-Refreshing the browser at any time will reset the tool and allow the user to begin a new analysis.
+Refreshing the browser or clicking the "Reload" button to the lower left will reset the tool and allow the user to begin a new analysis.
+
 
  
 ## Known Issues/Limitations
