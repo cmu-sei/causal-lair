@@ -3,10 +3,10 @@
 
 ## 1. Open Docker Desktop 
 
-If you don’t have a Docker Desktop, , you can download here:
+If you don’t have a Docker Desktop, you can download here:
 [https://www.docker.com/get-started/](https://www.docker.com/get-started/)
 
- Docker Desktop may require security policy permissions/changes, depending upon your organization’s current security ecosystem.
+Docker Desktop may require security policy permissions/changes, depending upon your organization’s current security ecosystem.
 
 ## 2. Download, extract, and run the AIR Tool container from GitHub.
 
@@ -14,7 +14,7 @@ In Docker Desktop, open the Terminal by clicking on that button at the bottom ri
 
 In the Terminal, enter command: 
 
-**docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v0.10.0**
+**docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v0.12.0**
 
 Terminal status should indicate the progress of downloading and extracting the container. 
 This step only downloads and extracts if there is a new container that you have not already downloaded.  The download and extract will not occur if you already have the current AIR Tool container. 
