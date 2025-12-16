@@ -2569,7 +2569,7 @@ TetradSearch <- setRefClass(
     #   num_starts > 1, random permuatations are used for subsequent restarts.
     # @param output_cpdag TRUE if a CPDAG should be output, FALSE if a DAG should be output.
     # @return The estimated graph.
-    run_boss = function(num_starts = 1, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
+    run_boss = function(num_starts = 30, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
       log_debug("Running BOSS algorithm...")
       
       .self$.setParam("useBes", use_bes)
