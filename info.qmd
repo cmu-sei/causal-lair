@@ -19,22 +19,68 @@ resources:
 
 <h1>Getting Started</h1>
 
-**Step 1: Building your Causal Graph**
+<h2>Step 1: Building your Causal Graph</h2>
 
 <!-- <img src="image1.png" style="width:6.5in; height:2.8in;" alt="Description of image1" /> -->
-The tool will first prompt the user for their data file. This file should conform to the characteristics outlined in the "Model and Data Requirements" section above. It is most helpful if it is either the same data that was used to build the AI classifier or if it is data that could be fed to the AI classifier to make predictions.
+<h3>Data Selection Required and Common Pitfalls</h3>
 
-After a data file is uploaded, the user will then select their knowledge file for upload. Knowledge files define rough hierarchies of three or more levels of causation as determined logically or by subject matter experts. Levels are defined as follows:
+The tool will first prompt the user for their data file. This file should conform to the characteristics outlined in the "Model and Data Requirements" section above. It is most helpful if it is either the same data that was used to build the AI classifier or if it is data that could be fed to the AI classifier to make predictions. When selecting variables for causal analysis in the AIR Tool, users must ensure that variables represent distinct, intervention-meaningful aspects of the system. The following conditions and pitfalls are especially important.
 
--   **Tier 0 — Exogenous variables:** These variables are not influenced by any other variables. Often used as starting points for causal graphs.
--   **Tier 1 — Endogenous variables:** Variables in this tier are potentially influenced by those in Tier 0 and possibly other Tier 1 variables.
--   **Tier 2 and up — Higher-tier variables:** These variables may be influenced by preceding tiers or even within the same tier. Although there can be any number of tiers, three tiers are strictly necessary.
+<h4>Required Conditions for Valid Causal Variables</h4>
 
-Currently, all knowledge assertions must be done ahead of time by the user as in-place editing is not yet supported. The file format should be similar to the data file (i.e., CSV with a header), but will contain only two columns: `level` and `variable` (where `level` contains a numeric tier and `variable` contains the variable name exactly as in the data file). Each variable name should appear exactly once.
+-    **Variables must represent distinct causal mechanisms.** Each variable should correspond to something that could plausibly be intervened upon independently of other variables in the system.
+-    **Data are not highly-intercorrelated.** Once your data columns reach correlation values above ~0.9, it may cause problems with causal discovery. We therefore recommend choosing one of the highly-intercorrelated variables and removing the other (based on whichever makes the most sense)
+-    **Variable must not be deterministic functions of other included variables.** If a variable is fully determined by one or more other variables (e.g., sums, ratios, indices, principal component scores, etc...), it does not represetn a separate causal entity. ***note: the same is true for highly-intercorrelated variables which must be removed before anaylsis***
+-    **Variables must have ontological status beyond mathematical description.** Valid causal variables correspond to properties, states, actions, or processes in the world—not merely to coordinate systems, embeddings, or summaries.
+-    **Variables must be interpretable under hypothetical intervention.** You should be able to meaningfully ask: “What would happen if I intervened on this variable while holding others fixed?” If that question is incoherent, the variable is not suitable for causal analysis.
+-    **Predictive usefulness alone is not sufficient.** A variable may be highly predictive while still being causally invalid. Prediction and causation are not interchangeable.
+
+<h4>Common Pitfalls to Avoid</h4>
+
+-    **Category errors.** Treating mathematical descriptions, transformations, or summaries as if they were independent causal agents. For example: Asking whether a variable “causes” its own principal component score.
+-    **Reification of abstract constructs.** Treating indices, latent factors, embeddings, or scores as concrete causes rather than as descriptive artifacts derived from other variables.
+-    **Using proxies as if they were causes.** Measurement proxies, composite indicators, or risk scores often reflect underlying causes but do not themselves exert causal influence.
+-    **Including multiple representations of the same information.** Including both raw variables and their transformations (e.g., features and PCA components) violates causal independence and distorts causal structure discovery.
+-    **Violating intervention independence.** If intervening on one variable necessarily changes another by definition, the variables cannot occupy separate positions in a causal model.
+-    **Reverse causal interpretation.** Using descriptive features of an outcome to explain or “cause” that outcome, rather than recognizing them as consequences of a common underlying cause.
+
+*In General: If you cannot intervene on a variable without simultaneously intervening on its inputs, it is not a valid causal variable.*
+
+<h3>Knowledge File: Defining Causal Tiers</h3>
+
+After uploading a data file, users must upload a knowledge file that encodes prior causal knowledge in the form of rough causal tiers. This file constrains the space of admissible causal graphs by specifying which variables are allowed to influence others.
+
+The knowledge file is bottom-up: lower tiers represent more causally fundamental variables, while higher tiers represent variables that may depend on those below them.
+
+**Conceptual Model**
+
+-   Variables in lower tiers cannot be caused by variables in higher tiers.
+-   Variables in higher tiers may be influenced by variables in any lower tier.
+-   Variables within the same tier may influence one another, unless otherwise restricted by the user’s domain knowledge.
+-   Tiers represent causal precedence, not temporal ordering, correlation strength, or statistical importance.
+
+**Tier Definitions**
+
+-   **Tier 0 — Exogenous variables:** Variables that are not causally influenced by any other variables in the dataset. These often represent background conditions, environmental factors, or fixed inputs. No incoming causal edges are permitted.
+-   **Tier 1 — Endogenous variables:** Variables that may be influenced by Tier 0 variables. They may also be influenced by other variables within Tier 1. They may not be influenced by variables in higher tiers.
+-   **Tier 2 and up — Higher-tier variables:** Variables that may be influenced by any variables in lower tiers. Variables within the same tier may also influence one another. These tiers often represent progressively more derived, downstream, or outcome-like variables.
+
+At least three tiers are required to provide sufficient causal structure for the AIR Tool’s discovery and estimation procedures. Currently, all knowledge assertions must be done ahead of time by the user as in-place editing is not yet supported.
+
+**File Format Requirements**
+
+-   The knowledge file must be a CSV file with a header.
+-   It must contain exactly two columns:
+-       level: a non-negative integer indicating the causal tier
+-       variable: the variable name, exactly matching the name used in the data file
+-   Each variable must appear exactly once in the file.
+-   Tier numbers must be consecutive integers starting at 0 (e.g., 0, 1, 2, 3).
+-   Make sure there are no spaces between columns
+
 
 Once both files are uploaded and accepted, a new button "Build Graph" will appear. Clicking it will run causal discovery algorithms to build your causal graph and display it in the main panel. If you are unsatisfied with the graph and feel that updating your data or knowledge file might help, you can select new files and re-build your graph until satisfied.
 
-**Step 2: Identifying potential sources of bias**
+<h2>Step 2: Identifying potential sources of bias</h2>
 
 <!-- ```{r} -->
 <!-- shiny::addResourcePath(prefix = "readme_md_files", directoryPath = "readme_md_files") -->
@@ -55,7 +101,7 @@ Once the user has completed their definitions for the experimental/treatment (x)
 
 As with Step 1, the user may continue editing until satisfied, but must always click "Update Graph" for changes to take effect.
 
-**Step 3: Estimating the causal effect to compare with your AI Classifier**
+<h2>Step 3: Estimating the causal effect to compare with your AI Classifier</h2>
 
 <!-- <img src="./readme_md_files/image3.png" style="width:6.5in; height:2.8in;" alt="Description of image3" /> -->
 The tool will now prompt the user for information about their classifier to be tested. This section is context-dependent, so the input boxes will change according to the user's selection. Currently, three options are available:
@@ -86,6 +132,7 @@ The ATE is then computed as the average difference between these potential outco
 $$
 ATE = \frac{1}{N}\sum\limits_{i = 1}^{N} \left( \widehat{Y}_{1i} - \widehat{Y}_{0i} \right)
 $$
+
 <h1>Known Issues/Limitations</h1>
 
 **Existing Problems:** Issues that remain in the current release will be identified as testing continues.
@@ -95,6 +142,7 @@ $$
 -   The tool currently only handles binary (on/off or true/false) treatment and outcome variables. This is due to differences in analysis requirements. A built-in tool to transform continuous variables into binary format is provided as part of Step 2.
 -   Only `.rda` files are accepted for model uploads. If you have another model format you’d like to use, please let us know.
 -   The tool does not fix your model but provides a health report that identifies potential sources of bias. It is up to the user to apply appropriate remedies based on this information.
+-   The AIR Tool infers causal structure and effects only over the variables explicitly included in the analysis. Variables that are not present in the causal graph are treated as unobserved and impose important limitations on what can be inferred from the results.
 
 <h1>Contact and Support Information</h1>
 
