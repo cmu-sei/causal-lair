@@ -790,7 +790,7 @@ np_dataset_to_df <- function(j_np_dataset, orig_names = NULL) {
 
 
 nonparanormal_transform <- function(j_dataset) {
-  
+
   j_dataset <- .jcast(j_dataset, "edu.cmu.tetrad.data.DataSet")
 
   .jcall(
@@ -803,7 +803,15 @@ nonparanormal_transform <- function(j_dataset) {
 }
 
 # 1. Build Java dataset and NP transform
-j_dataset    <- r_df_to_tetrad(data)
+isbinary <- apply(data, MARGIN = 2, FUN = function(x) {length(unique(x))==2 })
+log_debug("nvars: {ib}", ib = paste0(isbinary, collapse = ", "))
+
+data_binary <- data[, isbinary]
+data_continuous <- data[, !isbinary]
+
+log_debug("Discovered {db} binary and {dc} continuous columns...", db = ncol(data_binary), dc = ncol(data_continuous))  
+
+j_dataset    <- r_df_to_tetrad(data_continuous)
 log_debug("Class after java transform: {cls}", cls = .jclass(j_dataset))
 
 j_np_dataset <- nonparanormal_transform(j_dataset)
@@ -811,6 +819,7 @@ log_debug("Class after NP transform: {cls}", cls = .jclass(j_np_dataset))
 
 # 2. Convert NP dataset back to an R data.frame
 np_df <- np_dataset_to_df(j_np_dataset, orig_names = names(data))
+np_df <- cbind(data_binary, np_df)
 log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse = ", "))
 # optional:
 # log_debug(paste(capture.output(dplyr::glimpse(np_df)), collapse = "\n")) 
