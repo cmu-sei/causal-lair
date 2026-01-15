@@ -36,3 +36,5 @@ input/dataset_tests
 saved_50nodes_400Kcases.csv
 .flake-backups/
 
+
+**/*.quarto_ipynb

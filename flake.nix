@@ -25,17 +25,6 @@
 {
   description = "creates a dev container for AIR, with R and other tools";
 
-  nixConfig = {
-    substituters = [
-        "https://cache.nixos.org"
-        "https://airtool-dev.cachix.org"
-    ];
-    trusted-public-keys = [ 
-        "airtool-dev.cachix.org-1:dfX1T1ibTyc1dIOSWtxQxbpPJUya00RVFu9gLtiWvn8="
-        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
-    ];
-  };
-
   inputs = {
     flake-utils.url = "github:numtide/flake-utils"; # Utility functions for Nix flakes
 
@@ -62,7 +51,7 @@
 
     flake-parts = {
       url = "github:hercules-ci/flake-parts";
-      inputs.nixpkgs-lib.url = "github:NixOS/nixpkgs/eb9ceca17df2ea50a250b6b27f7bf6ab0186f198";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
     };
 
   };
@@ -73,6 +62,13 @@
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
+            (final: prev: {
+              # Make the default nodejs used by nixpkgs (and thus rPackages.V8) be nodejs_22
+              # Nix's recent updates to node for nodejs_24 are incompatible
+              # with V8 at this time, a package we need to support
+              # DiagrammeRSVG
+              nodejs = prev.nodejs_22;
+            })
             rust-overlay.overlays.default
             myNeovimOverlay.overlays.default
           ];
@@ -200,7 +196,7 @@
           src = pkgs.fetchFromGitHub{
             owner = "tlverse";
             repo = "sl3";
-            rev = "0e8f2365bcbe54010b8120c04a7a2dcfc8119227"; # <-- 'devel' branch
+            rev = "0e8f2365bcbe54010b8120c04a7a2dcfc8119227"; # <-- 'master' branch
             sha256 = "0m1cg7icdza230l2jlpkwf9s8b4pwbyn0xj5vrk6yq6lfq8dgvpr";
           };
           propagatedBuildInputs = with pkgs.rPackages; [
@@ -292,8 +288,8 @@
               src = pkgs.fetchFromGitHub{
                 owner = "tlverse";
                 repo = "tmle3";
-                rev = "ed72f8a20e64c914ab25ffe015d865f7a9963d27"; # <-- 'devel' branch
-                sha256 = "159vhzpcw1rldicql8w4ykmc87y0rj970cnn8apcyk9cwd08bk1r";
+                rev = "df0a0ed192d3dfb8e795e2f304bf66e4681a28dc"; # <-- 'devel' branch
+                sha256 = "1nq8akdg7vwldwgs72j0w4plwfwg428xz1h764yikij4m2l564qx";
               };
               propagatedBuildInputs = [
                 sl3
@@ -316,8 +312,8 @@
               src = pkgs.fetchFromGitHub{
                 owner = "tlverse";
                 repo = "hal9001";
-                rev = "00fe70f32bcf32e006ad415fe5b1bd8947be8b6f"; # <-- 'devel' branch
-                sha256 = "18wa8zk88fx1w5y814wby4an6jq1bj8ffkqnqsc9ykk37fagnnyw";
+                rev = "48f41e5d6cb86b926777ba44b465ac435ad0cb50"; # <-- 'devel' branch
+                sha256 = "1kr1j0v2m3c7qwkhvi74vggmzcs5p1w1b0qppad9xp90x9av1fwl";
               };
               propagatedBuildInputs = [
                 pkgs.rPackages.Rcpp
@@ -407,7 +403,7 @@
             wget
             zlib                    # zlib1g-dev
 
-            jdk23
+            jdk25
             maven
             pandoc
             libtirpc
@@ -566,7 +562,7 @@
               "CMAKE_MAKE_PROGRAM=/bin/make"
               "LIBCLANG_PATH=${pkgs.libclang.lib}/lib/"
               "SHELL=/bin/fish"
-              "JAVA_HOME=${pkgs.jdk23}"
+              "JAVA_HOME=${pkgs.jdk25}"
               "PATH=${myEnv}/bin:/bin:/usr/bin:/root/.cargo/bin:$JAVA_HOME/bin"
               "QUARTO_R=${rWithPkgs}/bin/R"
               "LOCALE_ARCHIVE=${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
@@ -618,7 +614,7 @@
             export LIBCLANG_PATH="${pkgs.libclang.lib}/lib/"
             export SSL_CERT_FILE="/etc/ssl/certs/ca-bundle.crt"
             export LOCALE_ARCHIVE="${pkgs.glibcLocalesUtf8}/lib/locale/locale-archive"
-            export JAVA_HOME="${pkgs.jdk23}"
+            export JAVA_HOME="${pkgs.jdk25}"
             export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:${pkgs.liblapack}/lib:${pkgs.openblasCompat}/lib:$LD_LIBRARY_PATH"
             export PATH="$JAVA_HOME/bin:$PATH"
           '';
