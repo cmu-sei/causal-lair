@@ -2662,6 +2662,7 @@ TetradSearch <- setRefClass(
                           "adjustmentSets",
                           source_node,
                           target_node,
+                          "dag",
                           as.integer(max_num_sets),
                           as.integer(max_distance_from_point),
                           as.integer(near_which_endpoint),
@@ -2760,8 +2761,8 @@ TetradSearch <- setRefClass(
       ad_dep <- safe_jcall(mc, "D", "getAndersonDarlingP", FALSE)
       ks_ind <- safe_jcall(mc, "D", "getKsPValue", TRUE)
       ks_dep <- safe_jcall(mc, "D", "getKsPValue", FALSE)
-      bin_indep <- safe_jcall(mc, "D", "getBinomialPValue", TRUE)
-      bin_dep <- safe_jcall(mc, "D", "getBinomialPValue", FALSE)
+      bin_indep <- safe_jcall(mc, "D", "getBinomialPValue_", TRUE)
+      bin_dep <- safe_jcall(mc, "D", "getBinomialPValue_", FALSE)
       frac_dep_ind <- safe_jcall(mc, "D", "getFractionDependent", TRUE)
       frac_dep_dep <- safe_jcall(mc, "D", "getFractionDependent", FALSE)
       num_tests_ind <- safe_jcall(mc, "I", "getNumTests", TRUE)
