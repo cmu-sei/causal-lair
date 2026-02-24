@@ -1,0 +1,17 @@
+﻿level,variable
+0,mission_urgency
+1,region_sensitivity
+2,dist_to_target
+3,temperature
+3,max_altitude
+3,heavy_winds
+4,bird_strike
+3,humidity
+4,speed_max
+5,ice_accrual
+5,fuel_consumed
+6,ice_sublimation
+6,hard_landing
+7,mission_duration
+7,data_loss
+8,mission_success
