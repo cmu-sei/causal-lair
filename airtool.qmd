@@ -4302,12 +4302,23 @@ output$xvar <- renderUI({
     tags$style(HTML("#xvar option:disabled { color:#9aa0a6; }")),
     tags$script(HTML(sprintf("
       (function(){
-        function applyDisabled(){
+        $(document).off('.xvarBlock');
+
+        var blocked = %s;
+
+        function applyXDisabled(){
           var sel = document.getElementById('xvar');
           if(!sel) return;
-          var blocked = %s;
 
-          if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
+          $('#xvar option').each(function(){
+            this.disabled = false;
+            this.title = '';
+          });
+
+          if (sel.value && blocked.indexOf(sel.value) !== -1) {
+            sel.value = '';
+            $(sel).trigger('change');
+          }
 
           $('#xvar option').each(function(){
             if (this.value && blocked.indexOf(this.value) !== -1){
@@ -4316,8 +4327,13 @@ output$xvar <- renderUI({
             }
           });
         }
-        var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
-        $(document).on('shiny:value shiny:visualchange', applyDisabled);
+
+        var tries=0, t=setInterval(function(){
+          applyXDisabled();
+          if(++tries>20) clearInterval(t);
+        }, 100);
+
+        $(document).on('shiny:value.xvarBlock shiny:visualchange.xvarBlock', applyXDisabled);
       })();
     ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
   )
@@ -4392,12 +4408,25 @@ output$yvar <- renderUI({
       tags$style(HTML("#yvar option:disabled { color:#9aa0a6; }")),
       tags$script(HTML(sprintf("
         (function(){
-          function applyDisabled(){
+          // Remove previous handler to prevent accumulation
+          $(document).off('.yvarBlock');
+
+          var blocked = %s;
+
+          function applyYDisabled(){
             var sel = document.getElementById('yvar');
             if(!sel) return;
-            var blocked = %s;
 
-            if (blocked.indexOf(sel.value) !== -1) { sel.value=''; $(sel).trigger('change'); }
+            // Re-enable ALL first, then disable current blocked set
+            $('#yvar option').each(function(){
+              this.disabled = false;
+              this.title = '';
+            });
+
+            if (sel.value && blocked.indexOf(sel.value) !== -1) {
+              sel.value = '';
+              $(sel).trigger('change');
+            }
 
             $('#yvar option').each(function(){
               if (this.value && blocked.indexOf(this.value) !== -1){
@@ -4406,8 +4435,13 @@ output$yvar <- renderUI({
               }
             });
           }
-          var tries=0,t=setInterval(function(){applyDisabled(); if(++tries>20)clearInterval(t);},100);
-          $(document).on('shiny:value shiny:visualchange', applyDisabled);
+
+          var tries=0, t=setInterval(function(){
+            applyYDisabled();
+            if(++tries>20) clearInterval(t);
+          }, 100);
+
+          $(document).on('shiny:value.yvarBlock shiny:visualchange.yvarBlock', applyYDisabled);
         })();
       ", jsonlite::toJSON(blocked_y, auto_unbox = TRUE))))
     )
@@ -4435,12 +4469,18 @@ output$yvar <- renderUI({
 #  }
 #}, ignoreInit = TRUE, priority = 1000)
 
-observeEvent(input$yvar, {
-  if (isTRUE(locked())) {
-    sel <- isolate(vars_sel()$y); if (is.null(sel)) sel <- ""
-    isolate(updateSelectInput(session, "yvar", selected = sel))
-  }
-}, ignoreInit = TRUE, priority = 1000)
+# ── Reset Y and downstream state when X changes ──────────────────
+observeEvent(input$xvar, ignoreInit = TRUE, {
+  # Only act if graph exists and X is valid
+  req(graph_complete(), nzchar(input$xvar))
+  
+  # Reset Y selection to force a fresh pick
+  updateSelectInput(session, "yvar", selected = "")
+  
+  # Clear stale adjustment set state
+  rv$Zvars <- NULL
+  graph_updated(FALSE)
+})
 
 fine_step <- function(vec, n_bins = 30) {
   rng <- range(vec, na.rm = TRUE)
