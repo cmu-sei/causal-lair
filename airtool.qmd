@@ -2883,15 +2883,7 @@ br()
 
 tagList(
   # 1) Normal Shiny button lives in the sidebar
-  div(
-    id = "reload_slot",
-    actionButton(
-      "reload_btn", "↻ Reload",
-      onclick = "location.reload();",
-      class = "btn btn-light btn-sm",
-      style = "width:100%; color:#212529;"
-    )
-  ),
+  uiOutput("ui_reset_btn"),
 
   # 2–3) JS: switch between fixed-at-bottom (no scroll) and sticky (when scroll shows up)
   tags$script(HTML("
@@ -3047,6 +3039,15 @@ uiOutput("log_table")
 ```{r backend-compute}
 #| context: server
 
+
+output$ui_reset_btn <- renderUI({
+  req(graph_complete())
+  actionButton(
+    "reload_btn", "↻ Reset Selections",
+    class = "btn btn-light btn-sm",
+    style = "width:100%; color:#212529;"
+  )
+})
 # Live log tail tracker ----
 output$live_log_tail <- renderUI({
   logfile <- tryCatch(
@@ -3715,7 +3716,66 @@ observeEvent(input$disconnect, {
 })
 
 observeEvent(input$reload_btn, {
-  session$reload()
+  ## ── "Reset Selections" – soft-reset back to Step 2 ─────────────────────
+  ## Preserves: uploaded files, parsed data, knowledge, causal graph
+  ## Resets:    variable selections, thresholds, model config, all results
+    req(graph_complete())        # only meaningful if a graph exists
+
+    # ── 1. Clear all result / estimation buffers ──────────────────────────
+
+    results_buffer(data.frame())
+    results_out_buffer(data.frame())
+    datafile_buffer(NULL)
+    superlearner_output_buffer(list())
+    tmle_buffer(data.frame())
+    ml_buffer(data.frame())
+    combined_buffer(data.frame())
+
+    # ── 2. Reset control flags ────────────────────────────────────────────
+    locked(FALSE)
+    calc_complete(FALSE)
+    graph_updated(FALSE)
+    # NOTE: step1lock and graph_complete intentionally left alone
+
+    # ── 3. Clear per-run reactive values (keep graph artefacts) ───────────
+    rv$Zvars     <- NULL
+    rv$model_yn  <- NULL
+    rv$model_ate <- NULL
+
+    # ── 4. Tidy up global-env leftovers from the previous run ─────────────
+    for (nm in c("Zvars", "df_vars", "results_detailed")) {
+      if (exists(nm, envir = .GlobalEnv)) rm(list = nm, envir = .GlobalEnv)
+    }
+
+    # ── 5. Reset UI inputs back to blanks ─────────────────────────────────
+    updateSelectInput(session, "xvar", selected = "")
+    updateSelectInput(session, "yvar", selected = "")
+    # Threshold / direction inputs will vanish automatically because their
+
+    # renderUI calls req(vars_sel()$x) / req(vars_sel()$y), which fail
+    # when the selects are empty.
+
+    # ── 6. Re-render the plain (uncoloured) causal graph ──────────────────
+    output$blankGraph <- renderGrViz({
+      req(graph_complete(), rv$dot)
+      dot <- sub(
+        "(digraph[^\\{]*\\{)",
+        "\\1\n  graph [tooltip=\"Causal graph\"]",
+        rv$dot, perl = TRUE
+      )
+      grViz(dot)
+    })
+
+    log_info("Reset Selections: state rolled back to Step 2.")
+
+    sendSweetAlert(
+      session = shiny::getDefaultReactiveDomain(),
+      title   = "Selections Reset",
+      text    = "Your causal graph has been preserved. Please select new X and Y variables to continue.",
+      type    = "info",
+      btn_labels        = "OK",
+      closeOnClickOutside = TRUE
+    )
 })
 
 # File input triggers reactive evaluation
