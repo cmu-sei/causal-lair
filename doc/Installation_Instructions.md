@@ -14,7 +14,7 @@ In Docker Desktop, open the Terminal by clicking on that button at the bottom ri
 
 In the Terminal, enter command: 
 
-**docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v0.12.0**
+**docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.1.1**
 
 Terminal status should indicate the progress of downloading and extracting the container. 
 This step only downloads and extracts if there is a new container that you have not already downloaded.  The download and extract will not occur if you already have the current AIR Tool container. 
