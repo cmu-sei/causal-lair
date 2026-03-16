@@ -37,7 +37,7 @@ Your data looks like this. We built out a graph (below) that represents the caus
 
 `r params$figure_cap`
 
-### Interpreting your results
+### AI Insights
 `r params$result_text`
 
 ![](finalgraph.pdf){width=100%}

@@ -192,6 +192,7 @@ options(shiny.maxRequestSize = Inf)
 suppressMessages({
   library(AIPW)
   library(base64enc)
+  library(commonmark)
   library(DiagrammeR)
   library(DiagrammeRsvg)  # SVG export
   library(doParallel)
@@ -422,6 +423,7 @@ step1lock <- reactiveVal(FALSE)
 tmle_buffer     <- reactiveVal(data.frame())   # 1 row per adjustment set
 ml_buffer       <- reactiveVal(data.frame())   # 1 row per ML algorithm
 combined_buffer <- reactiveVal(data.frame())   # exactly 1 row (ribbon plot)
+ai_insights_buffer <- reactiveVal(NULL)        # pre-computed AI interpretation
 
 # create a shared reactiveValues object to pass variables around
 rv$dot <- NULL  # define once in app init
@@ -912,7 +914,8 @@ log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse 
   }
 
   # Bail out early if absolutely nothing passed any threshold
-  if (!MC_passing_cpdag_already_found && is.null(cpdag_graph_when_PD_is_1)) {
+  # Bail out early if absolutely nothing was produced across the sweep
+  if (!MC_passing_cpdag_already_found && is.null(fallback_graph)) {
     stop(structure(
       list(
         message = "No valid graph found; TetradSearch may have failed",
@@ -922,17 +925,18 @@ log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse 
     ))
   }
 
-  log_debug("The best cpdag (the one with fewest edges among those for which unif > 0.1) has these attributes:")
-  log_debug(headers_string)
-  log_debug(best_cpdag_seen_so_far_params)
-
   graph <- if (!is.null(best_cpdag_seen_so_far)) {
-    # A valid CPDAG passed Markov Check
+    # A valid CPDAG passed Markov Check (ad_ind > 0.1); fewest edges among those
+    log_debug("The best cpdag (fewest edges among those with unif > 0.1) has these attributes:")
+    log_debug(headers_string)
+    log_debug(best_cpdag_seen_so_far_params)
     best_cpdag_seen_so_far
   } else {
-    # Nothing passed, but fallback to something rather than crashing
-    log_debug("Falling back to cpdag at PD=1.0, as no unif > 0.1 CPDAG was found")
-    cpdag_graph_when_PD_is_1
+    # Nothing passed threshold; use best fallback (highest ad_ind, fewest edges as tiebreaker)
+    log_debug("No cpdag passed unif > 0.1. Falling back to best candidate (highest ad_ind, fewest edges):")
+    log_debug(headers_string)
+    log_debug(fallback_params)
+    fallback_graph
   }
 
   graph_str <- tryCatch(
@@ -2050,53 +2054,605 @@ get_figure_caption <- function(AIRHome, df_vars) {
   return(caption)
 }
 
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  AI Insights – agentic writer/reviewer interpretation via Ollama
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── Ollama model preflight ────────────────────────────────────────────────────
+#    Checks whether the requested model is already available locally.
+#    If not, triggers a pull and waits for it to complete.
+#    Uses a session-level cache so the /api/tags check only runs once
+#    per model per R session (avoids redundant HTTP round-trips during
+#    the writer/reviewer loop).
+#    Returns TRUE if the model is ready, FALSE on any failure.
+ollama_ensure_model <- function(model,
+                                base_url = Sys.getenv("OLLAMA_BASE_URL",
+                                                      "http://ollama:11434")) {
+
+  # Session-level cache: once a model is confirmed available, skip
+  cache_key <- paste0(".ollama_model_ok_", gsub("[^A-Za-z0-9]", "_", model))
+  if (isTRUE(get0(cache_key, envir = .GlobalEnv))) return(TRUE)
+
+  tmp_err <- tempfile(fileext = ".txt")
+  on.exit(unlink(tmp_err), add = TRUE)
+
+  # ── 1. Ask Ollama what models it already has ──────────────────────────
+  tags_raw <- tryCatch({
+    system2("curl",
+            args = c("-s", "-S", "--max-time", "10",
+                     paste0(base_url, "/api/tags")),
+            stdout = TRUE, stderr = tmp_err)
+  }, error = function(e) NULL)
+
+  if (is.null(tags_raw)) {
+    log_warn("ollama_ensure_model() - cannot reach Ollama at {u}",
+             u = base_url)
+    return(FALSE)
+  }
+
+  tags_text <- paste(tags_raw, collapse = "\n")
+  if (!nzchar(trimws(tags_text)) || !grepl("^\\s*\\{", tags_text)) {
+    log_warn("ollama_ensure_model() - invalid /api/tags response")
+    return(FALSE)
+  }
+
+  tags <- tryCatch(
+    jsonlite::fromJSON(tags_text, simplifyVector = FALSE),
+    error = function(e) NULL
+  )
+  if (is.null(tags)) return(FALSE)
+
+  # Check if our model is in the list
+  local_models <- vapply(
+    tags$models %||% list(),
+    function(m) m$name %||% "",
+    character(1)
+  )
+
+  # Ollama stores names like "qwen2.5:14b" — match exactly or with
+  # ":latest" suffix
+  model_present <- model %in% local_models ||
+                   paste0(model, ":latest") %in% local_models
+
+  if (model_present) {
+    log_debug("ollama_ensure_model() - '{m}' already available.",
+              m = model)
+    assign(cache_key, TRUE, envir = .GlobalEnv)
+    return(TRUE)
+  }
+
+  # ── 2. Model not found — pull it ─────────────────────────────────────
+  log_info(paste0("ollama_ensure_model() - '{m}' not found locally. ",
+                  "Pulling now (this may take several minutes)..."),
+           m = model)
+
+  pull_body <- jsonlite::toJSON(
+    list(name = model, stream = FALSE),
+    auto_unbox = TRUE
+  )
+  tmp_pull <- tempfile(fileext = ".json")
+  on.exit(unlink(tmp_pull), add = TRUE)
+  writeLines(pull_body, tmp_pull)
+
+  pull_raw <- tryCatch({
+    system2("curl",
+            args = c("-s", "-S",
+                     "--max-time", "1800",
+                     "-X", "POST",
+                     "-H", "Content-Type: application/json",
+                     "-d", paste0("@", tmp_pull),
+                     paste0(base_url, "/api/pull")),
+            stdout = TRUE, stderr = tmp_err)
+  }, error = function(e) NULL)
+
+  if (is.null(pull_raw)) {
+    log_warn("ollama_ensure_model() - pull request failed for '{m}'",
+             m = model)
+    return(FALSE)
+  }
+
+  pull_text <- paste(pull_raw, collapse = "\n")
+
+  # Check for success — Ollama returns {"status":"success"} when done
+  if (grepl("success", pull_text, ignore.case = TRUE)) {
+    log_info("ollama_ensure_model() - '{m}' pulled successfully.",
+             m = model)
+    assign(cache_key, TRUE, envir = .GlobalEnv)
+    return(TRUE)
+  }
+
+  # Check for error
+  if (grepl("error", pull_text, ignore.case = TRUE)) {
+    log_warn("ollama_ensure_model() - pull error for '{m}': {txt}",
+             m = model,
+             txt = substr(pull_text, 1, 200))
+    return(FALSE)
+  }
+
+  # Ambiguous response — log it and assume success if no error
+  log_info(paste0("ollama_ensure_model() - pull for '{m}' returned: ",
+                  "{txt}"),
+           m = model,
+           txt = substr(pull_text, 1, 200))
+  assign(cache_key, TRUE, envir = .GlobalEnv)
+  return(TRUE)
+}
+
+# ── Ollama HTTP helper ────────────────────────────────────────────────────────
+#    Uses system curl (guaranteed by curlFull in flake.nix) to POST to Ollama.
+#    Returns the assistant's text content, or NULL on failure.
+ollama_chat <- function(messages,
+                        model    = "qwen2.5:14b",
+                        base_url = Sys.getenv("OLLAMA_BASE_URL",
+                                              "http://ollama:11434")) {
+
+  # Ensure the model is available (pulls automatically if missing)
+  if (!ollama_ensure_model(model, base_url)) {
+    log_warn("ollama_chat() - model '{m}' unavailable, skipping.",
+             m = model)
+    return(NULL)
+  }
+
+  url  <- paste0(base_url, "/api/chat")
+  body <- jsonlite::toJSON(
+    list(model = model, messages = messages, stream = FALSE),
+    auto_unbox = TRUE
+  )
+
+  # write body to a temp file so we don't hit shell-escaping issues
+  tmp_body <- tempfile(fileext = ".json")
+  tmp_err  <- tempfile(fileext = ".txt")
+  on.exit(unlink(c(tmp_body, tmp_err)), add = TRUE)
+  writeLines(body, tmp_body)
+
+  result <- tryCatch({
+    # Keep stderr separate so curl errors don't corrupt the JSON
+    raw <- system2(
+      "curl",
+      args = c("-s", "-S",
+               "--max-time", "120",
+               "-X", "POST",
+               "-H", "Content-Type: application/json",
+               "-d", paste0("@", tmp_body),
+               url),
+      stdout = TRUE,
+      stderr = tmp_err
+    )
+
+    # Check for curl-level failure (exit code embedded in attr)
+    exit_code <- attr(raw, "status")
+    if (!is.null(exit_code) && exit_code != 0) {
+      err_msg <- paste(readLines(tmp_err, warn = FALSE), collapse = " ")
+      log_warn("ollama_chat() curl exit {code}: {msg}",
+               code = exit_code, msg = err_msg)
+      return(NULL)
+    }
+
+    # Guard against empty response
+    response_text <- paste(raw, collapse = "\n")
+    if (!nzchar(trimws(response_text))) {
+      log_warn("ollama_chat() received empty response from {u}", u = url)
+      return(NULL)
+    }
+
+    # Validate it looks like JSON before parsing
+    if (!grepl("^\\s*\\{", response_text)) {
+      log_warn("ollama_chat() response is not JSON: {snippet}",
+               snippet = substr(response_text, 1, 120))
+      return(NULL)
+    }
+
+    parsed <- jsonlite::fromJSON(response_text, simplifyVector = FALSE)
+
+    # Ollama returns errors as {"error": "..."} 
+    if (!is.null(parsed$error)) {
+      log_warn("ollama_chat() API error: {msg}", msg = parsed$error)
+      return(NULL)
+    }
+
+    parsed$message$content
+  }, error = function(e) {
+    log_warn("ollama_chat() failed: {msg}", msg = conditionMessage(e))
+    NULL
+  })
+
+  return(result)
+}
+
+# ── Build the RAG context payload ─────────────────────────────────────────────
+#    Gathers every piece of causal analysis data the LLM needs to write an
+#    accurate, layperson-friendly interpretation.
+build_insights_context <- function(dfr, df_vars, Zvars,
+                                   model_yn, model_ate) {
+
+  nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+  nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
+
+  xvar <- df_vars[1, ][[2]]
+  yvar <- df_vars[2, ][[2]]
+
+  # Adjustment set variables
+  z1_vars <- paste0(Zvars$Z[Zvars$grp == "Z1"], collapse = ", ")
+  z2_vars <- paste0(Zvars$Z[Zvars$grp == "Z2"], collapse = ", ")
+  if (!nzchar(z1_vars)) z1_vars <- "(none)"
+  if (!nzchar(z2_vars)) z2_vars <- "(none)"
+
+  # Causal estimates
+  z1_ate <- round(dfr$z1_ATE[1], 4)
+  z1_lci <- round(dfr$z1_ATE_LCI[1], 4)
+  z1_uci <- round(dfr$z1_ATE_UCI[1], 4)
+  z2_ate <- round(dfr$z2_ATE[1], 4)
+  z2_lci <- round(dfr$z2_ATE_LCI[1], 4)
+  z2_uci <- round(dfr$z2_ATE_UCI[1], 4)
+
+  # Overlap
+  lo_overlap     <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
+  hi_overlap     <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
+  overlap_exists <- hi_overlap >= lo_overlap &&
+                    !any(is.na(c(lo_overlap, hi_overlap)))
+
+  # Model flag / ATE
+  flag_val   <- if (!is.null(dfr$flag)) round(dfr$flag[1], 4) else NA
+  show_model <- model_yn != "null"
+
+  # Bias assessment (only meaningful when a model is present)
+  inZ1 <- any(dplyr::between(flag_val, z1_lci, z1_uci), na.rm = TRUE)
+  inZ2 <- any(dplyr::between(flag_val, z2_lci, z2_uci), na.rm = TRUE)
+
+  # Effect direction
+  maxflag <- max(c(z1_lci, z1_uci, z2_lci, z2_uci), na.rm = TRUE)
+  minflag <- min(c(z1_lci, z1_uci, z2_lci, z2_uci), na.rm = TRUE)
+  effect_dir <- if (maxflag < 0) {
+    "negative"
+  } else if (minflag > 0) {
+    "positive"
+  } else {
+    "no clear direction (CI spans zero)"
+  }
+
+  ctx <- paste0(
+    "=== CAUSAL ANALYSIS DATA (RAG CONTEXT) ===\n\n",
+    "VARIABLES:\n",
+    "  Cause (X): ", xvar, "\n",
+    "  Effect (Y): ", yvar, "\n\n",
+    "ADJUSTMENT SETS (confounders controlled for):\n",
+    "  Set 1 (Z1): ", z1_vars, "\n",
+    "  Set 2 (Z2): ", z2_vars, "\n\n",
+    "CAUSAL ESTIMATES (Average Treatment Effect as Risk Difference):\n",
+    "  Analysis 1 (using Z1): ATE = ", z1_ate,
+      " [95% CI: ", z1_lci, " to ", z1_uci, "]\n",
+    "  Analysis 2 (using Z2): ATE = ", z2_ate,
+      " [95% CI: ", z2_lci, " to ", z2_uci, "]\n\n",
+    "CI OVERLAP:\n",
+    "  The two analyses ",
+      if (overlap_exists) "DO" else "DO NOT",
+      " agree (confidence intervals ",
+      if (overlap_exists) "overlap" else "do not overlap", ").\n",
+    if (overlap_exists) paste0(
+      "  Overlap region: [", round(lo_overlap, 4),
+      " to ", round(hi_overlap, 4), "]\n"
+    ) else "",
+    "\n",
+    "EFFECT DIRECTION: ", effect_dir, "\n",
+    "  The combined CI range spans from ", round(minflag, 4),
+      " to ", round(maxflag, 4), ".\n",
+    "  As a risk difference, this means: when ", xvar,
+      " shifts from baseline to\n",
+    "  experimental values, the probability of ", yvar,
+      " changes by that amount.\n",
+    "  For example, an ATE of 0.05 means a 5 percentage-point increase.\n\n"
+  )
+
+  if (show_model) {
+    bias_status <- if (inZ1 & inZ2) {
+      "UNBIASED - model ATE falls within BOTH causal CIs"
+    } else if (inZ1 | inZ2) {
+      paste0("PARTIALLY BIASED - model ATE falls within one CI but not ",
+             "the other")
+    } else {
+      "BIASED - model ATE falls outside BOTH causal CIs"
+    }
+
+    ctx <- paste0(ctx,
+      "USER'S MODEL:\n",
+      "  Model mode: ", model_yn, "\n",
+      "  Model ATE (risk difference): ", flag_val, "\n",
+      "  Bias assessment: ", bias_status, "\n",
+      "  Model ATE within Z1 CI: ", inZ1, "\n",
+      "  Model ATE within Z2 CI: ", inZ2, "\n\n"
+    )
+  } else {
+    ctx <- paste0(ctx,
+      "USER'S MODEL:\n",
+      "  The user selected 'Just show me the effect' -- no model ",
+        "comparison is needed.\n",
+      "  Focus ONLY on interpreting the causal effect of ",
+        xvar, " on ", yvar, ".\n\n"
+    )
+  }
+
+  ctx <- paste0(ctx,
+    "DEFINITIONS FOR YOUR REFERENCE:\n",
+    "  ATE (Average Treatment Effect): The average causal effect of ",
+      "changing the\n",
+    "    cause variable from baseline to experimental, expressed as a ",
+      "risk difference.\n",
+    "  Risk Difference: The change in probability of the outcome. ",
+      "E.g., 0.08 means\n",
+    "    an 8 percentage-point increase in the likelihood of the ",
+      "outcome.\n",
+    "  Confidence Interval: A range that captures the true effect ",
+      "with 95% certainty.\n",
+    "  Adjustment Set: Variables controlled for to remove ",
+      "confounding bias.\n",
+    "  Bias (in this context): When a model's estimated effect ",
+      "differs from the\n",
+    "    unbiased causal estimate because confounders were not ",
+      "properly accounted for.\n"
+  )
+
+  return(ctx)
+}
+
+# ── Writer system prompt ──────────────────────────────────────────────────────
+build_writer_prompt <- function(show_model) {
+  base <- paste0(
+    "You are an expert at explaining causal inference results to ",
+    "non-technical users. ",
+    "You will receive a data summary from a causal analysis tool ",
+    "called AIR (AI Robustness). ",
+    "Your job is to write a clear, friendly, plain-language ",
+    "interpretation of the results.\n\n",
+    "RULES:\n",
+    "- Write in Markdown format.\n",
+    "- Use simple, everyday language. Avoid jargon. When you must ",
+      "use a technical term,\n",
+    "  define it immediately in parentheses.\n",
+    "- Explain what the ATE (risk difference) value means in ",
+      "practical terms.\n",
+    "  E.g., 'This means that when [X] changes, the chance of [Y] ",
+      "shifts by about N\n",
+    "  percentage points.'\n",
+    "- Explain what the confidence interval means: it is the range ",
+      "of plausible values\n",
+    "  for the true effect, given the data.\n",
+    "- Mention whether the two causal analyses agree with each ",
+      "other.\n"
+  )
+
+  if (show_model) {
+    base <- paste0(base,
+      "- Compare the user's model effect to the causal estimates.\n",
+      "- Explain whether the model appears biased or unbiased, and ",
+        "what that means.\n",
+      "- If biased, mention which adjustment-set variable(s) may be ",
+        "the source.\n"
+    )
+  } else {
+    base <- paste0(base,
+      "- The user chose 'Just show me the effect,' so do NOT ",
+        "discuss model comparison.\n",
+      "- Focus entirely on interpreting the causal effect of X ",
+        "on Y.\n"
+    )
+  }
+
+  base <- paste0(base,
+    "- End with a brief disclaimer that these results depend on ",
+      "the variables in the\n",
+    "  causal graph, and missing variables could change the ",
+      "conclusions.\n",
+    "- Keep it to 2-4 short paragraphs. Do not use bullet lists.\n",
+    "- Do NOT invent numbers. Only use the exact values provided ",
+      "in the data summary.\n",
+    "- Be warm and conversational, not clinical.\n"
+  )
+
+  return(base)
+}
+
+# ── Reviewer system prompt ────────────────────────────────────────────────────
+build_reviewer_prompt <- function() {
+  paste0(
+    "You are a rigorous fact-checker for causal inference summaries. ",
+    "You will receive:\n",
+    "  1. A DATA SUMMARY with the ground-truth numbers from a ",
+      "causal analysis.\n",
+    "  2. A DRAFT INTERPRETATION written by another assistant.\n\n",
+    "Your job is to check the draft for factual accuracy against ",
+    "the data summary.\n\n",
+    "CHECK FOR:\n",
+    "- Any numbers that don't match the data summary (wrong ATE, ",
+      "wrong CI, wrong direction).\n",
+    "- Incorrect claims about bias status, CI overlap, or effect ",
+      "direction.\n",
+    "- Claims that go beyond what the data supports.\n",
+    "- Missing key information that the user needs to understand ",
+      "the results.\n",
+    "- Jargon that isn't explained in plain language.\n\n",
+    "RESPOND WITH EXACTLY ONE OF:\n",
+    "  A) If the draft is accurate and complete, respond ONLY ",
+      "with:\n",
+    "     APPROVED\n",
+    "  B) If there are issues, respond with:\n",
+    "     REVISE\n",
+    "     [Then list each specific issue, citing the correct value ",
+      "from the data summary.]\n\n",
+    "Be strict. Every number must match. Every directional claim ",
+    "must be correct.\n"
+  )
+}
+
+# ── The agentic writer/reviewer loop ─────────────────────────────────────────
+run_ai_insights <- function(context, show_model, max_rounds = 3) {
+
+  writer_sys   <- build_writer_prompt(show_model)
+  reviewer_sys <- build_reviewer_prompt()
+
+  # Round 1: initial draft
+  draft <- ollama_chat(messages = list(
+    list(role = "system",  content = writer_sys),
+    list(role = "user",    content = context)
+  ))
+
+  if (is.null(draft)) return(NULL)
+  log_info("AI Insights - writer draft (round 1) received.")
+
+  approved  <- FALSE
+  round_num <- 1
+
+  while (!approved && round_num <= max_rounds) {
+    # Reviewer evaluates
+    review <- ollama_chat(messages = list(
+      list(role = "system", content = reviewer_sys),
+      list(role = "user",   content = paste0(
+        "=== DATA SUMMARY ===\n", context,
+        "\n\n=== DRAFT INTERPRETATION ===\n", draft
+      ))
+    ))
+
+    if (is.null(review)) {
+      log_warn("AI Insights - reviewer call failed at round {r}.",
+               r = round_num)
+      break
+    }
+
+    log_info("AI Insights - reviewer response (round {r}): {snippet}",
+             r = round_num,
+             snippet = substr(trimws(review), 1, 80))
+
+    if (grepl("^\\s*APPROVED", review, ignore.case = TRUE)) {
+      approved <- TRUE
+      log_info("AI Insights - approved at round {r}.", r = round_num)
+    } else {
+      # Writer revises based on feedback
+      round_num <- round_num + 1
+      if (round_num > max_rounds) break
+
+      draft <- ollama_chat(messages = list(
+        list(role = "system", content = writer_sys),
+        list(role = "user",   content = context),
+        list(role = "assistant", content = draft),
+        list(role = "user",   content = paste0(
+          "A reviewer found issues with your draft. ",
+          "Please revise it.\n\n",
+          "REVIEWER FEEDBACK:\n", review, "\n\n",
+          "Write a corrected version. Keep the same style and ",
+          "rules. Output ONLY the revised interpretation in ",
+          "Markdown, nothing else."
+        ))
+      ))
+
+      if (is.null(draft)) {
+        log_warn("AI Insights - writer revision failed at round {r}.",
+                 r = round_num)
+        break
+      }
+      log_info("AI Insights - writer revised draft (round {r}) received.",
+               r = round_num)
+    }
+  }
+
+  # Attach disclaimer if we hit the cap without approval
+  if (!approved) {
+    draft <- paste0(
+      draft, "\n\n---\n\n",
+      "*Note: This AI-generated summary reached the maximum number ",
+      "of review iterations without full reviewer approval. The ",
+      "information above has been reviewed but may contain minor ",
+      "imprecisions. Please cross-reference with the chart and ",
+      "causal graph above.*"
+    )
+  }
+
+  return(draft)
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  get_ui_interpretation()  --  main entry point (unchanged signature)
+#
+#  Tries the agentic AI Insights pipeline first. On failure, falls back to
+#  the original template interpretation with a notice to the user.
+# ══════════════════════════════════════════════════════════════════════════════
 get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
   dfr <- results_out_buffer()
 
   if (nrow(dfr) == 0) {
-    return(tags$em("No results – model fitting failed. Check the log."))
+    return(tags$em("No results - model fitting failed. Check the log."))
   }
 
-  # helper functions
-  nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
-  nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
+  show_model <- (rv$model_yn != "null")
 
-  # --- check for confidence interval overlap ---
+  # ── Try AI Insights ────────────────────────────────────────────────────
+  ai_result <- tryCatch({
+    ctx <- build_insights_context(dfr, df_vars, Zvars,
+                                  rv$model_yn, rv$model_ate)
+    run_ai_insights(ctx, show_model, max_rounds = 3)
+  }, error = function(e) {
+    log_warn("AI Insights pipeline error: {msg}",
+             msg = conditionMessage(e))
+    NULL
+  })
+
+  if (!is.null(ai_result) && nzchar(trimws(ai_result))) {
+    log_info("AI Insights - returning LLM-generated interpretation.")
+    return(ai_result)
+  }
+
+  # ── Fallback: original template interpretation ─────────────────────────
+  log_warn(paste0("AI Insights unavailable - falling back to template ",
+                  "interpretation."))
+  fallback <- get_fallback_interpretation(dfr, df_vars, Zvars)
+  notice   <- paste0(
+    "**Note:** The AI-powered interpretation is currently unavailable ",
+    "(the Ollama service may be unreachable). ",
+    "The following is an automated template-based summary.\n\n---\n\n"
+  )
+  return(paste0(notice, fallback))
+}
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  get_fallback_interpretation()  --  the original logic, preserved as
+#  fallback
+# ══════════════════════════════════════════════════════════════════════════════
+get_fallback_interpretation <- function(dfr, df_vars, Zvars) {
+
+  nz_max <- function(x) {
+    if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
+  }
+  nz_min <- function(x) {
+    if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
+  }
+
   lo_overlap <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
   hi_overlap <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
-  overlap_exists <- hi_overlap >= lo_overlap && !any(is.na(c(lo_overlap, hi_overlap)))
+  overlap_exists <- hi_overlap >= lo_overlap &&
+                    !any(is.na(c(lo_overlap, hi_overlap)))
 
-  # --- special message when no overlap exists ---
   if (!overlap_exists) {
     return(paste0(
-      "<strong>Consensus Could Not Be Reached for This Scenario.</strong> ",
-      "The two causal analyses do not agree within their confidence ranges. ",
-      "This suggests that the data or model assumptions may not support a stable or consistent causal conclusion for this scenario."
+      "**Consensus Could Not Be Reached for This Scenario.** ",
+      "The two causal analyses do not agree within their confidence ",
+      "ranges. This suggests that the data or model assumptions may ",
+      "not support a stable or consistent causal conclusion for ",
+      "this scenario."
     ))
   }
 
-  # --- continue with standard interpretation logic ---
   dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
   dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
-  
-  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
-      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
-    interpretation <- "The causal estimates appear inconsistent, suggesting there may not be enough information to train a reliable model."
-  } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
-    interpretation <- "Your model’s predictions align with the causal estimates. This indicates healthy model performance."
-  } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
-    interpretation <- "Your model’s predictions diverge from the causal estimates, suggesting potential reliability issues. Investigate possible causes for this mismatch."
-  } else {
-    interpretation <- "Your model partly agrees with the causal estimates but shows inconsistencies. Interpret these results with caution."
-  }
 
-  # --- determine relative bias direction ---
-  inZ1 <- any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]), na.rm = TRUE)
-  inZ2 <- any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), na.rm = TRUE)
-  
-  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
-  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
-  
+  inZ1 <- any(between(dfr$flag, dfr$z1_ATE_LCI[1],
+                       dfr$z1_ATE_UCI[1]), na.rm = TRUE)
+  inZ2 <- any(between(dfr$flag, dfr$z2_ATE_LCI[1],
+                       dfr$z2_ATE_UCI[1]), na.rm = TRUE)
+
+  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI,
+                 dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI,
+                 dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+
   flagdir <- case_when(
     maxflag < 0 ~ "a negative",
     minflag > 0 ~ "a positive",
@@ -2104,37 +2660,46 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
   )
 
   effect_estimation <- case_when(
-    any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
-    any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
+    any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~
+      "underestimating",
+    any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~
+      "overestimating",
     TRUE ~ "accurately estimating"
   )
 
   effect_percent <- case_when(
-    effect_estimation == "underestimating" ~ paste0(" by roughly ",
-      round(abs(maxflag) - abs(mean(dfr$flag)), 2) * 100, "–",
+    effect_estimation == "underestimating" ~ paste0(
+      " by roughly ",
+      round(abs(maxflag) - abs(mean(dfr$flag)), 2) * 100, "-",
       round(abs(minflag) - abs(mean(dfr$flag)), 2) * 100, "%"),
-    effect_estimation == "overestimating" ~ paste0(" by roughly ",
-      round(abs(mean(dfr$flag)) - abs(minflag), 2) * 100, "–",
+    effect_estimation == "overestimating" ~ paste0(
+      " by roughly ",
+      round(abs(mean(dfr$flag)) - abs(minflag), 2) * 100, "-",
       round(abs(mean(dfr$flag)) - abs(maxflag), 2) * 100, "%"),
     TRUE ~ ""
   )
 
   effect_fortune <- if (inZ1 & inZ2) "Fortunately" else "Unfortunately"
 
-  # --- simplified, human-readable result narrative ---
   result_text <- paste0(
-    "Your model appears to be ", effect_estimation, " the effect that ",
-    df_vars[1, ][[2]], " has on ", df_vars[2, ][[2]], effect_percent, ". ",
-    "Based on the causal analysis, ", df_vars[1, ][[2]], 
-    " is expected to have ", flagdir, " effect on ", df_vars[2, ][[2]], ". ",
-    "As ", df_vars[1, ][[2]], " changes from baseline to experimental values,
-    the likelihood of ", df_vars[2, ][[2]], " ",
+    "Your model appears to be ", effect_estimation,
+    " the effect that ",
+    df_vars[1, ][[2]], " has on ", df_vars[2, ][[2]],
+    effect_percent, ". ",
+    "Based on the causal analysis, ", df_vars[1, ][[2]],
+    " is expected to have ", flagdir, " effect on ",
+    df_vars[2, ][[2]], ". ",
+    "As ", df_vars[1, ][[2]],
+    " changes from baseline to experimental values, ",
+    "the likelihood of ", df_vars[2, ][[2]], " ",
     case_when(
-      flagdir == "a negative" ~ paste0("decreases by about ",
-        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
+      flagdir == "a negative" ~ paste0(
+        "decreases by about ",
+        round(min(abs(minflag), abs(maxflag)), 2) * 100, "-",
         round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
-      flagdir == "a positive" ~ paste0("increases by about ",
-        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
+      flagdir == "a positive" ~ paste0(
+        "increases by about ",
+        round(min(abs(minflag), abs(maxflag)), 2) * 100, "-",
         round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
       TRUE ~ "is unlikely to change."
     ), " ",
@@ -2143,41 +2708,51 @@ get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
       inZ1 & inZ2 ~ "unbiased",
       inZ1 | inZ2 ~ "partially biased",
       TRUE ~ "biased"
-    ), " results. Your model's effect is: ",rv$model_ate,". Overall, this suggests your seeing ",
+    ), " results. Your model's effect is: ", rv$model_ate,
+    ". Overall, this suggests you're seeing ",
     case_when(
-      effect_estimation == "underestimating" ~ "a smaller than expected ",
-      effect_estimation == "overestimating" ~ "a larger than expected ",
+      effect_estimation == "underestimating" ~
+        "a smaller than expected ",
+      effect_estimation == "overestimating" ~
+        "a larger than expected ",
       TRUE ~ "an appropriate "
     ),
-    "change in ", df_vars[2, ][[2]], " as ", df_vars[1, ][[2]], " varies. ",
+    "change in ", df_vars[2, ][[2]], " as ",
+    df_vars[1, ][[2]], " varies. ",
     case_when(
-      inZ1 & inZ2 ~ "No evidence of bias is detected at this time.",
+      inZ1 & inZ2 ~
+        "No evidence of bias is detected at this time.",
       inZ1 == TRUE & inZ2 == FALSE ~ paste0(
         "Bias may be introduced through variable(s): ",
-        paste0(Zvars$Z[2], collapse = ", "), " (see causal graph)."
-      ),
+        paste0(Zvars$Z[2], collapse = ", "),
+        " (see causal graph)."),
       inZ2 == TRUE & inZ1 == FALSE ~ paste0(
         "Bias may be introduced through variable(s): ",
-        paste0(Zvars$Z[1], collapse = ", "), " (see causal graph)."
-      ),
+        paste0(Zvars$Z[1], collapse = ", "),
+        " (see causal graph)."),
       TRUE ~ paste0(
         "Bias may be introduced through variable(s): ",
-          case_when(
-            identical(Zvars$Z[1], Zvars$Z[2]) ~ Zvars$Z[1],
-            TRUE ~ paste0(paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")) 
-          ),
-          " (see causal graph)."
-      )
+        case_when(
+          identical(Zvars$Z[1], Zvars$Z[2]) ~ Zvars$Z[1],
+          TRUE ~ paste0(
+            paste0(Zvars$Z[1], collapse = ", "),
+            " and/or ",
+            paste0(Zvars$Z[2], collapse = ", "))
+        ),
+        " (see causal graph).")
     )
   )
 
-  # --- improved, cleaner disclaimer text ---
   results_text <- paste0(
-    result_text, "\n These treatment effect estimates are based on the variables included in your causal graph. ",
-    "If important factors are missing, the results may not represent true causal relationships. ",
-    "The system assumes that any missing variables are independent of those included, which may not hold in practice. ",
-    "Interpret these estimates carefully and consider updating your graph if key relationships are uncertain. "
-    )
+    result_text,
+    "\n\nThese treatment effect estimates are based on the ",
+    "variables included in your causal graph. If important factors ",
+    "are missing, the results may not represent true causal ",
+    "relationships. The system assumes that any missing variables ",
+    "are independent of those included, which may not hold in ",
+    "practice. Interpret these estimates carefully and consider ",
+    "updating your graph if key relationships are uncertain."
+  )
 
   return(results_text)
 }
@@ -3730,6 +4305,7 @@ observeEvent(input$reload_btn, {
     tmle_buffer(data.frame())
     ml_buffer(data.frame())
     combined_buffer(data.frame())
+    ai_insights_buffer(NULL)
 
     # ── 2. Reset control flags ────────────────────────────────────────────
     locked(FALSE)
@@ -4243,6 +4819,38 @@ shiny::validate({
       }, error = function(e) {
         log_debug("Fatal error during ATE estimation: {msg}", msg = conditionMessage(e))
       })
+
+      # ── Generate AI Insights (inside progress bar) ──────────────────
+      incProgress(0.05, message = "Generating AI Insights",
+                  detail = "Contacting Ollama...")
+      ai_text <- tryCatch({
+        dfr <- results_out_buffer()
+        if (nrow(dfr) > 0) {
+          show_model <- (rv$model_yn != "null")
+          ctx <- build_insights_context(dfr, df_vars, Zvars,
+                                        rv$model_yn, rv$model_ate)
+
+          incProgress(0.02, detail = "Writer drafting interpretation...")
+          result <- run_ai_insights(ctx, show_model, max_rounds = 3)
+
+          if (!is.null(result) && nzchar(trimws(result))) {
+            log_info("AI Insights - pre-computed successfully.")
+            result
+          } else {
+            NULL
+          }
+        } else {
+          NULL
+        }
+      }, error = function(e) {
+        log_warn("AI Insights pre-generation failed: {msg}",
+                 msg = conditionMessage(e))
+        NULL
+      })
+      ai_insights_buffer(ai_text)
+      incProgress(0.03, message = if (!is.null(ai_text))
+                    "AI Insights Ready" else "AI Insights Unavailable",
+                  detail = "")
 
      calc_complete(TRUE)
 
@@ -4960,11 +5568,39 @@ output$figurecaption = renderUI({
 output$ui_interpretation = renderUI({
   req(calc_complete())  
 
-  result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
+  # Use pre-computed AI result from the progress block if available;
+  # otherwise fall back to template interpretation.
+  ai_text <- ai_insights_buffer()
+
+  if (!is.null(ai_text) && nzchar(trimws(ai_text))) {
+    result_text <- ai_text
+  } else {
+    # Fallback: template interpretation with notice
+    dfr <- results_out_buffer()
+    if (nrow(dfr) == 0) {
+      return(tags$em("No results - model fitting failed. Check the log."))
+    }
+    fallback <- get_fallback_interpretation(dfr, df_vars, Zvars)
+    notice   <- paste0(
+      "**Note:** The AI-powered interpretation is currently unavailable ",
+      "(the Ollama service may be unreachable). ",
+      "The following is an automated template-based summary.\n\n---\n\n"
+    )
+    result_text <- paste0(notice, fallback)
+  }
+
+  # Render Markdown as HTML
+  rendered_html <- tryCatch(
+    commonmark::markdown_html(result_text, extensions = TRUE),
+    error = function(e) result_text
+  )
 
   tagList(
-    tags$h3("Interpreting your results:"),
-    tags$div(style = "font-size:24px;", result_text)
+    tags$h3("AI Insights:"),
+    tags$div(
+      style = "font-size:16px; line-height:1.6;",
+      HTML(rendered_html)
+    )
   )
 })
 
@@ -5028,7 +5664,19 @@ output$download_report <- downloadHandler(
       )
   
       figure_cap   <- get_figure_caption(AIRHome, df_vars)
-      result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars)
+
+      # Use pre-computed AI Insights if available; fall back to template
+      ai_text <- isolate(ai_insights_buffer())
+      if (!is.null(ai_text) && nzchar(trimws(ai_text))) {
+        result_text <- ai_text
+      } else {
+        dfr_snap <- isolate(results_out_buffer())
+        result_text <- if (nrow(dfr_snap) > 0) {
+          get_fallback_interpretation(dfr_snap, df_vars, vals$Zvars)
+        } else {
+          "No interpretation available."
+        }
+      }
 
   
       # -----------------------------------------------------------------
