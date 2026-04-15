@@ -248,7 +248,6 @@
             pkgs.rPackages.shinyWidgets
             pkgs.rPackages.tidyr
             pkgs.rPackages.xgboost
-            pkgs.rPackages.quarto
 
             # These are SL3's dependencies
             pkgs.rPackages.BBmisc
@@ -329,7 +328,7 @@
           ];
         };
 
-        quartoPatched = pkgs.quarto.overrideAttrs (old: {
+        quartoPatched = pkgs.quartoMinimal.overrideAttrs (old: {
           buildInputs = (old.buildInputs or []) ++ [ rWithPkgs ];
 
           postFixup = ''
