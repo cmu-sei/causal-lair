@@ -419,9 +419,10 @@ locked <- reactiveVal(FALSE)
 step1lock <- reactiveVal(FALSE)
 
 # ── NEW: keep TMLE rows, ML rows, and the 1-row summary apart ────────────────
-tmle_buffer     <- reactiveVal(data.frame())   # 1 row per adjustment set
-ml_buffer       <- reactiveVal(data.frame())   # 1 row per ML algorithm
-combined_buffer <- reactiveVal(data.frame())   # exactly 1 row (ribbon plot)
+tmle_buffer        <- reactiveVal(data.frame())   # 1 row per adjustment set
+ml_buffer          <- reactiveVal(data.frame())   # 1 row per ML algorithm
+combined_buffer    <- reactiveVal(data.frame())   # exactly 1 row (ribbon plot)
+classifier_buffer  <- reactiveVal(NULL)            # all 5 classifier ATEs ("No" mode only)
 
 # create a shared reactiveValues object to pass variables around
 rv$dot <- NULL  # define once in app init
@@ -1523,7 +1524,8 @@ processResults <- function(settings,
     ate_df_ref <- dplyr::filter(ate_df_all,
                                 algorithm == "ML Model Summary")
 
-    ml_buffer(ate_df_ref)       # now identical semantics to options 1 & 2
+    classifier_buffer(ate_df_all)   # all 5 ATEs — used for spread display in interpretation
+    ml_buffer(ate_df_ref)           # stacked-SL summary is the reference ATE
 
   } else {
     log_info(sprintf("Using existing model config: %s", model_yn))
@@ -2050,136 +2052,354 @@ get_figure_caption <- function(AIRHome, df_vars) {
   return(caption)
 }
 
-get_ui_interpretation <- function(AIRHome, df_vars, Zvars) {
+get_ui_interpretation <- function(AIRHome, df_vars, Zvars, model_yn, n_obs) {
   dfr <- results_out_buffer()
 
   if (nrow(dfr) == 0) {
     return(tags$em("No results – model fitting failed. Check the log."))
   }
 
-  # helper functions
+  # ── helpers ────────────────────────────────────────────────────────────────
   nz_max <- function(x) if (all(is.na(x))) NA_real_ else max(x, na.rm = TRUE)
   nz_min <- function(x) if (all(is.na(x))) NA_real_ else min(x, na.rm = TRUE)
 
-  # --- check for confidence interval overlap ---
+  fmt_pct_signed <- function(x) {
+    v <- round(x * 100, 0)
+    if (v > 0) paste0("+", v, "%") else paste0(v, "%")
+  }
+  fmt_range <- function(lo, hi) paste0(fmt_pct_signed(lo), " to ", fmt_pct_signed(hi))
+  fmt_range_abs <- function(lo, hi) {
+    paste0(round(min(abs(lo), abs(hi)) * 100, 0), "\u2013",
+           round(max(abs(lo), abs(hi)) * 100, 0), "%")
+  }
+
+  x_var <- df_vars[1, ][[2]]
+  y_var <- df_vars[2, ][[2]]
+
+  # ── CI overlap ─────────────────────────────────────────────────────────────
   lo_overlap <- nz_max(c(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI))
   hi_overlap <- nz_min(c(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI))
-  overlap_exists <- hi_overlap >= lo_overlap && !any(is.na(c(lo_overlap, hi_overlap)))
+  overlap_exists <- !is.na(lo_overlap) && !is.na(hi_overlap) && hi_overlap >= lo_overlap
 
-  # --- special message when no overlap exists ---
-  if (!overlap_exists) {
+  # ── CI width note ──────────────────────────────────────────────────────────
+  z1_width   <- dfr$z1_ATE_UCI[1] - dfr$z1_ATE_LCI[1]
+  z2_width   <- dfr$z2_ATE_UCI[1] - dfr$z2_ATE_LCI[1]
+  max_width  <- max(z1_width, z2_width, na.rm = TRUE)
+  ci_width_note <- if (max_width < 0.10) {
+    "The uncertainty range is narrow, so this is a fairly precise estimate \u2014 not just a directional guess."
+  } else if (max_width < 0.25) {
+    "The uncertainty range is moderate; the direction of the effect is reliable but the exact size is approximate."
+  } else {
+    paste0(
+      "Note: the uncertainty range is wide (spanning more than ",
+      round(max_width * 100, 0),
+      " percentage points). The data supports only a rough directional conclusion here, not a precise effect size. ",
+      "Collecting more data or refining the causal graph may narrow this range."
+    )
+  }
+
+  # ── Z1/Z2 point estimate proximity ─────────────────────────────────────────
+  z1_pt <- dfr$z1_ATE[1]
+  z2_pt <- dfr$z2_ATE[1]
+  pt_gap <- abs(z1_pt - z2_pt)
+  proximity_note <- if (pt_gap < 0.05) {
+    paste0(
+      "Both independent analyses give nearly identical estimates ",
+      "(Analysis A: ", fmt_range(dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]),
+      "; Analysis B: ", fmt_range(dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]),
+      "), which adds confidence to this finding."
+    )
+  } else if (pt_gap < 0.10) {
+    paste0(
+      "The two analyses give similar estimates ",
+      "(Analysis A: ", fmt_range(dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]),
+      "; Analysis B: ", fmt_range(dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), ")."
+    )
+  } else {
+    paste0(
+      "The two analyses agree on direction but differ in magnitude ",
+      "(Analysis A: ", fmt_range(dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]),
+      "; Analysis B: ", fmt_range(dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]),
+      "). Treat the exact size with some caution."
+    )
+  }
+
+  # ── Effect direction (from consensus range, or full range if no overlap) ───
+  if (overlap_exists) {
+    flagdir <- if (lo_overlap > 0) "positive" else if (hi_overlap < 0) "negative" else "none"
+  } else {
+    all_bounds <- c(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
+    flagdir <- if (max(all_bounds, na.rm = TRUE) < 0) "negative" else if (min(all_bounds, na.rm = TRUE) > 0) "positive" else "none"
+  }
+
+  # ── Sample size caveat ─────────────────────────────────────────────────────
+  sample_caveat <- if (!is.null(n_obs) && !is.na(n_obs) && n_obs < 500) {
+    "Note: this dataset is relatively small, which means there may not have been enough data to detect a small-to-moderate effect even where the analyses agree. Treat directional conclusions with caution."
+  } else {
+    "These estimates are only as reliable as the variables included in your causal graph. If an important variable is missing, the true effect may differ."
+  }
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # NULL MODE — causal effect only, no model comparison
+  # ══════════════════════════════════════════════════════════════════════════
+  if (isTRUE(model_yn == "null")) {
+
+    if (!overlap_exists) {
+      return(paste0(
+        "<strong>The two causal analyses gave conflicting answers.</strong><br><br>",
+        "AIR estimates the effect of <em>", x_var, "</em> on <em>", y_var,
+        "</em> using two different sets of background variables. ",
+        "Here those two approaches disagree completely \u2014 ",
+        "Analysis A estimates the effect at ", fmt_range(dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]),
+        ", while Analysis B estimates it at ", fmt_range(dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), ". ",
+        "When the ranges don\u2019t even overlap, no single reliable conclusion can be drawn.<br><br>",
+        "This often happens when the dataset is small, the causal graph includes uncertain relationships, ",
+        "or a key variable is missing.<br><br>",
+        "<strong>What to do:</strong> Review your causal graph for missing variables or incorrect edges. ",
+        "Consider collecting more data before drawing conclusions."
+      ))
+    }
+
+    direction_phrase <- if (flagdir == "positive") {
+      paste0("is associated with a <strong>", fmt_range_abs(lo_overlap, hi_overlap),
+             " increase</strong> in the probability of <em>", y_var, "</em>")
+    } else if (flagdir == "negative") {
+      paste0("is associated with a <strong>", fmt_range_abs(lo_overlap, hi_overlap),
+             " decrease</strong> in the probability of <em>", y_var, "</em>")
+    } else {
+      paste0("does <strong>not meaningfully change</strong> the probability of <em>", y_var,
+             "</em> \u2014 the effect is too small to distinguish from random variation")
+    }
+
+    consensus_text <- if (flagdir != "none") {
+      paste0(
+        "The range where both analyses agree \u2014 the most defensible single estimate \u2014 is ",
+        "<strong>", fmt_range(lo_overlap, hi_overlap), "</strong>. "
+      )
+    } else {
+      paste0(
+        "The range where both analyses agree spans roughly ",
+        "<strong>", fmt_range(lo_overlap, hi_overlap), "</strong>, ",
+        "which AIR treats as no meaningful effect. "
+      )
+    }
+
     return(paste0(
-      "<strong>Consensus Could Not Be Reached for This Scenario.</strong> ",
-      "The two causal analyses do not agree within their confidence ranges. ",
-      "This suggests that the data or model assumptions may not support a stable or consistent causal conclusion for this scenario."
+      "<strong>Causal Effect Summary</strong><br><br>",
+      "Based on your data and causal graph, changing <em>", x_var,
+      "</em> from its baseline range to its experimental range ", direction_phrase, ".<br><br>",
+      consensus_text, proximity_note, "<br><br>",
+      ci_width_note, "<br><br>",
+      "<strong>Caveat:</strong> ", sample_caveat
     ))
   }
 
-  # --- continue with standard interpretation logic ---
-  dfr$zmax <- max(dfr$z1_ATE_UCI, dfr$z2_ATE_UCI)
-  dfr$zmin <- min(dfr$z1_ATE_LCI, dfr$z2_ATE_LCI)
-  
-  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
-      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
-    interpretation <- "The causal estimates appear inconsistent, suggesting there may not be enough information to train a reliable model."
-  } else if (all(dfr$flag > dfr$zmin & dfr$flag < dfr$zmax)) {
-    interpretation <- "Your model’s predictions align with the causal estimates. This indicates healthy model performance."
-  } else if (all(dfr$flag > dfr$zmax) | all(dfr$flag < dfr$zmin)) {
-    interpretation <- "Your model’s predictions diverge from the causal estimates, suggesting potential reliability issues. Investigate possible causes for this mismatch."
-  } else {
-    interpretation <- "Your model partly agrees with the causal estimates but shows inconsistencies. Interpret these results with caution."
+  # ══════════════════════════════════════════════════════════════════════════
+  # MODEL COMPARISON MODES: Yes / ATE / No
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ── State 1: No consensus ─────────────────────────────────────────────────
+  if (!overlap_exists) {
+    return(paste0(
+      "<strong>The two causal analyses gave conflicting answers.</strong><br><br>",
+      "AIR computes the effect of <em>", x_var, "</em> on <em>", y_var,
+      "</em> using two different sets of background variables. ",
+      "Here those two approaches disagree completely \u2014 ",
+      "Analysis A estimates the effect at ", fmt_range(dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]),
+      ", while Analysis B estimates it at ", fmt_range(dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), ". ",
+      "When the ranges don\u2019t even overlap, no single reliable conclusion can be drawn.<br><br>",
+      "Wide uncertainty ranges often accompany this result and can indicate a small dataset, ",
+      "uncertain relationships in the causal graph, or a missing variable driving the disagreement.<br><br>",
+      "<strong>What to do:</strong> Review your causal graph for missing variables or incorrect edges. ",
+      "Consider collecting more data before drawing conclusions."
+    ))
   }
 
-  # --- determine relative bias direction ---
-  inZ1 <- any(between(dfr$flag, dfr$z1_ATE_LCI[1], dfr$z1_ATE_UCI[1]), na.rm = TRUE)
-  inZ2 <- any(between(dfr$flag, dfr$z2_ATE_LCI[1], dfr$z2_ATE_UCI[1]), na.rm = TRUE)
-  
-  maxflag <- max(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
-  minflag <- min(dfr$z1_ATE_LCI, dfr$z1_ATE_UCI, dfr$z2_ATE_LCI, dfr$z2_ATE_UCI)
-  
-  flagdir <- case_when(
-    maxflag < 0 ~ "a negative",
-    minflag > 0 ~ "a positive",
-    TRUE ~ "no"
+  # ── State 2: Internally inconsistent ──────────────────────────────────────
+  if ((all(dfr$z1_ATE_UCI < dfr$z2_ATE) & all(dfr$z2_ATE_LCI > dfr$z1_ATE)) |
+      (all(dfr$z1_ATE_LCI > dfr$z2_ATE) & all(dfr$z2_ATE_UCI < dfr$z1_ATE))) {
+    dir_word <- if (flagdir == "positive") "a positive" else if (flagdir == "negative") "a negative" else "a possible"
+    return(paste0(
+      "<strong>The two analyses agree on direction but disagree on size.</strong><br><br>",
+      "Both analyses find ", dir_word, " effect of <em>", x_var, "</em> on <em>", y_var,
+      "</em>, but they differ meaningfully on how large that effect is. ",
+      "Analysis A estimates <strong>", fmt_pct_signed(z1_pt),
+      "</strong> and Analysis B estimates <strong>", fmt_pct_signed(z2_pt),
+      "</strong> \u2014 a ", round(pt_gap * 100, 0), " percentage-point spread. ",
+      "Their confidence ranges do overlap (roughly ", fmt_range(lo_overlap, hi_overlap),
+      "), so a causal effect in that region is plausible, but the disagreement means ",
+      "estimates should be treated as rough approximations rather than precise values.<br><br>",
+      "This usually reflects limited data or structural uncertainty in the causal graph, ",
+      "not necessarily a problem with your model."
+    ))
+  }
+
+  # ── State 3: Standard interpretation ──────────────────────────────────────
+  flag <- dfr$flag[1]
+
+  inZ1 <- any(flag >= dfr$z1_ATE_LCI & flag <= dfr$z1_ATE_UCI, na.rm = TRUE)
+  inZ2 <- any(flag >= dfr$z2_ATE_LCI & flag <= dfr$z2_ATE_UCI, na.rm = TRUE)
+  bias_status <- if (inZ1 & inZ2) "unbiased" else if (inZ1 | inZ2) "partial" else "biased"
+
+  # Degree of divergence from nearest CI boundary
+  divergence <- if (!inZ1 & !inZ2) {
+    if (flag > max(dfr$z1_ATE_UCI[1], dfr$z2_ATE_UCI[1])) {
+      flag - max(dfr$z1_ATE_UCI[1], dfr$z2_ATE_UCI[1])
+    } else {
+      min(dfr$z1_ATE_LCI[1], dfr$z2_ATE_LCI[1]) - flag
+    }
+  } else if (!inZ1) {
+    if (flag > dfr$z1_ATE_UCI[1]) flag - dfr$z1_ATE_UCI[1] else dfr$z1_ATE_LCI[1] - flag
+  } else if (!inZ2) {
+    if (flag > dfr$z2_ATE_UCI[1]) flag - dfr$z2_ATE_UCI[1] else dfr$z2_ATE_LCI[1] - flag
+  } else {
+    0
+  }
+  divergence_pp <- round(abs(divergence) * 100, 0)
+
+  model_dir <- if (flag > hi_overlap) "overestimating" else if (flag < lo_overlap) "underestimating" else "accurate"
+
+  # Bias source explanation with structural roles
+  Z1_vars <- Zvars[Zvars$grp == "Z1", ]$Z
+  Z2_vars <- Zvars[Zvars$grp == "Z2", ]$Z
+
+  build_source <- function(vars, role) {
+    if (length(vars) == 0 || all(is.na(vars)) || all(!nzchar(vars))) return(NULL)
+    paste0("<em>", paste(vars, collapse = ", "), "</em> (", role, ")")
+  }
+
+  z1_role <- paste0(
+    "direct background ", if (length(Z1_vars) == 1) "cause" else "causes",
+    " of <em>", x_var, "</em>"
+  )
+  z2_role <- paste0(
+    if (length(Z2_vars) == 1) "a variable" else "variables",
+    " that influence the pathway between <em>", x_var, "</em> and <em>", y_var, "</em>"
   )
 
-  effect_estimation <- case_when(
-    any(abs(dfr$flag) < min(abs(maxflag), abs(minflag))) ~ "underestimating",
-    any(abs(dfr$flag) > max(abs(maxflag), abs(minflag))) ~ "overestimating",
-    TRUE ~ "accurately estimating"
-  )
+  bias_sources <- Filter(Negate(is.null), list(
+    if (!inZ1) build_source(Z1_vars, z1_role) else NULL,
+    if (!inZ2) build_source(Z2_vars, z2_role) else NULL
+  ))
 
-  effect_percent <- case_when(
-    effect_estimation == "underestimating" ~ paste0(" by roughly ",
-      round(abs(maxflag) - abs(mean(dfr$flag)), 2) * 100, "–",
-      round(abs(minflag) - abs(mean(dfr$flag)), 2) * 100, "%"),
-    effect_estimation == "overestimating" ~ paste0(" by roughly ",
-      round(abs(mean(dfr$flag)) - abs(minflag), 2) * 100, "–",
-      round(abs(mean(dfr$flag)) - abs(maxflag), 2) * 100, "%"),
-    TRUE ~ ""
-  )
-
-  effect_fortune <- if (inZ1 & inZ2) "Fortunately" else "Unfortunately"
-
-  # --- simplified, human-readable result narrative ---
-  result_text <- paste0(
-    "Your model appears to be ", effect_estimation, " the effect that ",
-    df_vars[1, ][[2]], " has on ", df_vars[2, ][[2]], effect_percent, ". ",
-    "Based on the causal analysis, ", df_vars[1, ][[2]], 
-    " is expected to have ", flagdir, " effect on ", df_vars[2, ][[2]], ". ",
-    "As ", df_vars[1, ][[2]], " changes from baseline to experimental values,
-    the likelihood of ", df_vars[2, ][[2]], " ",
-    case_when(
-      flagdir == "a negative" ~ paste0("decreases by about ",
-        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
-        round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
-      flagdir == "a positive" ~ paste0("increases by about ",
-        round(min(abs(minflag), abs(maxflag)), 2) * 100, "–",
-        round(max(abs(minflag), abs(maxflag)), 2) * 100, "%."),
-      TRUE ~ "is unlikely to change."
-    ), " ",
-    effect_fortune, ", your model is producing ",
-    case_when(
-      inZ1 & inZ2 ~ "unbiased",
-      inZ1 | inZ2 ~ "partially biased",
-      TRUE ~ "biased"
-    ), " results. Your model's effect is: ",rv$model_ate,". Overall, this suggests your seeing ",
-    case_when(
-      effect_estimation == "underestimating" ~ "a smaller than expected ",
-      effect_estimation == "overestimating" ~ "a larger than expected ",
-      TRUE ~ "an appropriate "
-    ),
-    "change in ", df_vars[2, ][[2]], " as ", df_vars[1, ][[2]], " varies. ",
-    case_when(
-      inZ1 & inZ2 ~ "No evidence of bias is detected at this time.",
-      inZ1 == TRUE & inZ2 == FALSE ~ paste0(
-        "Bias may be introduced through variable(s): ",
-        paste0(Zvars$Z[2], collapse = ", "), " (see causal graph)."
-      ),
-      inZ2 == TRUE & inZ1 == FALSE ~ paste0(
-        "Bias may be introduced through variable(s): ",
-        paste0(Zvars$Z[1], collapse = ", "), " (see causal graph)."
-      ),
-      TRUE ~ paste0(
-        "Bias may be introduced through variable(s): ",
-          case_when(
-            identical(Zvars$Z[1], Zvars$Z[2]) ~ Zvars$Z[1],
-            TRUE ~ paste0(paste0(Zvars$Z[1], collapse = ", "), " and/or ", paste0(Zvars$Z[2], collapse = ", ")) 
-          ),
-          " (see causal graph)."
-      )
+  bias_source_text <- if (bias_status != "unbiased" && length(bias_sources) > 0) {
+    paste0(
+      "<strong>Likely source of bias:</strong> ",
+      paste(bias_sources, collapse = "; and "),
+      " \u2014 highlighted in red on the causal graph. ",
+      "Review these variables and the edges connected to them."
     )
+  } else ""
+
+  # Classifier spread (No mode only)
+  classifier_text <- ""
+  if (isTRUE(model_yn == "No")) {
+    clf <- classifier_buffer()
+    if (!is.null(clf) && nrow(clf) > 1) {
+      clf_flags <- clf$flag[clf$algorithm != "ML Model Summary"]
+      clf_flags <- clf_flags[!is.na(clf_flags)]
+      if (length(clf_flags) > 1) {
+        clf_spread <- max(clf_flags) - min(clf_flags)
+        classifier_text <- if (clf_spread < 0.05) {
+          paste0(
+            "The five classifiers AIR trained internally gave consistent predictions ",
+            "(range: ", fmt_range_abs(min(clf_flags), max(clf_flags)), "), ",
+            "which reinforces this conclusion."
+          )
+        } else if (clf_spread < 0.15) {
+          paste0(
+            "The five classifiers AIR trained internally were moderately consistent ",
+            "(range: ", fmt_range_abs(min(clf_flags), max(clf_flags)), ")."
+          )
+        } else {
+          paste0(
+            "Note: the five classifiers AIR trained internally gave a wide spread of predictions ",
+            "(range: ", fmt_range_abs(min(clf_flags), max(clf_flags)), "). ",
+            "This spread suggests the model may be sensitive to the choice of algorithm. ",
+            "Interpret the specific effect size with caution."
+          )
+        }
+      }
+    }
+  }
+
+  # Headline
+  headline <- if (bias_status == "unbiased") {
+    "<strong>No bias detected.</strong>"
+  } else if (bias_status == "partial") {
+    "<strong>Possible bias detected.</strong>"
+  } else {
+    "<strong>Bias detected.</strong>"
+  }
+
+  # What the causal analysis found
+  direction_phrase <- if (flagdir == "positive") {
+    paste0("a <strong>", fmt_range_abs(lo_overlap, hi_overlap),
+           " increase</strong> in the probability of <em>", y_var, "</em>")
+  } else if (flagdir == "negative") {
+    paste0("a <strong>", fmt_range_abs(lo_overlap, hi_overlap),
+           " decrease</strong> in the probability of <em>", y_var, "</em>")
+  } else {
+    paste0("<strong>no meaningful change</strong> in the probability of <em>", y_var,
+           "</em> \u2014 the effect is too small to distinguish from random variation")
+  }
+
+  found_text <- paste0(
+    "<strong>What the causal analysis found:</strong> When <em>", x_var,
+    "</em> moves from its baseline range to its experimental range, the expected outcome is ",
+    direction_phrase, ". ", proximity_note
   )
 
-  # --- improved, cleaner disclaimer text ---
-  results_text <- paste0(
-    result_text, "\n These treatment effect estimates are based on the variables included in your causal graph. ",
-    "If important factors are missing, the results may not represent true causal relationships. ",
-    "The system assumes that any missing variables are independent of those included, which may not hold in practice. ",
-    "Interpret these estimates carefully and consider updating your graph if key relationships are uncertain. "
-    )
+  # Model comparison paragraph
+  model_pct      <- fmt_pct_signed(flag)
+  consensus_range <- fmt_range(lo_overlap, hi_overlap)
 
-  return(results_text)
+  model_para <- if (bias_status == "unbiased") {
+    paste0(
+      "Your model\u2019s predicted effect (", model_pct,
+      ") falls within the range both analyses expect (", consensus_range,
+      "). The model is performing as expected."
+    )
+  } else if (flagdir == "none") {
+    paste0(
+      "Your model predicts an effect of ", model_pct, " on <em>", y_var,
+      "</em>, but the causal analysis finds no real effect ",
+      "(both analyses agree the effect is near zero: ", consensus_range, "). ",
+      "The relationship your model learned is likely spurious."
+    )
+  } else {
+    over_under_word  <- if (model_dir == "overestimating") "overstating" else "understating"
+    divergence_clause <- if (divergence_pp > 0) {
+      paste0(" \u2014 your model is ", over_under_word, " the effect by roughly <strong>",
+             divergence_pp, " percentage points</strong>")
+    } else ""
+    warning_clause <- if (bias_status == "partial") {
+      " Your model\u2019s prediction falls within one analysis range but outside the other, which is a warning sign rather than a definitive verdict."
+    } else {
+      " Your model\u2019s prediction falls outside both analysis ranges."
+    }
+    paste0(
+      "Your model predicts an effect of ", model_pct, " on <em>", y_var,
+      "</em>, but the causal analysis puts the best estimate at ", consensus_range,
+      divergence_clause, ".", warning_clause
+    )
+  }
+
+  # Assemble all parts
+  parts <- c(
+    headline,
+    "<br><br>",
+    model_para,
+    "<br><br>",
+    found_text,
+    if (nzchar(bias_source_text)) c("<br><br>", bias_source_text) else NULL,
+    if (nzchar(classifier_text))  c("<br><br>", classifier_text)  else NULL,
+    "<br><br>",
+    ci_width_note,
+    if (bias_status != "biased") c("<br><br>", "<strong>Caveat:</strong> ", sample_caveat) else NULL
+  )
+
+  paste0(parts, collapse = "")
 }
 
 
@@ -3730,6 +3950,7 @@ observeEvent(input$reload_btn, {
     tmle_buffer(data.frame())
     ml_buffer(data.frame())
     combined_buffer(data.frame())
+    classifier_buffer(NULL)
 
     # ── 2. Reset control flags ────────────────────────────────────────────
     locked(FALSE)
@@ -4960,11 +5181,13 @@ output$figurecaption = renderUI({
 output$ui_interpretation = renderUI({
   req(calc_complete())  
 
-  result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars)
+  result_text <- get_ui_interpretation(AIRHome, df_vars, Zvars,
+                                       model_yn = rv$model_yn,
+                                       n_obs    = nrow(datafile_buffer()))
 
   tagList(
     tags$h3("Interpreting your results:"),
-    tags$div(style = "font-size:24px;", result_text)
+    tags$div(style = "font-size:24px;", HTML(result_text))
   )
 })
 
@@ -5028,7 +5251,9 @@ output$download_report <- downloadHandler(
       )
   
       figure_cap   <- get_figure_caption(AIRHome, df_vars)
-      result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars)
+      result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars,
+                                            model_yn = isolate(rv$model_yn),
+                                            n_obs    = nrow(vals$df))
 
   
       # -----------------------------------------------------------------
