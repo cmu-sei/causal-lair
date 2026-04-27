@@ -1,0 +1,10 @@
+[book]
+title = "AIR Tool Documentation"
+authors = ["Software Engineering Institute, Carnegie Mellon University"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+git-repository-url = "https://github.com/cmu-sei/causal-lair/"

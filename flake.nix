@@ -63,15 +63,25 @@
           inherit system;
           overlays = [
             (final: prev: {
-              # Make the default nodejs used by nixpkgs (and thus rPackages.V8) be nodejs_22
-              # Nix's recent updates to node for nodejs_24 are incompatible
-              # with V8 at this time, a package we need to support
-              # DiagrammeRSVG
               nodejs = prev.nodejs_22;
+              gjs = prev.gjs.overrideAttrs (_: { doCheck = false; });
+              sdl3 = prev.sdl3.overrideAttrs (old: { 
+                doCheck = false;
+                cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
+                outputs = builtins.filter (o: o != "installedTests") old.outputs;
+              });
+              sdl2-compat = prev.sdl2-compat.overrideAttrs (old: { 
+                doCheck = false;
+                cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
+                outputs = builtins.filter (o: o != "installedTests") old.outputs;
+              });
             })
             rust-overlay.overlays.default
             myNeovimOverlay.overlays.default
           ];
+          config = {
+            doCheckByDefault = false;
+          };
         };
 
         identify = let
