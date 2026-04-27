@@ -61,25 +61,24 @@ Classified options are not available at the SEI at this point.
 
 -   **Hardware:**
 
-    -   10+GiB of storage + any additional for your data
+    -   20+GiB of storage + any additional for your data (the bundled
+        AI model requires ~5 GB; GPU mode requires an additional ~9 GB
+        on first run)
 
     -   12GiB+ memory (Estimate is based on our testing, but may vary)
 
+    -   **Optional:** NVIDIA GPU with 12 GB+ VRAM for faster AI-generated
+        interpretations (CPU mode works on any machine but is slower)
+
 -   **Software:**
 
-    -   Docker-capable system (i.e., Linux/Mac/Windows)
+    -   Podman or Docker (Linux, macOS, or Windows via WSL2)
 
-    -   WSL2/Docker/Docker Desktop software
-
-    -   A text editor
-
-    -   A web browser (used for viewing/interacting with local .html
-        files)
+    -   A web browser
 
 -   **User:**
 
-    -   Permissions to run a Docker container and any other supporting
-        tools
+    -   Permissions to run a container and any other supporting tools
 
     -   Local copies of datasets to use with the AIR tool
 
@@ -111,9 +110,6 @@ before using the tool.
     -   Must be compatible with use in an R environment and be able to
         utilize a predict() function OR allow the user to predict output
         given user-defined input (to predict ATE).
-
-    -   Must not require GPU acceleration or external hardware not
-        currently supported by the tool.
 
 -   Data:
 
@@ -152,49 +148,41 @@ before using the tool.
     
 ### Installation Instructions
 
-Having met the usage requirements above, installation is a matter of
-copying the container to a location that is accessible from the Docker
-host. You'll want to have your data and knowledge files accessible to
-the Docker host as well. A sample run command for using the container
-would be:
+Having met the usage requirements above, running the AIR Tool is a single command.
+Full setup instructions — including podman installation and optional GPU setup for
+all platforms — are in [HOST_SETUP.md](./HOST_SETUP.md).
+
+**Quick start (CPU mode — works on any machine):**
 
 ```bash
-docker run -it -p 4173:4173 -u root --rm --name airtool airtool-image:latest
+podman run \
+  -it \
+  -v .:/workspace \
+  -v ollama_data:/root/.ollama \
+  -p 4173:4173 \
+  ghcr.io/cmu-sei/airtool-dev:latest
 ```
 
-Flag definitions:
+Then open `http://localhost:4173` in your browser.
 
--   4173: Default port that the development server runs on, it can be
-    re-mapped if this port is inconvenient in your environment by simply
-    changing the docker command.
+**GPU mode (Linux with NVIDIA GPU — faster AI interpretations):**
 
--   '-u root': Indicates what user the process inside the container will
-    think it is running as (Note: Does not mean you need root
-    permissions to run the container)
+```bash
+podman run \
+  --device nvidia.com/gpu=all \
+  -it \
+  -v .:/workspace \
+  -v ollama_data:/root/.ollama \
+  -p 4173:4173 \
+  ghcr.io/cmu-sei/airtool-dev:latest
+```
 
--   '--rm': Indicates to remove the container after you've finished with
-    it. If you wish to keep it around, remove this parameter.
+The container starts ollama automatically, selects the appropriate AI model
+based on GPU availability, and launches the tool. No manual steps are required
+after the run command.
 
--   '--name': provides the name Docker will use to refer to this
-    container. This is important, as if you don't choose a name, a new
-    one will be assigned every time you run the container. If you are
-    not removing the container, you will soon find you are running out
-    of hard drive storage, after a handful of runs.
-
--   'airtool-image:latest': is the tagged name for the container. If you
-    loaded the image to a local registry, using:
-
-*docker load \< airtool.tar*\
-*docker tag airtool-image:latest*
-
-then the container will be viewable in your local docker registry,
-using:
-
-*docker images*
-
-You may wish to add a data volume to your container. A limitation of the
-current release is that intermediate products are not stored within the
-container. I.e., every run starts from a new state.
+The `ollama_data` volume persists the AI model across container runs so it does
+not need to be re-downloaded each time.
 
 ## Getting Started
 

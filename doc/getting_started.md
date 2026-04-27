@@ -13,17 +13,16 @@ Projects that have an established AI/ML model workflow, complete with data dicti
 AIR tool can be installed at a partner site or run in the SEI environment. Classified options are not available at the SEI at this point.
 
 ### Hardware:
-- 16 GB of storage (20GB recommended) + any additional for your data
-- 12GB+ memory (Estimate is based on our testing, but may vary)
+- 20 GB of storage + any additional for your data (the bundled AI model requires ~5 GB; GPU mode adds ~9 GB on first run)
+- 12 GB+ memory (estimate based on testing; may vary)
+- **Optional:** NVIDIA GPU with 12 GB+ VRAM for faster AI-generated interpretations
 
 ### Software:
-- Docker-capable system (i.e., Linux/Mac/Windows)
-- WSL2/Docker/Docker Desktop software
-- A text editor
-- A web browser (used for viewing/interacting with local .html files)
+- Podman or Docker (Linux, macOS, or Windows via WSL2)
+- A web browser
 
 ### User:
-- Permissions to run a Docker container and any other supporting tools
+- Permissions to run a container and any other supporting tools
 - Local copies of datasets to use with the AIR tool
 
 ### Model (if AIR analysis is intended for existing model):
@@ -31,7 +30,6 @@ AIR tool can be installed at a partner site or run in the SEI environment. Class
 - Should have a single outcome variable that the classifier is predicting. This could be something like mission success, threat assessment, component failure, etc.
 - Should be run against multiple scenarios to predict outcome above. For example, does location affect mission success, does operating system affect threat assessment, does weather affect component failure, etc.
 - Should be compatible with use in an R environment and be able to utilize a predict() function – **OR** - allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE)
-- Must not require GPU acceleration or external hardware not currently supported by the tool
 - Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported
 
 ### Data:
@@ -49,11 +47,19 @@ More information about Data Requirements can be found in [AIR Tool Dataset Guide
 
 ## Installation Instructions
 
-Having met the usage requirements above, installation is a matter of copying the container to a location that is accessible from the Docker host. Detailed instructions can be found in [AIR Tool Installation Instructions](./Installation_Instructions.md)
+Having met the usage requirements above, running the AIR Tool is a single command. Full step-by-step instructions — including podman installation and optional GPU setup for Linux, macOS, and Windows — are in [AIR Tool Installation Instructions](./Installation_Instructions.md).
 
-You'll want to have your data and knowledge files accessible to the Docker host as well.
+**Quick start:**
+```bash
+podman run \
+  -it \
+  -v .:/workspace \
+  -v ollama_data:/root/.ollama \
+  -p 4173:4173 \
+  ghcr.io/cmu-sei/airtool-dev:latest
+```
 
-You may wish to add a data volume to your container. A limitation of the current release is that intermediate products are not stored within the container, i.e., every run starts from a new state.
+Then open `http://localhost:4173` in your browser. The container starts the AI model and the tool automatically — no manual steps are needed after the run command.
 
 
 

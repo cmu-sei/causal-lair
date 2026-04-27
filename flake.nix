@@ -61,6 +61,7 @@
       let
         pkgs = import nixpkgs {
           inherit system;
+          config.allowUnfree = true; # required for CUDA packages (pkgs.ollama-cuda)
           overlays = [
             (final: prev: {
               # Make the default nodejs used by nixpkgs (and thus rPackages.V8) be nodejs_22
@@ -478,6 +479,7 @@
             quartoEnv
             tetrad.packages.${system}.default
             score
+            pkgs.ollama-cuda
           ];
           pathsToLink = [
             "/bin"
@@ -513,6 +515,41 @@
           executable = true;
         };
  
+        # Pull qwen2.5:7b at image-build time and store at /root/.ollama-baked.
+        # This makes the 7b model available inside the container without any
+        # network access at runtime. __noChroot = true disables the Nix sandbox
+        # so the derivation can reach the ollama registry; network access is
+        # required at `nix build` time, not at container runtime.
+        # A non-standard port (11435) is used for the temporary ollama daemon to
+        # avoid conflicting with any ollama instance already running on the host.
+        qwen7bModel = pkgs.runCommand "qwen2.5-7b-model" {
+          __noChroot = true;
+          nativeBuildInputs = [ pkgs.ollama-cuda pkgs.cacert pkgs.curl ];
+        } ''
+          export HOME=$TMPDIR
+          export OLLAMA_MODELS=$TMPDIR/models
+          export OLLAMA_HOST=127.0.0.1:11435
+          export SSL_CERT_FILE=${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt
+          mkdir -p $TMPDIR/models
+
+          ${pkgs.ollama-cuda}/bin/ollama serve &
+          OLLAMA_PID=$!
+
+          echo "Waiting for ollama daemon..."
+          for i in $(seq 1 30); do
+            ${pkgs.curl}/bin/curl -sf http://127.0.0.1:11435 > /dev/null 2>&1 && break
+            sleep 2
+          done
+
+          OLLAMA_MODELS=$TMPDIR/models ${pkgs.ollama-cuda}/bin/ollama pull qwen2.5:7b
+
+          kill $OLLAMA_PID 2>/dev/null || true
+          wait $OLLAMA_PID 2>/dev/null || true
+
+          mkdir -p $out/root/.ollama-baked
+          cp -r $TMPDIR/models/. $out/root/.ollama-baked/
+        '';
+
         # Materialize the flake directory
         workspacePath = pkgs.runCommand "materialized-flake" {} ''
           mkdir -p $out/workspace
@@ -540,6 +577,7 @@
             createUserScript
             fishPluginsFile
             workspacePath
+            qwen7bModel
           ];
           config = {
             WorkingDir = "/workspace";
@@ -574,13 +612,24 @@
               "_JAVA_OPTIONS='-Dawt.useSystemAAFontSettings=lcd -Dswing.defaultlaf=com.sun.java.swing.plaf.gtk.GTKLookAndFeel'"
               "DISPLAY=:1"
               "TETRAD_PATH=${TETRAD_PATH}"
+
+              # Ollama configuration
+              # NVIDIA_VISIBLE_DEVICES / NVIDIA_DRIVER_CAPABILITIES are read by
+              # the NVIDIA container runtime to enable GPU passthrough when the
+              # container is started with --device nvidia.com/gpu=all.
+              "NVIDIA_VISIBLE_DEVICES=all"
+              "NVIDIA_DRIVER_CAPABILITIES=compute,utility"
+              "OLLAMA_BASE_URL=http://localhost:11434"
+              # OLLAMA_MODEL is the model selected at startup. The start.sh
+              # script overrides this to qwen2.5:7b when no GPU is detected.
+              "OLLAMA_MODEL=qwen2.5:14b"
             ];
             Volumes = { };
-            Cmd = [ "/bin/fish" ]; # Default command
+            Cmd = [ "/bin/bash" "/workspace/scripts/start.sh" ];
             ExposedPorts = {
                 "4173/tcp" = {};
+                "11434/tcp" = {};
             };
-            # Cmd = [ "sh" "/app/scripts/run_quarto.sh" ];
           };
           extraCommands = ''
             # Link the env binary (needed for the check requirements script)

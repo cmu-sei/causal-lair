@@ -2068,7 +2068,7 @@ get_figure_caption <- function(AIRHome, df_vars) {
 #    Returns TRUE if the model is ready, FALSE on any failure.
 ollama_ensure_model <- function(model,
                                 base_url = Sys.getenv("OLLAMA_BASE_URL",
-                                                      "http://ollama:11434")) {
+                                                      "http://localhost:11434")) {
 
   # Session-level cache: once a model is confirmed available, skip
   cache_key <- paste0(".ollama_model_ok_", gsub("[^A-Za-z0-9]", "_", model))
@@ -2183,9 +2183,9 @@ ollama_ensure_model <- function(model,
 #    Uses system curl (guaranteed by curlFull in flake.nix) to POST to Ollama.
 #    Returns the assistant's text content, or NULL on failure.
 ollama_chat <- function(messages,
-                        model    = "qwen2.5:14b",
+                        model    = Sys.getenv("OLLAMA_MODEL", "qwen2.5:14b"),
                         base_url = Sys.getenv("OLLAMA_BASE_URL",
-                                              "http://ollama:11434")) {
+                                              "http://localhost:11434")) {
 
   # Ensure the model is available (pulls automatically if missing)
   if (!ollama_ensure_model(model, base_url)) {
