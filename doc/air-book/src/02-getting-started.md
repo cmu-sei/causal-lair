@@ -4,11 +4,11 @@
 
 Modern analytic methods, including Artificial Intelligence (AI) and Machine Learning (ML) classifiers, depend on correlations; however, such approaches often fail to account for confounding in the data, which prevents accurate modeling of cause and effect and often leads to prediction bias. The AI Robustness (AIR) tool allows users to gauge AI/ML classifier performance with unprecedented confidence.
 
-**Target Audience:** Projects that have an established AI/ML model workflow, complete with data dictionaries and subject-matter experts.
+**Target Audience:** Projects that have an established AI/ML model workflow (or are working to establish an AI/ML model workflow), complete with data dictionaries and subject-matter experts.
 
 ## Requirements for Running AIR
 
-AIR tool can be installed at a partner site or run in the SEI environment. Classified options are not available at the SEI at this point.
+The AIR tool can be installed at a partner site or run in the SEI environment. Classified options are not available at the SEI at this point.
 
 ### Hardware
 
