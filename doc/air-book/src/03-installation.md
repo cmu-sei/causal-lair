@@ -24,6 +24,8 @@ The Terminal will indicate the progress of downloading and extracting the contai
 
 ![Docker Desktop terminal showing /workspace prompt](../images/image4.png)
 
+ <img src="./images/step_1.png"  alt="AIR Tool screen at Step 1." />
+
 ## Step 3: Initiate the AIR Tool Scripts for the User Interface
 
 At the `/workspace` prompt, enter:
