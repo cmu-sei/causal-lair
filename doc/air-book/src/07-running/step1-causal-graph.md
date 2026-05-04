@@ -13,7 +13,7 @@ Once activated, the tool runs Causal Discovery algorithms and displays the resul
 More detailed information about assessing causal graphs can be found in [AIR Tool Causal Graph Insights](https://github.com/cmu-sei/causal-lair/blob/main/doc/causal_graph_checks.md).
 
 ![Causal graph displayed in the AIR Tool main panel](../../images/image1.png)
-
+ 
 ## Causal Graph Checks
 
 Use the following checks to evaluate whether the causal graph produced by the tool reflects reasonable expectations before proceeding.
