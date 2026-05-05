@@ -22,7 +22,6 @@ docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.1
 
 The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a `/workspace` prompt.
 
-![Docker Desktop terminal showing /workspace prompt](../images/image4.png)
 
  <img src="./images/step_1.png"  alt="AIR Tool screen at Step 1." />
 
