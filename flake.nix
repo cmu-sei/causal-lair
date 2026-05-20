@@ -444,7 +444,6 @@
 
             quartoEnv
             tetrad.packages.${system}.default
-            score
           ];
           pathsToLink = [
             "/bin"
