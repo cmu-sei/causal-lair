@@ -102,48 +102,6 @@
           '';
         };
 
-        score = let
-          scoreSrc = ./score;
-          cargoToml = builtins.fromTOML (builtins.readFile "${scoreSrc}/Cargo.toml");
-        in
-        pkgs.rustPlatform.buildRustPackage {
-          pname = cargoToml.package.name;
-          version = cargoToml.package.version;
-          src = scoreSrc;
-
-          cargoLock.lockFile = "${scoreSrc}/Cargo.lock";
-          doCheck = false;
-
-          nativeBuildInputs = [
-            pkgs.pkg-config
-            pkgs.openssl
-            pkgs.openblasCompat
-            pkgs.liblapack
-            pkgs.gfortran13
-            pkgs.gfortran13.cc.lib
-          ];
-        
-          buildInputs = [
-            pkgs.pkg-config
-            pkgs.openssl
-            pkgs.openblasCompat
-            pkgs.liblapack
-            pkgs.gfortran13
-            pkgs.gfortran13.cc.lib
-          ];
-        
-          env = {
-            OPENBLAS_DIR = "${pkgs.openblasCompat}";
-            OPENBLAS_INCLUDE_DIR = "${pkgs.openblasCompat}/include";
-            OPENBLAS_LIB_DIR = "${pkgs.openblasCompat}/lib";
-            OPENSSL_DIR = "${pkgs.openssl.out}";
-            OPENSSL_INCLUDE_DIR = "${pkgs.openssl.dev}/include";
-            OPENSSL_LIB_DIR = "${pkgs.openssl.out}/lib";
-            PKG_CONFIG_PATH = "${pkgs.openssl.dev}/lib/pkgconfig";
-            LD_LIBRARY_PATH = "${pkgs.gfortran13.cc.lib}/lib:$LD_LIBRARY_PATH";
-          };
-        };
-
         # We create an account for the container user. These are necessary user files.
         baseInfo = pkgs.buildEnv {
           name  = "base-info";
