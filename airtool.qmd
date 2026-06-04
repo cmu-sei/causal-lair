@@ -221,6 +221,7 @@ suppressMessages({
   library(tmle3)
   library(xgboost)
   library(xml2)
+  library(lubridate)
 })
 
 ## ── session-wide defaults ───────────────────────────────────────────────
@@ -342,13 +343,32 @@ if (TETRAD_PATH == "") {
 }
 
 # ––– shield any .jcall from killing R –––––––––––––––––––––––––––––––––
+# safe_jcall <- function(...) {
+#   tryCatch(
+#     .jcall(...),
+#     Throwable = function(e) {
+#       msg <- .jcall("java/lang/Throwable", "S", "toString", e)
+#       log_debug("Java exception trapped: {msg}", msg = msg)
+#       NULL                                   # propagate safe NULL
+#     }
+#   )
+# }
 safe_jcall <- function(...) {
   tryCatch(
     .jcall(...),
     Throwable = function(e) {
-      msg <- .jcall("java/lang/Throwable", "S", "toString", e)
+      # Try to get the actual Java exception object for a full message
+      java_ex <- tryCatch(.jgetEx(clear = TRUE), error = function(x) NULL)
+      msg <- if (!is.null(java_ex)) {
+        tryCatch(
+          .jcall(java_ex, "S", "toString"),   # instance call — this is correct
+          error = function(x) conditionMessage(e)
+        )
+      } else {
+        conditionMessage(e)
+      }
       log_debug("Java exception trapped: {msg}", msg = msg)
-      NULL                                   # propagate safe NULL
+      NULL
     }
   )
 }
@@ -823,6 +843,7 @@ log_debug("Class after NP transform: {cls}", cls = .jclass(j_np_dataset))
 np_df <- np_dataset_to_df(j_np_dataset, orig_names = names(data_continuous))
 np_df <- cbind(data_binary, np_df)
 log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse = ", "))
+
 # optional:
 # log_debug(paste(capture.output(dplyr::glimpse(np_df)), collapse = "\n")) 
   MC_passing_cpdag_already_found <- FALSE
@@ -872,7 +893,9 @@ log_debug("After NP back to R: class={cls}", cls = paste(class(np_df), collapse 
       
       ts$use_sem_bic(penalty_discount = pd)
 
-      suppress_output(ts$run_boss())
+      if (r_ts_select()) time_lag_val <- 1 else time_lag_val <- 0
+      suppress_output(ts$run_boss(is_time_series = r_ts_select(), time_lag = time_lag_val))
+      
       g2 <- ts$get_java()
 
       bic <- tryCatch(g2$getAttribute("BIC"), error = function(e) NA_real_)
@@ -2645,6 +2668,78 @@ visualize_graph <- function(graph) {
     }
   }
 }
+
+detect_time_columns <- function(data, parse_threshold = 0.8, sample_n = 100) {
+
+  name_pattern <- paste0(
+    "(?i)(^|_|\\.|\\s)",
+    "(date|time|timestamp|datetime|year|month|day|hour|minute|second|",
+    "period|qtr|quarter|week|epoch|created|updated|modified|",
+    "start|end|begin|finish|ts|dt)",
+    "(_|\\.|\\s|$)"
+  )
+
+  per_col <- lapply(names(data), function(col) {
+    x <- data[[col]]
+
+    class_hit <- inherits(x, c("Date", "POSIXct", "POSIXlt", "POSIXt",
+                               "yearmon", "yearqtr", "hms", "difftime"))
+
+    name_hit <- grepl(name_pattern, col, perl = TRUE) ||
+                grepl("^(t|ts|dt)$", col, ignore.case = TRUE)
+
+    parse_hit <- FALSE
+    parse_rate <- 0
+    if (is.character(x) || is.factor(x)) {
+      vals <- na.omit(as.character(x))
+      if (length(vals) > sample_n) vals <- sample(vals, sample_n)
+      if (length(vals) > 0) {
+        parsed <- suppressWarnings(parse_date_time(
+          vals,
+          orders = c("ymd", "mdy", "dmy",
+                     "ymd HMS", "mdy HMS", "dmy HMS",
+                     "ymd HM",  "Y-m",     "Y/m", "Y")
+        ))
+        parse_rate <- mean(!is.na(parsed))
+        parse_hit  <- parse_rate >= parse_threshold
+      }
+    }
+
+    numeric_time_hit <- FALSE
+    if (is.numeric(x)) {
+      vals <- na.omit(x)
+      if (length(vals) > 0) {
+        is_yearlike <- all(vals >= 1800 & vals <= 2100) && all(vals == floor(vals))
+        is_unix_s   <- all(vals >= 6.3e8  & vals <= 2.5e9)
+        is_unix_ms  <- all(vals >= 6.3e11 & vals <= 2.5e12)
+        numeric_time_hit <- is_yearlike || is_unix_s || is_unix_ms
+      }
+    }
+
+    is_time <- class_hit || name_hit || parse_hit || numeric_time_hit
+
+    list(
+      column  = col,
+      is_time = is_time,
+      reasons = c(
+        if (class_hit)        "temporal class",
+        if (name_hit)         "name pattern",
+        if (parse_hit)        sprintf("parsed %.0f%% as datetime", 100 * parse_rate),
+        if (numeric_time_hit) "numeric time encoding"
+      )
+    )
+  })
+
+  names(per_col) <- names(data)
+  time_cols <- names(data)[vapply(per_col, `[[`, logical(1), "is_time")]
+
+  list(
+    is_time_series = length(time_cols) > 0,
+    time_columns   = time_cols,
+    details        = per_col
+  )
+}
+
   # --- END INLINE: scripts/tetrad_utils.R ---
 # --- BEGIN INLINE: scripts/TetradSearch.R ---
 # This class translates some select methods from TetradSearch.py in py-tetrad
@@ -2799,15 +2894,17 @@ TetradSearch <- setRefClass(
     #   num_starts > 1, random permuatations are used for subsequent restarts.
     # @param output_cpdag TRUE if a CPDAG should be output, FALSE if a DAG should be output.
     # @return The estimated graph.
-    run_boss = function(num_starts = 30, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE) {
+    run_boss = function(num_starts = 30, use_bes = FALSE, time_lag = 0, use_data_order = TRUE, output_cpdag = TRUE, is_time_series = FALSE) {
       log_debug("Running BOSS algorithm...")
       
       .self$.setParam("useBes", use_bes)
       .self$.setParamInt("numStarts", num_starts)
       .self$.setParamInt("timeLag", time_lag)
+      .self$.setParam("timeLagReplicatingGraph", is_time_series)
       .self$.setParam("useDataOrder", use_data_order)
       .self$.setParam("outputCpdag", output_cpdag)
-      
+      ### add time lag and time lage replicating graph here
+
       dataModel <- .jcast(.self$data_model, "edu.cmu.tetrad.data.DataModel")
       
       boss <- .jnew("edu.cmu.tetrad.algcomparison.algorithm.oracle.cpdag.Boss", .self$score)
@@ -3084,6 +3181,7 @@ useShinyjs()
 br()
 h5("Step 1- Upload data file:")
 uiOutput("ui_file1")
+div(class = "text-end", uiOutput("ui_ts_select"))  # Bootstrap 5
 uiOutput('ui_file2')
 uiOutput('ui_buildButton')
 uiOutput('step3')
@@ -3309,7 +3407,15 @@ output$live_log_tail <- renderUI({
 ### file input text --------------------------------------
 output$file1_txt <- renderUI({
   req(input$file1)
-  HTML(paste0("<i>Found ", nrow(df()), " instances of ", ncol(df()), " variables</i>"))
+  res <- detect_time_columns(df())
+  is_ts <- res$is_time_series # boolean for whether time series was detected
+  res$time_colums # actual variables that were flagged as time series
+  if (is_ts){
+    tscols <- length(res$time_columns)
+    HTML(paste0("<i>Found ", nrow(df()), " instances of ", ncol(df()), " variables and ", tscols, " possible time series variable(s)</i>"))
+  } else{
+    HTML(paste0("<i>Found ", nrow(df()), " instances of ", ncol(df()), " variables</i>"))
+  }
 })
 
 output$file2_txt <- renderUI({
@@ -3744,6 +3850,10 @@ if (nrow(pairs) > 0) {
 
 })
 
+r_ts_select <- reactive({
+  ts_val <- input$ts_select
+  return(ts_val)
+})
 
 knowledge <- reactive({
   req(input$file2)
@@ -4922,6 +5032,10 @@ output$ui_file1 <- renderUI({
       tags$b(fname)
     )
   }
+})
+
+output$ui_ts_select <- renderUI({
+  checkboxInput("ts_select", label = "Time Series?", value = FALSE)
 })
 
 output$ui_file2 <- renderUI({
