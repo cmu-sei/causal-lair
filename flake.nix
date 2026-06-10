@@ -102,6 +102,141 @@
           '';
         };
 
+        pandoc-3_8_3 =
+          let
+            hpkgs = pkgs.haskell.packages.ghc967.override {
+              overrides = hself: hsuper: {
+                pandoc = pkgs.haskell.lib.dontCheck (hself.callHackageDirect {
+                  pkg = "pandoc";
+                  ver = "3.8.3";
+                  sha256 = "sha256-tv6Ufj1cwFnwqXqVwaDC/8lxolwABdb7RCR8zKyUaZk=";
+                } {});
+                citeproc = hself.callHackageDirect {
+                  pkg = "citeproc";
+                  ver = "0.12";
+                  sha256 = "sha256-yNDqJpXJeGpEXun46nFkhGeXBx3FVxqWT+y8+YjsoF4=";
+                } {};
+                texmath = hself.callHackageDirect {
+                  pkg = "texmath";
+                  ver = "0.13.0.2";
+                  sha256 = "sha256-ecrQEgHZfYLojvoWOcwIgloRwh4m4+w0PN9LnU99Cgk=";
+                } {};
+                typst = hself.callHackageDirect {
+                  pkg = "typst";
+                  ver = "0.8.1";
+                  sha256 = "sha256-KKtIUx1hXFaIu1DI3jolpL+eb62V/fK/mOGQv6+9nGs=";
+                } {};
+                typst-symbols = hself.callHackageDirect {
+                  pkg = "typst-symbols";
+                  ver = "0.1.9.1";
+                  sha256 = "sha256-Gx1LV9dO68SuiwrxYx0ChnlbiBVPe3uFhzNKawIIXYE=";
+                } {};
+                pandoc-lua-engine = pkgs.haskell.lib.dontCheck (hself.callHackageDirect {
+                  pkg = "pandoc-lua-engine";
+                  ver = "0.5.0.2";
+                  sha256 = "sha256-e5txwxgQGPVmcyZsABCjhtq9w4O7UGGveH4ZtSKbmWM=";
+                } {});
+                hslua = hself.callHackageDirect {
+                  pkg = "hslua";
+                  ver = "2.4.0";
+                  sha256 = "sha256-br+uSVF7tx7LH636YojgJxvOA32XJti2m7Yf5SHEm4g=";
+                } {};
+                hslua-module-doclayout = hself.callHackageDirect {
+                  pkg = "hslua-module-doclayout";
+                  ver = "1.2.0.1";
+                  sha256 = "sha256-1udisDrOjoormNtEO5q7zKyECNUu7+HIrcnqHjHyvZA=";
+                } {};
+                hslua-module-path = hself.callHackageDirect {
+                  pkg = "hslua-module-path";
+                  ver = "1.1.1";
+                  sha256 = "sha256-sUatH0qA7afNMFaCQiFTh4idLBq/Mu/R0EpAJYjZtBU=";
+                } {};
+                hslua-module-system = hself.callHackageDirect {
+                  pkg = "hslua-module-system";
+                  ver = "1.2.3";
+                  sha256 = "sha256-oK4LFzty2zacUyjhDKQtLNHXcQ/SoEij6T7RaDrQtnk=";
+                } {};
+                hslua-module-text = hself.callHackageDirect {
+                  pkg = "hslua-module-text";
+                  ver = "1.1.1";
+                  sha256 = "sha256-x68vdBTOSR/YCJCLVgsF97GxCu4vG8Cj7DYpPW+YlKE=";
+                } {};
+                hslua-module-version = hself.callHackageDirect {
+                  pkg = "hslua-module-version";
+                  ver = "1.1.1";
+                  sha256 = "sha256-823ZNb8CHrtk3RgYtG6p4qoxmyTGHVHxhr3YG8daxGg=";
+                } {};
+                hslua-module-zip = hself.callHackageDirect {
+                  pkg = "hslua-module-zip";
+                  ver = "1.1.4";
+                  sha256 = "sha256-HYIni1uatiZJ3KqlCDn2bFi9pUqmGQNMfb5MfdNW9mg=";
+                } {};
+                hslua-repl = hself.callHackageDirect {
+                  pkg = "hslua-repl";
+                  ver = "0.1.2";
+                  sha256 = "sha256-c6B5KATFzzkV3fD4vb/ZMOiy8PZ5eJnYQ2k1Z1CsYiM=";
+                } {};
+                pandoc-lua-marshal = hself.callHackageDirect {
+                  pkg = "pandoc-lua-marshal";
+                  ver = "0.3.2.1";
+                  sha256 = "sha256-iuouPwYsUBUrliAoJV6wOGVUYlsh1yIONDTtlZOpDNc=";
+                } {};
+                pandoc-server = pkgs.haskell.lib.dontCheck (hself.callHackageDirect {
+                  pkg = "pandoc-server";
+                  ver = "0.1.1";
+                  sha256 = "sha256-Tb+0OOSO1qI2k7AIbHmhNy5XD1gNWsrmNHlda/GsRJ8=";
+                } {});
+                hslua-cli = hself.callHackageDirect {
+                  pkg = "hslua-cli";
+                  ver = "1.4.4";
+                  sha256 = "sha256-WaDuOkNuNPyUBm6gl5DQnjuyl73GQ6a9JnrNMHUtiqk=";
+                } {};
+                hslua-aeson = hself.callHackageDirect {
+                  pkg = "hslua-aeson";
+                  ver = "2.3.2";
+                  sha256 = "sha256-BbWysq/injplaWuGd9dXkUiVzinZKeimYZE9wc1NUiE=";
+                } {};
+                hslua-classes = hself.callHackageDirect {
+                  pkg = "hslua-classes";
+                  ver = "2.3.2";
+                  sha256 = "sha256-rfPvmxZwfEV+mlRv6YQSttCZggLB8UBW6sV4eC6BxPE=";
+                } {};
+                hslua-core = hself.callHackageDirect {
+                  pkg = "hslua-core";
+                  ver = "2.3.2.1";
+                  sha256 = "sha256-nKJ4jjkHKrDMf39pcnXrIjfSJEs8zH6U7hM9rogRgs0=";
+                } {};
+                hslua-marshalling = hself.callHackageDirect {
+                  pkg = "hslua-marshalling";
+                  ver = "2.3.2";
+                  sha256 = "sha256-0H+5/bCAN0EUG2JH6p42IbliDsWtXh3vI3nlDU+4uvc=";
+                } {};
+                hslua-objectorientation = hself.callHackageDirect {
+                  pkg = "hslua-objectorientation";
+                  ver = "2.4.0";
+                  sha256 = "sha256-5ShHW5aRnX9fp5eAqUh3N7xQ48UCEVbDBW1IvsNUYzE=";
+                } {};
+                hslua-packaging = hself.callHackageDirect {
+                  pkg = "hslua-packaging";
+                  ver = "2.3.2";
+                  sha256 = "sha256-FwsqfpoBrO/H+Vgi3JFjHbQyDzl/ffK5XEZr4vMGDmk=";
+                } {};
+                hslua-typing = hself.callHackageDirect {
+                  pkg = "hslua-typing";
+                  ver = "0.1.1";
+                  sha256 = "sha256-RljGDysAiPPHXa5SI8oanzJ2JHvsDxNGt1guQqxoHm0=";
+                } {};
+              };
+            };
+          in
+            pkgs.haskell.lib.dontCheck (
+              hpkgs.callHackageDirect {
+                pkg = "pandoc-cli";
+                ver = "3.8.3";
+                sha256 = "sha256-be+h2+6Se1MptUaisfrdaEDp1TcYKThLKrSgoAuQL8A=";
+              } {}
+            );
+
         # We create an account for the container user. These are necessary user files.
         baseInfo = pkgs.buildEnv {
           name  = "base-info";
@@ -318,6 +453,7 @@
           paths = [
             rWithPkgs
             quartoPatched
+            pandoc-3_8_3
             identify
           ];
         };
@@ -372,7 +508,7 @@
 
             jdk25
             maven
-            pandoc
+            pandoc-3_8_3
             libtirpc
 
 
@@ -540,6 +676,7 @@
               "_JAVA_OPTIONS='-Dawt.useSystemAAFontSettings=lcd -Dswing.defaultlaf=com.sun.java.swing.plaf.gtk.GTKLookAndFeel'"
               "DISPLAY=:1"
               "TETRAD_PATH=${TETRAD_PATH}"
+              "QUARTO_PANDOC=${pandoc-3_8_3}/bin/pandoc"
             ];
             Volumes = { };
             Cmd = [ "/bin/fish" ]; # Default command

@@ -24,4 +24,4 @@
 
 execute:
   type: r
-  engine: /nix/store/bfwlxjbs2ablij7830ryjyvv7h8mp9bc-R-4.4.1-wrapper/bin/R
+  engine: /nix/store/c0dcjr558fy4w7185gdb421rza823daq-R-4.5.3-wrapper/bin/R
