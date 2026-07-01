@@ -46,4 +46,5 @@ The User Interface is accessible on Chrome, Safari, Edge, and Firefox.
 
 When the page loads (may require approximately 30 seconds or a refresh), the AIR Tool interface will appear.
 
-![AIR Tool user interface in browser](../images/Opening screen.jpg)
+<img src="./images/Opening screen.jpg"  alt="AIR Tool Openign Screen" />
+
