@@ -23,7 +23,6 @@ docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.1
 The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a `/workspace` prompt.
 
 
- <img src="./images/image1.png"  alt="AIR Tool Container start up screen." />
 
 ## Step 3: Initiate the AIR Tool Scripts for the User Interface
 
@@ -35,11 +34,12 @@ scripts/run_quarto.sh
 
 When this command completes, a URL will appear in the terminal.
 
- <img src="./images/image5.png"  alt="Terminal showing AIR Tool URL after running run_quarto." />
+ <img src="./images/image1.png"  alt="AIR Tool Container start up screen." />
+
 
 ## Step 4: Access the AIR Tool User Interface in a Browser
 
-The User Interface is accessible on Chrome, Safari, Edge, and Firefox.
+The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.
 
 - **Linux OS:** `http://172.17.0.2:4173/`
 - **Windows OS:** `localhost:4173/`
