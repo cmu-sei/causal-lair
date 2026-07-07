@@ -8,7 +8,7 @@ Modern analytic methods, including Artificial Intelligence (AI) and Machine Lear
 
 ## Requirements for Running AIR
 
-The AIR tool can be installed at a partner site or run in the SEI environment. Classified options are not available at the SEI at this point.
+Installing the AIR tool requires: 
 
 ### Hardware
 
@@ -27,15 +27,6 @@ The AIR tool can be installed at a partner site or run in the SEI environment. C
 - Permissions to run a Docker container and any other supporting tools
 - Local copies of datasets to use with the AIR tool
 
-### Model (if AIR analysis is intended for an existing model)
-
-- Must be an AI/ML model (e.g., classifier) that operates on structured or tabular data, relying on numerical, categorical, or time-series features — not unstructured data such as images, audio, or natural language text
-- Should have a single outcome variable that the classifier is predicting (e.g., mission success, threat assessment, component failure)
-- Should be run against multiple scenarios to predict the outcome above (e.g., does location affect mission success, does operating system affect threat assessment, does weather affect component failure)
-- Should be compatible with use in an R environment and able to utilize a `predict()` function — **or** allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE)
-- Must not require GPU acceleration or external hardware not currently supported by the tool
-- Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported
-
 ### Data
 
 - Must be tabular `.csv` format with a header specifying variable names with no spaces in the variable names
@@ -47,4 +38,14 @@ The AIR tool can be installed at a partner site or run in the SEI environment. C
 - No missing or null entries in the data
 - Features must have variability (no constant columns) and must not be intentional duplicates of one another
 
-More information can be found in [Data Guidelines](../06-data-guidelines/README.md).
+  More information can be found in [Data Guidelines](../06-data-guidelines/README.md).
+
+### Model (if AIR analysis is intended for an existing model)
+
+- Must be an AI/ML model that operates on structured or tabular data, relying on numerical, categorical, or time-series features — not unstructured data such as images, audio, or natural language text
+- Should have a single outcome variable that the model is predicting (e.g., mission success, threat assessment, component failure)
+- Should be run against multiple scenarios to predict the outcome above (e.g., does location affect mission success, does operating system affect threat assessment, does weather affect component failure)
+- Should allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE) **or** be compatible with use in an R environment and able to utilize a `predict()` function
+- Must not require GPU acceleration or external hardware not currently supported by the tool
+- Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported
+
