@@ -10,13 +10,12 @@ After the data file is uploaded, you will be prompted to upload the knowledge fi
 
 Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.
 
-More detailed information about assessing causal graphs can be found in [AIR Tool Causal Graph Insights](https://github.com/cmu-sei/causal-lair/blob/main/doc/causal_graph_checks.md).
 
-![Causal graph displayed in the AIR Tool main panel](../../images/image1.png)
+ <img src="../images/Screem when causal graph is built.jpg"  alt="AIR Tool display of causal graph." />
  
 ## Causal Graph Checks
 
-Use the following checks to evaluate whether the causal graph produced by the tool reflects reasonable expectations before proceeding.
+As you review the causal graph, you may choose to use the following checks to evaluate whether the causal graph produced by the tool reflects reasonable expectations before proceeding.
 
 ### Check 1: The tool is not returning a causal graph
 
