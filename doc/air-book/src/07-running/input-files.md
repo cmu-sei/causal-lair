@@ -46,6 +46,6 @@ The Knowledge File should be a CSV with two columns:
 
 Each variable name should appear exactly once. The AIR tool will provide a notification if it detects header formatting issues or variable names that don't appear in the uploaded data.
 
- <img src="./images/KF_Example.png"  alt="Knowledge File Example." />
+ <img src="../images/KF_Example.png"  alt="Knowledge File Example." />
 
 Currently, all knowledge assertions must be done ahead of time as in-place editing is not yet supported by the tool.
