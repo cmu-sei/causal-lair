@@ -14,9 +14,11 @@ Selecting and preparing the right dataset is one of the most important factors i
 - No variables that are constant values across all cases
 - Variable names must have no embedded spaces and must be in the first row of the CSV file
 
-## Other Key Considerations
+### Time Series Data 
 
-For time-series data, using data from two time periods can provide meaningful direct causal relationships between variables in the current time period and the next. Causal relationships within the same time period will be much less robust.
+The current version of the AIR tool has the capability of analyzing time series data.   Time series data should be ordered sequentially from earliest to latest and should not include timestamps or other data values reflecting the time series intervals.
+ 
+## Other Key Considerations
 
 The dataset is most helpful if it is either the same data used to build the AI classifier in question, or data that is or could be fed to the classifier to make predictions.
 
