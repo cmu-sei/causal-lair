@@ -11,7 +11,7 @@ After the data file is uploaded, you will be prompted to upload the knowledge fi
 Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.
 
 
- <img src="../images/Screem when causal graph is built.jpg"  alt="AIR Tool display of causal graph." />
+ <img src="../images/Uploads_complete.jpg"  alt="AIR Tool display when uploads are complete." />
  
 ## Causal Graph Checks
 
