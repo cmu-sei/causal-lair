@@ -481,10 +481,10 @@ disconnectMessage <- function(
     top = 50,
     size = 22,
     background = "white",
-    colour = "#444444",
+    colour = "#212529",
     overlayColour = "black",
     overlayOpacity = 0.6,
-    refreshColour = "#337ab7",
+    refreshColour = "#1976d2",
     css = ""
 ) {
   
@@ -595,7 +595,7 @@ disconnectMessage2 <- function() {
     background = "rgba(64, 64, 64, 0.9)",
     width = "full",
     top = "center",
-    overlayColour = "#999",
+    overlayColour = "#6c757d",
     overlayOpacity = 0.7,
     css = "padding: 15px !important; box-shadow: none !important;"
   )
@@ -665,21 +665,28 @@ fix_knowledge <- function(df){
 }
 
 # change color of nodes in graph
-change_node_color <- function(dot_code, node, color) {
+# fontcolor is optional -- pass it for dark fills (e.g. the red bias flag)
+# where the default black label text is hard to read
+change_node_color <- function(dot_code, node, color, fontcolor = NULL) {
   node <- escape_dot(node)
   # Remove any accidental extra quotes from the color string
   color <- trimws(gsub("['\"]", "", color))
-  node_definition <- paste0("\"", node, "\" [style=filled, fillcolor=\"", color, "\"];")
+  attrs <- paste0('style=filled, fillcolor="', color, '"')
+  if (!is.null(fontcolor)) {
+    fontcolor <- trimws(gsub("['\"]", "", fontcolor))
+    attrs <- paste0(attrs, ', fontcolor="', fontcolor, '"')
+  }
+  node_definition <- paste0("\"", node, "\" [", attrs, "];")
   dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definition), dot_code)
   dot_code <- gsub("\'", "\"", dot_code)
   return(dot_code)
 }
 
 
-paint_nodes <- function(dot, nodes, col) {
+paint_nodes <- function(dot, nodes, col, fontcolor = NULL) {
   nodes <- nodes[nzchar(nodes)]
   for (n in nodes) {
-    dot <- change_node_color(dot, n, col)
+    dot <- change_node_color(dot, n, col, fontcolor)
   }
   dot
 }
@@ -2016,7 +2023,7 @@ This suggests that the data or model assumptions may not support a consistent ca
     ## red baseline ribbon (everything outside CIs)
     geom_linerange(aes(ymin = -1, ymax = 1),
                    lwd = 3.5,
-                   col = "#C00000",
+                   col = "#B6202D",
                    alpha = 1,
                    stat = "unique",
                    lineend = "round",
@@ -2025,13 +2032,13 @@ This suggests that the data or model assumptions may not support a consistent ca
     ## yellow ribbons for Z1 and Z2 CIs
     geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
                    lwd = 3.5,
-                   col = "#FCB514",
+                   col = "#DDB64B",
                    alpha = 1,
                    stat = "unique",
                    position = position_nudge(x = 0)) +
     geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
                    lwd = 3.5,
-                   col = "#FCB514",
+                   col = "#DDB64B",
                    alpha = 1,
                    stat = "unique",
                    position = position_nudge(x = 0)) +
@@ -2040,7 +2047,7 @@ This suggests that the data or model assumptions may not support a consistent ca
     {if (overlap_exists)
       geom_linerange(aes(ymin = lo_overlap, ymax = hi_overlap),
                      lwd = 3.5,
-                     col = "#378855",
+                     col = "#2E8F5C",
                      alpha = 1,
                      stat = "unique",
                      position = position_nudge(x = 0))
@@ -2048,7 +2055,7 @@ This suggests that the data or model assumptions may not support a consistent ca
 
     ## Z1 range + mean
     geom_linerange(aes(ymin = z1_ATE_LCI, ymax = z1_ATE_UCI),
-                   lwd = 3.5, col = "#9394A2",
+                   lwd = 3.5, col = "#8A93A6",
                    alpha = 1, stat = "unique",
                    lineend = "round", position = position_nudge(x = 1)) +
     geom_point(aes(y = z1_ATE),
@@ -2057,7 +2064,7 @@ This suggests that the data or model assumptions may not support a consistent ca
 
     ## Z2 range + mean
     geom_linerange(aes(ymin = z2_ATE_LCI, ymax = z2_ATE_UCI),
-                   lwd = 3.5, col = "#D4C7C7",
+                   lwd = 3.5, col = "#D6DAE3",
                    alpha = 1, stat = "unique",
                    lineend = "round", position = position_nudge(x = 0.5)) +
     geom_point(aes(y = z2_ATE),
@@ -2489,7 +2496,7 @@ get_histogram_x <- function(df, xvar, dir, threshold) {
          x = NULL, fill = NULL) +
     guides(colour = "none") +
     theme_minimal(base_size = 10) +
-    theme(text             = element_text(colour = "#666666", face = "bold"),
+    theme(text             = element_text(colour = "#6c757d", face = "bold"),
           panel.background = element_rect(fill = "transparent", colour = NA),
           plot.background  = element_rect(fill = "transparent", colour = NA),
           legend.position  = "bottom",
@@ -2510,7 +2517,7 @@ get_histogram_y <- function(df, yvar, dir, threshold) {
                     levels = c("Fail", "Success"))
   )
 
-  colors <- c(Success = "#5C6CFF",
+  colors <- c(Success = "#0D47A1",
               Fail    = "#EAE1D7")
 
   fail_label    <- paste0("Fail") # (< ",  signif(threshold, 4), ")")
@@ -2534,7 +2541,7 @@ get_histogram_y <- function(df, yvar, dir, threshold) {
          x = NULL, fill = NULL) +
     guides(colour = "none") +
     theme_minimal(base_size = 10) +
-    theme(text             = element_text(colour = "#666666", face = "bold"),
+    theme(text             = element_text(colour = "#6c757d", face = "bold"),
           panel.background = element_rect(fill = "transparent", colour = NA),
           plot.background  = element_rect(fill = "transparent", colour = NA),
           legend.position  = "bottom",
@@ -2553,11 +2560,11 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   Z2 <- if (!is.null(Zvars)) Zvars$Z[Zvars$grp == "Z2"] else character(0)
 
   nodes_by_color <- list(
-   # "#FFC107" = c(xvar, yvar),
+   # "#DDB64B" = c(xvar, yvar),
     "#5C9AFF" = xvar,
-    "#5C6CFF" = yvar,
-    "#9394A2" = Z1,
-    "#D4C7C7" = Z2
+    "#0D47A1" = yvar,
+    "#8A93A6" = Z1,
+    "#D6DAE3" = Z2
   )
 
   # flatten + clean
@@ -2576,9 +2583,9 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   # synthesize new declarations
   new_lines <- c(
     if (nzchar(xvar)) sapply(xvar, make_decl, colour = "#5C9AFF"),
-    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#5C6CFF"),
-    if (length(Z1))   sapply(Z1,   make_decl, colour = "#9394A2"),
-    if (length(Z2))   sapply(Z2,   make_decl, colour = "#D4C7C7")
+    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#0D47A1"),
+    if (length(Z1))   sapply(Z1,   make_decl, colour = "#8A93A6"),
+    if (length(Z2))   sapply(Z2,   make_decl, colour = "#D6DAE3")
   )
 
   # insert after the digraph line (more robust than hard-coded 2L)
@@ -2595,7 +2602,7 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
   # Highlight treatment and outcome nodes
   dot <- change_node_color(dot, xvar, "'#5C9AFF'")
-  dot <- change_node_color(dot, yvar, "'#5C6CFF'")
+  dot <- change_node_color(dot, yvar, "'#0D47A1'")
 
   # Extract Z1 and Z2 sets
   Z1 <- Zvars[Zvars$grp == "Z1", ]$Z
@@ -2625,18 +2632,19 @@ if (in_z1 && in_z2) {
 } else if (xor(in_z1, in_z2)) {
   # Inside one, outside the other → paint the one that's outside
   if (!in_z1) {
-    dot <- paint_nodes(dot, Z1, "'#FFC107'")
+    dot <- paint_nodes(dot, Z1, "'#DDB64B'")
     log_debug("flag outside Z1 only")
   }
   if (!in_z2) {
-    dot <- paint_nodes(dot, Z2, "'#FFC107'")
+    dot <- paint_nodes(dot, Z2, "'#DDB64B'")
     log_debug("flag outside Z2 only")
   }
 
 } else if (!in_z1 && !in_z2) {
-  # Outside both → paint both in red
-  dot <- paint_nodes(dot, Z1, "'#C00000'")
-  dot <- paint_nodes(dot, Z2, "'#C00000'")
+  # Outside both → paint both in red; white text keeps labels legible
+  # against the dark fill
+  dot <- paint_nodes(dot, Z1, "'#B6202D'", "'white'")
+  dot <- paint_nodes(dot, Z2, "'#B6202D'", "'white'")
   log_debug("flag outside both intervals")
 }
   dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Final Causal graph\"]", 
@@ -3342,20 +3350,20 @@ cat(knitr::knit_child("info.qmd", quiet = TRUE, envir = knitr::knit_global()))
 
 -   Graph Colors
     -   [Blue]{style="color: #5C9AFF; font-weight: bold;"}: X Variable of interest, selected by the user in step 2. 
-    -   [Violet]{style="color: #5C6CFF; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
-    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
-    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
-    -   [Red]{style="color: #C00000; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
+    -   [Navy]{style="color: #0D47A1; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
+    -   [Dark Gray]{style="color: #8A93A6; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the first identified adjustment set, used to calculate causal effect estimates.
+    -   [Light Gray]{style="color: #D6DAE3; font-weight: bold;"}: Any nodes with this color have been identified as belonging to the second identified adjustment set, used to calculate causal effect estimates.
+    -   [Red]{style="color: #B6202D; font-weight: bold;"}: Any nodes with this color have been flagged as introducing bias into the results of the input model. Nodes will change from (dark/light) gray to red if the model ATE falls outside the 95% confidence interval for a given adjustment set.
 -   Histogram Colors
     -   [Blue]{style="color: #5C9AFF; font-weight: bold;"}: This is the 'treated' or 'success' portion of the data. Data falling within this range are categorized as 1. This represents the presence of a treatment, success, category of interest, etc...X Variable of interest, selected by the user in step 2. 
-    -   [Violet]{style="color: #5C6CFF; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
+    -   [Navy]{style="color: #0D47A1; font-weight: bold;"}: Y Variable of interest, selected by the user in step 2.
     -   [Gray]{style="color: #EAE1D7; font-weight: bold;"}: This is the 'untreated' or 'fail' portion of the data. Data falling within this range are categorized as 0. This represents the absence of a treatment, success, category of interest, etc...
 -   Ribbon Plot Colors
-    -   [Red]{style="color: #C00000; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
-    -   [Yellow]{style="color: #FCB514; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
-    -   [Green]{style="color: #378855; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
-    -   [Dark Gray]{style="color: #9394A2; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the first identified adjustment set in your data. 
-    -   [Light Gray]{style="color: #D4C7C7; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the second identified adjustment set in your data. 
+    -   [Red]{style="color: #B6202D; font-weight: bold;"}: The range of effect sizes that are outside the 95% confidence intervals of both adjustment sets. Values falling in this range are considered non-significant.
+    -   [Yellow]{style="color: #DDB64B; font-weight: bold;"}: The range of effect sizes that are outside of one 95% confidence interval for one effect size, but inside for the other. Values falling in this range are considered suspect, and should be closely monitored for signs of bias.
+    -   [Green]{style="color: #2E8F5C; font-weight: bold;"}: The range of effect sizes that are inside both adjustment set's 95% confidence intervals. Values falling in this range are consistent with those calculated by AIR's causal estimation and are considered bias-free.
+    -   [Dark Gray]{style="color: #8A93A6; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the first identified adjustment set in your data. 
+    -   [Light Gray]{style="color: #D6DAE3; font-weight: bold;"}: The dot (causal estimate) and lines (95% confidence interval) drawn in this color correspond to the second identified adjustment set in your data. 
  
 # Logs {layout-ncol=2}
 :::: {.columns}
@@ -3417,7 +3425,7 @@ output$live_log_tail <- renderUI({
   HTML(paste0(
     "<div style='height:100%; min-height:100%; display:flex; flex-direction:column;'>",
       "<div style='flex:1; height:100%; overflow-y:auto; ",
-                  "background-color:#ddd; color:#111; ",
+                  "background-color:#f9f9f9; color:#212529; ",
                   "font-family:monospace; font-size:0.9em; padding:10px; border-radius:6px;'>",
         "<strong>Live log:</strong><br><br>",
         "<pre style='white-space:pre-wrap; margin:0; height:100%;'>",
@@ -4040,12 +4048,12 @@ highlighted_graph <- reactive({
 
   ## — colour the outcome variable if one is chosen
   if (!is.null(vars_sel()$y) && nzchar(vars_sel()$y))
-    dot <- change_node_color(dot, vars_sel()$y, "'#5C6CFF'")
+    dot <- change_node_color(dot, vars_sel()$y, "'#0D47A1'")
 
 
   if (!is.null(Z) && nrow(Z)) {
-      if (any(Z$grp == "Z1")) dot <- change_node_color(dot, Z[Z$grp == "Z1", "Z"], "'#9394A2'")
-      if (any(Z$grp == "Z2")) dot <- change_node_color(dot, Z[Z$grp == "Z2", "Z"], "'#D4C7C7'")
+      if (any(Z$grp == "Z1")) dot <- change_node_color(dot, Z[Z$grp == "Z1", "Z"], "'#8A93A6'")
+      if (any(Z$grp == "Z2")) dot <- change_node_color(dot, Z[Z$grp == "Z2", "Z"], "'#D6DAE3'")
   }  
 
   dot
@@ -4210,7 +4218,7 @@ run_calc <- function() {
           text = "Please review your data to ensure that a causal relationship exists in your data",
           type = "warning",
           btn_labels = "Continue",
-          btn_colors = "#3085d6",
+          btn_colors = "#1976d2",
           closeOnClickOutside = FALSE,
           showCloseButton = TRUE
         )
@@ -4274,7 +4282,7 @@ run_calc <- function() {
         text = "The discovered graph has more than one disconnected component. This can happen when certain variables have no causal relationship with others, or when key mediators are missing. If you expected a single connected graph, consider whether important variables are absent, or whether some variables should be treated as non-causal.",
         type = "warning",
         btn_labels = "Continue",
-        btn_colors = "#3085d6",
+        btn_colors = "#1976d2",
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
       )
@@ -4285,7 +4293,7 @@ run_calc <- function() {
         text = NULL,
         type = "success",
         btn_labels = "Continue",
-        btn_colors = "#3085d6",
+        btn_colors = "#1976d2",
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
       )
@@ -4636,7 +4644,7 @@ shiny::validate({
         text = "",
         type = "success",
         btn_labels = "Continue",
-        btn_colors = "#3085d6",
+        btn_colors = "#1976d2",
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
       )
@@ -4738,7 +4746,7 @@ output$xvar <- renderUI({
       selected  = selected_val,
       selectize = FALSE
     ),
-    tags$style(HTML("#xvar option:disabled { color:#9aa0a6; }")),
+    tags$style(HTML("#xvar option:disabled { color:#6c757d; }")),
     tags$script(HTML(sprintf("
       (function(){
         $(document).off('.xvarBlock');
@@ -4844,7 +4852,7 @@ output$yvar <- renderUI({
         selected  = selected_y,
         selectize = FALSE
       ),
-      tags$style(HTML("#yvar option:disabled { color:#9aa0a6; }")),
+      tags$style(HTML("#yvar option:disabled { color:#6c757d; }")),
       tags$script(HTML(sprintf("
         (function(){
           // Remove previous handler to prevent accumulation
@@ -5075,7 +5083,7 @@ output$ui_file1 <- renderUI({
     # Show locked/greyed label after "Conduct Experiment"
     fname <- if (!is.null(input$file1)) input$file1$name else "<none selected>"
     tags$div(
-      style = "margin-bottom: 10px; color: #aaa; font-style: italic;",
+      style = "margin-bottom: 10px; color: #6c757d; font-style: italic;",
       tags$span(icon("file"), "Uploaded data file: "),
       tags$b(fname)
     )
@@ -5103,7 +5111,7 @@ output$ui_file2 <- renderUI({
   } else {
     fname <- if (!is.null(input$file2)) input$file2$name else "<none selected>"
     tags$div(
-      style = "margin-bottom: 10px; color: #aaa; font-style: italic;",
+      style = "margin-bottom: 10px; color: #6c757d; font-style: italic;",
       tags$span(icon("file"), "Knowledge file: "),
       tags$b(fname)
     )
@@ -5165,7 +5173,7 @@ output$ui_ate_upload = renderUI({
     if (locked()) {
       # After calculation: show value as static text
       tags$div(
-        style = "color: #999; font-style: italic; margin-top: 0.5em;",
+        style = "color: #6c757d; font-style: italic; margin-top: 0.5em;",
         paste("ATE provided:", val)
       )
     } else {
@@ -5197,7 +5205,7 @@ output$ui_model_upload = renderUI({
         "No model file selected."
       }
       tags$div(
-        style = "color: #999; font-style: italic; margin-top: 0.5em;",
+        style = "color: #6c757d; font-style: italic; margin-top: 0.5em;",
         file_label
       )
     } else {
