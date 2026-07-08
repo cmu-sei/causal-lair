@@ -622,7 +622,7 @@ check_column_exists <- function(df, col, id = "") {
   col
 }
 
-escape_dot <- function(x) gsub('[^\\w\\s]', '_', x, perl = TRUE)  # DOT-safe
+escape_dot <- function(x) gsub('[^\\w\\s:]', '_', x, perl = TRUE)  # DOT-safe; : is literal inside quoted node IDs
 
 # keeps thresholds inside the data range and numeric
 safe_thresh <- function(val, vec, id) {
@@ -1403,6 +1403,23 @@ processResults <- function(settings,
 
   log_info("Data loaded and split.")
 
+  # Drop columns that are constant within the training split: single-level
+  # factors/characters cause "contrasts can be applied only to factors with 2
+  # or more levels" in glm/lm/svm; zero-variance numerics cause singularity.
+  const_cols <- names(train)[vapply(train, function(x) {
+    if (is.factor(x) || is.character(x)) length(unique(x[!is.na(x)])) < 2
+    else if (is.numeric(x) || is.logical(x)) length(unique(x[!is.na(x)])) < 2
+    else FALSE
+  }, logical(1L))]
+  if (length(const_cols) > 0) {
+    log_info("Dropping constant columns from ML training data: {cols}",
+             cols = paste(const_cols, collapse = ", "))
+    keep       <- setdiff(names(train),   const_cols)
+    train      <- train[,   keep,                               drop = FALSE]
+    xtest_0    <- xtest_0[, intersect(names(xtest_0), keep),   drop = FALSE]
+    xtest_1    <- xtest_1[, intersect(names(xtest_1), keep),   drop = FALSE]
+  }
+
   if (model_yn == "No") {
     log_info("Running new ML models")
 
@@ -1702,13 +1719,21 @@ processResults <- function(settings,
                                                                  settings$varName))
   }
 
-  # crash loudly *here* (where the problem is easy to see) if anything
-  # critical is still NA/NULL
-  req_cols <- c("Treatment", "z1_ATE_LCI", "z1_ATE_UCI",
-                "z2_ATE_LCI", "z2_ATE_UCI")
-  missing_vals <- purrr::keep(final_results[req_cols], ~ all(is.na(.x)))
-  if (length(missing_vals) > 0) {
+  # Abort only when *both* Z-level ATEs are completely absent — that means
+  # every TMLE worker failed and there is nothing to display.  If only one
+  # Z-level is missing (partial result) we log a warning and continue; the
+  # ribbon plot and significance tests already guard individual NA columns.
+  missing_vals <- purrr::keep(
+    final_results[c("z1_ATE_LCI", "z1_ATE_UCI", "z2_ATE_LCI", "z2_ATE_UCI")],
+    ~ all(is.na(.x))
+  )
+  z_missing <- intersect(names(missing_vals), c("z1_ATE_LCI", "z2_ATE_LCI"))
+  if (length(z_missing) == 2 || all(is.na(final_results$Treatment))) {
     stop("processResults(): critical columns still NA – see log for details")
+  }
+  if (length(missing_vals) > 0) {
+    log_info("⚠️ Partial results: {cols} are all NA — one adjustment-set level failed.",
+             cols = paste(names(missing_vals), collapse = ", "))
   }
 
   # log a concise snapshot for post-mortem debugging
@@ -4492,6 +4517,29 @@ shiny::validate({
         # ---- take immutable copies while we're still in the main thread ----
         df_snapshot     <- isolate(datafile_buffer())   # <-- plain data.frame now
         graph_snapshot  <- isolate(rv$dot)              # whatever rv$dot is
+
+        # Time-series mode: materialize col:n columns so workers can use them as
+        # TMLE confounders. Tetrad names lagged variables as `col:n` (e.g.
+        # enginehours_max:1). Lags are computed in original data order, matching
+        # BOSS (use_data_order = TRUE).
+        ts_lag <- if (isTRUE(r_ts_select())) 1L else 0L
+        if (ts_lag > 0L) {
+          lag_cols <- names(df_snapshot)[
+            vapply(df_snapshot, function(x) {
+              is.numeric(x) || is.logical(x) ||
+                inherits(x, c("Date", "POSIXct", "POSIXlt", "POSIXt"))
+            }, logical(1L))
+          ]
+          for (col in lag_cols) {
+            df_snapshot[[paste0(col, ":", ts_lag)]] <- dplyr::lag(df_snapshot[[col]], n = ts_lag)
+          }
+          # The first ts_lag rows have no prior values; drop them so sl3/tmle3
+          # never sees NA covariates.
+          lagged_names <- paste0(lag_cols, ":", ts_lag)
+          df_snapshot  <- df_snapshot[complete.cases(df_snapshot[, lagged_names, drop = FALSE]), ]
+          log_debug("Time-series lag={lag}: created {n} lagged columns; {r} rows remain after NA drop.",
+                    lag = ts_lag, n = length(lag_cols), r = nrow(df_snapshot))
+        }
 
         # pass the snapshots to the workers; nothing reactive inside anymore
         results_list <- foreach(k = 1:nrow(combos),
