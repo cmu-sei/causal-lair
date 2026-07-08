@@ -2551,8 +2551,10 @@ get_histogram_y <- function(df, yvar, dir, threshold) {
 get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
 
-  make_decl <- function(node, colour) {
-    sprintf('  "%s" [style=filled, fillcolor="%s"];', node, colour)
+  make_decl <- function(node, colour, fontcolor = NULL) {
+    attrs <- paste0('style=filled, fillcolor="', colour, '"')
+    if (!is.null(fontcolor)) attrs <- paste0(attrs, ', fontcolor="', fontcolor, '"')
+    sprintf('  "%s" [%s];', node, attrs)
   }
 
   # ---- build lists safely ----
@@ -2583,7 +2585,7 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
   # synthesize new declarations
   new_lines <- c(
     if (nzchar(xvar)) sapply(xvar, make_decl, colour = "#5C9AFF"),
-    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#0D47A1"),
+    if (nzchar(yvar)) sapply(yvar, make_decl, colour = "#0D47A1", fontcolor = "white"),
     if (length(Z1))   sapply(Z1,   make_decl, colour = "#8A93A6"),
     if (length(Z2))   sapply(Z2,   make_decl, colour = "#D6DAE3")
   )
@@ -2602,7 +2604,7 @@ get_updated_graph <- function(dot, xvar, yvar, Zvars = NULL) {
 get_final_graph <- function(dot, xvar, yvar, Zvars, dfr = results_out_buffer()) {
   # Highlight treatment and outcome nodes
   dot <- change_node_color(dot, xvar, "'#5C9AFF'")
-  dot <- change_node_color(dot, yvar, "'#0D47A1'")
+  dot <- change_node_color(dot, yvar, "'#0D47A1'", "'white'")
 
   # Extract Z1 and Z2 sets
   Z1 <- Zvars[Zvars$grp == "Z1", ]$Z
@@ -4048,7 +4050,7 @@ highlighted_graph <- reactive({
 
   ## — colour the outcome variable if one is chosen
   if (!is.null(vars_sel()$y) && nzchar(vars_sel()$y))
-    dot <- change_node_color(dot, vars_sel()$y, "'#0D47A1'")
+    dot <- change_node_color(dot, vars_sel()$y, "'#0D47A1'", "'white'")
 
 
   if (!is.null(Z) && nrow(Z)) {
