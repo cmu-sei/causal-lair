@@ -4,7 +4,11 @@ Once the AIR tool is successfully installed and open in the web browser, the fir
 
 ## Uploading Files
 
-The tool will first prompt you to upload your data file. The blue status bar will confirm when upload is complete. The tool will provide a notification if errors are discovered during upload.
+The tool will first prompt you to upload your data file. If you are uploading time series data sorted in sequential order, select the Time Series? radio button to enable the approrpriate analysis capability. 
+
+ <img src="../images/Opening_creen.jpg"  alt="AIR Tool initial screen with prompt to upload." />
+
+The blue status bar will confirm when upload is complete. The tool will provide a notification if errors are discovered during upload.
 
  <img src="../images/High_Corr_Detected.jpg"  alt="AIR Tool display when potential issues are discovered during data upload." />
 
