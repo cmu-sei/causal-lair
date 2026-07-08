@@ -1,5 +1,27 @@
-AIR Tool
+# AI Robustness Tool 
 
+The AI Robustness (AIR) tool is a project of the Software Engineering Institute at 
+Carnegie Mellon University. The tool allows users to gauge AI/ML classifier performance with
+data-based confidence. Modern analytic methods, including Artificial Intelligence (AI) 
+and Machine Learning (ML) classifiers, depend on correlations; however, such approaches 
+often fail to account for confounding in the data, which prevents accurate modeling of cause
+and effect, which can lead to prediction bias.  
+
+The SEI AIR tool offers a precedent-setting capability to improve the correctness of AI classifications and predictions, increasing confidence in the use of AI in development, testing, and operations decision making.
+
+The AIR tool uses state-of-the art algorithms and techniques to
+
+- build a causal graph from variables in the dataset  
+- determine adjustment sets, which allows it to remove any potential bias introduced between X and Y.
+- calculate the average risk difference and associated 95% confidence intervals for each adjustment set
+
+In this way, the AIR tool shows when the predictive model can’t be trusted and suggests where it could be improved.
+
+**Target Audience:** Projects that have an established AI classifier
+    workflow, complete with data dictionaries and subject-matter
+    experts. These release notes are for potential partners that would
+    like to install the AIR tool in their own environment.
+ 
 Copyright 2024 Carnegie Mellon University.
 
 NO WARRANTY. THIS CARNEGIE MELLON UNIVERSITY AND SOFTWARE ENGINEERING INSTITUTE
@@ -29,28 +51,7 @@ DM24-1686
 
 **Release Date: 12/18/2024**
 
-## Introduction
 
--   **Brief Overview:** Modern analytic methods, including Artificial
-    Intelligence (AI) and Machine Learning (ML) classifiers, depend on
-    correlations; however, such approaches often fail to account for
-    confounding in the data, which prevents accurate modeling of cause
-    and effect, which often leads to prediction bias. The AI Robustness
-    (AIR) tool allows users to gauge AI/ML classifier performance with
-    unprecedented confidence.
-
--   **Target Audience:** Projects that have an established AI classifier
-    workflow, complete with data dictionaries and subject-matter
-    experts. These release notes are for potential partners that would
-    like to install the AIR tool in their own environment.
-
-## New Features
-
--   **Detailed Descriptions:** Initial release.
-
--   **Benefits:** NA for this release.
-
--   **Screenshots or Visuals:** (see tutorial)
 
 ## System Requirements and Installation
 
