@@ -6,16 +6,20 @@ Once the AIR tool is successfully installed and open in the web browser, the fir
 
 The tool will first prompt you to upload your data file. The blue status bar will confirm when upload is complete. The tool will provide a notification if errors are discovered during upload.
 
+ <img src="../images/High_Corr_Detected.jpg"  alt="AIR Tool display when potential issues are discovered during data upload." />
+
 After the data file is uploaded, you will be prompted to upload the knowledge file. Once both files are accepted, a **Build Graph** button will appear.
 
-Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.
+ <img src="../images/Uploads_complete.jpg"  alt="AIR Tool display when input uploads are complete." />
 
+Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. Review the causal graph carefully to evaluate whether this causal graph produced by the tool reflects reasonable expectations before proceeding. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.
 
- <img src="../images/Uploads_complete.jpg"  alt="AIR Tool display when uploads are complete." />
+ <img src="../images/Screen_graph_is_built.jpg"  alt="AIR Tool display when causal graph is complete." />
+
  
 ## Causal Graph Checks
 
-As you review the causal graph, you may choose to use the following checks to evaluate whether the causal graph produced by the tool reflects reasonable expectations before proceeding.
+As you evaluate whether this causal graph, you may encounter these results:  
 
 ### Check 1: The tool is not returning a causal graph
 
