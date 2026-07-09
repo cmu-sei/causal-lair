@@ -1811,6 +1811,134 @@ second_node <- function(line) {
   split_line(line)[2]
 }
 
+## 5. bold every edge whose source is one of `nodes` ─────────────────────
+## (used to draw attention to edges leaving a bias-flagged/red node)
+bold_edges_from <- function(dot, nodes, penwidth = 2) {
+  nodes <- nodes[nzchar(nodes)]
+  if (!length(nodes)) return(dot)
+
+  lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
+
+  bold_one <- function(line) {
+    if (!is_edge_line(line) || !(first_node(line) %in% nodes)) return(line)
+
+    if (grepl("penwidth\\s*=", line, perl = TRUE)) {
+      sub("penwidth\\s*=\\s*[0-9.]+", paste0("penwidth=", penwidth), line, perl = TRUE)
+    } else if (grepl("\\[", line, perl = TRUE)) {
+      sub("\\[", paste0("[penwidth=", penwidth, ", "), line, perl = TRUE)
+    } else {
+      sub(";\\s*$", paste0(' [penwidth=', penwidth, '];'), line, perl = TRUE)
+    }
+  }
+
+  paste(vapply(lines, bold_one, character(1), USE.NAMES = FALSE), collapse = "\n")
+}
+
+## 6. every node name appearing anywhere in a dot string (edges + standalone
+## declarations) -- used to find the "everything else" set to gray out
+all_dot_nodes <- function(dot) {
+  lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
+
+  is_decl_line <- function(line) {
+    grepl('^\\s*"[^"]+"\\s*(\\[|;)', line, perl = TRUE) && !is_edge_line(line)
+  }
+
+  edge_lines <- lines[vapply(lines, is_edge_line, logical(1))]
+  decl_lines <- lines[vapply(lines, is_decl_line, logical(1))]
+
+  from_edges <- if (length(edge_lines))
+    c(vapply(edge_lines, first_node,  character(1), USE.NAMES = FALSE),
+      vapply(edge_lines, second_node, character(1), USE.NAMES = FALSE))
+  else character(0)
+
+  from_decls <- if (length(decl_lines))
+    vapply(decl_lines, function(l) split_line(l)[1], character(1), USE.NAMES = FALSE)
+  else character(0)
+
+  unique(c(from_edges, from_decls))
+}
+
+## mute a node's outline + label only -- leaves fill untouched (unfilled/
+## transparent), unlike change_node_color which always sets style=filled
+mute_node <- function(dot_code, node, color, fontcolor) {
+  node <- escape_dot(node)
+  color <- trimws(gsub("['\"]", "", color))
+  fontcolor <- trimws(gsub("['\"]", "", fontcolor))
+  node_definition <- paste0("\"", node, "\" [color=\"", color, "\", fontcolor=\"", fontcolor, "\"];")
+  dot_code <- sub("digraph g \\{", paste0("digraph g {\n  ", node_definition), dot_code)
+  dot_code <- gsub("\'", "\"", dot_code)
+  return(dot_code)
+}
+
+mute_nodes <- function(dot, nodes, color, fontcolor) {
+  nodes <- nodes[nzchar(nodes)]
+  for (n in nodes) dot <- mute_node(dot, n, color, fontcolor)
+  dot
+}
+
+## nodes reachable FROM `sources` (fwd) and nodes that can REACH `targets`
+## (bwd), following only directed "->" edges in the dot string. A node lies on
+## some sources → … → targets path iff it's in both sets; an edge u -> v lies
+## on such a path iff u ∈ fwd and v ∈ bwd. Undirected edges are deliberately
+## ignored -- they aren't unambiguously "downstream" and stay muted.
+dot_path_sets <- function(dot, sources, targets) {
+  lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
+  edge_lines <- lines[vapply(lines, is_edge_line, logical(1))]
+  if (!length(edge_lines)) return(list(fwd = character(0), bwd = character(0)))
+
+  from <- vapply(edge_lines, first_node,  character(1), USE.NAMES = FALSE)
+  to   <- vapply(edge_lines, second_node, character(1), USE.NAMES = FALSE)
+
+  reach <- function(seeds, from, to) {
+    seen <- unique(seeds[nzchar(seeds)])
+    frontier <- seen
+    while (length(frontier)) {
+      nxt <- unique(to[from %in% frontier])
+      frontier <- setdiff(nxt, seen)
+      seen <- union(seen, frontier)
+    }
+    seen
+  }
+
+  list(
+    fwd = reach(sources, from, to),   # downstream of the flagged set
+    bwd = reach(targets, to, from)    # upstream of X / Y (edges reversed)
+  )
+}
+
+## 7. mute every node/edge *not* in `highlighted` -- rather than literally
+## graying the whole graph first and layering colors on top (repeated node
+## statements merge with the FIRST call winning on conflicts -- see
+## change_node_color), we paint the highlighted set as usual and gray only
+## the complement, which needs no ordering trick at all.
+## `path_fwd`/`path_bwd` (from dot_path_sets) optionally spare the bias
+## pathway: nodes in BOTH sets, and edges from a fwd node to a bwd node, keep
+## their standard black border/text so the flagged Z → X/Y routes stay legible
+gray_out_background <- function(dot, highlighted, node_color = "#B9BEC7",
+                                 node_font = "#6B7280", edge_color = "#C7CBD1",
+                                 path_fwd = character(0), path_bwd = character(0)) {
+  highlighted <- unique(highlighted[nzchar(highlighted)])
+  on_path <- intersect(path_fwd, path_bwd)
+
+  others <- setdiff(all_dot_nodes(dot), c(highlighted, on_path))
+  dot <- mute_nodes(dot, others, node_color, node_font)
+
+  lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
+  fade_edge <- function(line) {
+    if (!is_edge_line(line)) return(line)
+    if (first_node(line) %in% highlighted) return(line)  # black only *from* a highlighted node
+    if (first_node(line) %in% path_fwd && second_node(line) %in% path_bwd)
+      return(line)                                       # edge lies on a flagged Z → X/Y path
+
+    if (grepl("\\[", line, perl = TRUE)) {
+      sub("\\[", paste0('[color="', edge_color, '", '), line, perl = TRUE)
+    } else {
+      sub(";\\s*$", paste0(' [color="', edge_color, '"];'), line, perl = TRUE)
+    }
+  }
+  paste(vapply(lines, fade_edge, character(1), USE.NAMES = FALSE), collapse = "\n")
+}
+
 ## The key methods defined here are descendants (and its dual: ancestors)
 descendants <- function(node, children) {
   checked_so_far <- set()
@@ -2632,21 +2760,36 @@ if (in_z1 && in_z2) {
   log_debug("flag within both intervals")
 
 } else if (xor(in_z1, in_z2)) {
-  # Inside one, outside the other → paint the one that's outside
+  # Inside one, outside the other → paint only the one that's outside;
+  # the in-range set is NOT highlighted, so it gets grayed with everything else
+  flagged <- character(0)
   if (!in_z1) {
     dot <- paint_nodes(dot, Z1, "'#DDB64B'")
+    flagged <- c(flagged, Z1)
     log_debug("flag outside Z1 only")
   }
   if (!in_z2) {
     dot <- paint_nodes(dot, Z2, "'#DDB64B'")
+    flagged <- c(flagged, Z2)
     log_debug("flag outside Z2 only")
   }
+  # something's suspect -- mute everything but X/Y/the flagged set, sparing
+  # the pathways that carry the flagged bias into X/Y
+  paths <- dot_path_sets(dot, flagged, c(xvar, yvar))
+  dot <- gray_out_background(dot, c(xvar, yvar, flagged),
+                             path_fwd = paths$fwd, path_bwd = paths$bwd)
 
 } else if (!in_z1 && !in_z2) {
   # Outside both → paint both in red; white text keeps labels legible
   # against the dark fill
   dot <- paint_nodes(dot, Z1, "'#B6202D'", "'white'")
   dot <- paint_nodes(dot, Z2, "'#B6202D'", "'white'")
+  dot <- bold_edges_from(dot, c(Z1, Z2))
+  # biased -- mute everything but X/Y/Z1/Z2, sparing the pathways that carry
+  # the flagged bias into X/Y
+  paths <- dot_path_sets(dot, c(Z1, Z2), c(xvar, yvar))
+  dot <- gray_out_background(dot, c(xvar, yvar, Z1, Z2),
+                             path_fwd = paths$fwd, path_bwd = paths$bwd)
   log_debug("flag outside both intervals")
 }
   dot <- sub("(digraph[^\\{]*\\{)", "\\1\n  graph [tooltip=\"Final Causal graph\"]", 
@@ -3234,92 +3377,7 @@ uiOutput('ui_dl_btn')
 
 br()
 
-tagList(
-  # 1) Normal Shiny button lives in the sidebar
-  uiOutput("ui_reset_btn"),
-
-  # 2–3) JS: switch between fixed-at-bottom (no scroll) and sticky (when scroll shows up)
-  tags$script(HTML("
-    (function () {
-      const slot = document.getElementById('reload_slot');
-      if (!slot) return;
-
-      // placeholder preserves original position for 'sticky' mode
-      const ph = document.createElement('span');
-      ph.id = 'reload_slot_ph';
-      slot.parentNode.insertBefore(ph, slot);
-
-      function getSidebar() {
-        // Quarto dashboard sidebar container
-        return document.querySelector('.quarto-dashboard-sidebar')
-            || document.querySelector('.sidebar')
-            || document.querySelector('[class*=sidebar]');
-      }
-
-      function getScrollEl(sidebar) {
-        // find the actual scrolling element inside the sidebar
-        const nodes = [sidebar, ...sidebar.querySelectorAll('*')];
-        for (const n of nodes) {
-          const cs = getComputedStyle(n);
-          if ((cs.overflowY === 'auto' || cs.overflowY === 'scroll') &&
-              n.scrollHeight > n.clientHeight + 1) return n;
-        }
-        return sidebar;
-      }
-
-      function placeFixed() {
-        const sb = getSidebar();
-        if (!sb) return;
-        const rect = sb.getBoundingClientRect();
-        // move slot to body so overflow clipping won't affect it
-        if (slot.parentNode !== document.body) document.body.appendChild(slot);
-        Object.assign(slot.style, {
-          position: 'fixed',
-          bottom: '12px',
-          left: (rect.left + 12) + 'px',
-          width: (rect.width - 24) + 'px',
-          zIndex: 10000,
-          background: 'transparent'
-        });
-      }
-
-      function placeSticky() {
-        // move slot back under the placeholder, full-width of sidebar content
-        if (slot.parentNode !== ph.parentNode) {
-          ph.parentNode.insertBefore(slot, ph.nextSibling);
-        }
-        Object.assign(slot.style, {
-          position: 'sticky',
-          bottom: '12px',
-          left: '',
-          width: '100%',
-          zIndex: 1,
-          background: 'transparent'
-        });
-      }
-
-      function refreshPlacement() {
-        const sb = getSidebar();
-        if (!sb) return;
-        const scroller = getScrollEl(sb);
-        const needsScroll = scroller.scrollHeight > scroller.clientHeight + 1;
-        if (needsScroll) placeSticky(); else placeFixed();
-      }
-
-      // run now and on likely changes
-      setTimeout(refreshPlacement, 0);
-      window.addEventListener('resize', refreshPlacement);
-      document.addEventListener('shiny:value', refreshPlacement);
-      document.addEventListener('shiny:outputinvalidated', refreshPlacement);
-
-      const sb = getSidebar();
-      if (sb) {
-        new MutationObserver(refreshPlacement)
-          .observe(sb, { childList: true, subtree: true });
-      }
-    })();
-  "))
-)
+uiOutput("ui_reset_btn")
 
 ```
 
@@ -3992,8 +4050,11 @@ vars_ready <- reactive({
   nzchar(input$xvar) && nzchar(input$yvar)
 })
 
-x_ready   <- reactive({ nzchar(vars_sel()$x) })         # X chosen & valid
-y_ready   <- reactive({ nzchar(vars_sel()$y) })         # Y chosen & valid
+## read raw inputs directly (not via vars_sel()) so that picking Y doesn't
+## spuriously invalidate x_ready() (and vice versa) -- vars_sel() bundles
+## xvar+yvar into one reactive, so changing either one invalidates both
+x_ready   <- reactive({ !is.null(input$xvar) && nzchar(input$xvar) })  # X chosen & valid
+y_ready   <- reactive({ !is.null(input$yvar) && nzchar(input$yvar) })  # Y chosen & valid
 both_ready <- reactive({ x_ready() && y_ready() })      # X + Y ready
 
 tv_dir <- reactive({
@@ -4007,13 +4068,13 @@ ov_dir <- reactive({
 tv_val <- reactive({
   req(x_ready(), !is.null(input$tv_threshold))          # ← new guard
   safe_thresh(input$tv_threshold,
-              df()[[vars_sel()$x]], "X threshold")
+              df()[[x_val()]], "X threshold")
 })
 
 ov_val <- reactive({
   req(y_ready(), !is.null(input$ov_threshold))          # ← new guard
   safe_thresh(input$ov_threshold,
-              df()[[vars_sel()$y]], "Y threshold")
+              df()[[y_val()]], "Y threshold")
 })
 
 vars_sel <- reactive({
@@ -4027,6 +4088,21 @@ vars_sel <- reactive({
            check_column_exists(df(), input$yvar, "yvar")
          else ""
   )
+})
+
+## scoped single-variable versions of vars_sel()$x / vars_sel()$y -- use these
+## (not vars_sel() directly) in anything that should only react to ONE of
+## X/Y, e.g. per-variable renderUI/renderPlot outputs. Reading vars_sel()$x
+## still subscribes to input$yvar too, since they're bundled into one
+## reactive -- that's what caused X's threshold widget (and others) to
+## needlessly rebuild every time Y was picked, and vice versa
+x_val <- reactive({
+  req(df())
+  if (!is.null(input$xvar) && nzchar(input$xvar)) check_column_exists(df(), input$xvar, "xvar") else ""
+})
+y_val <- reactive({
+  req(df())
+  if (!is.null(input$yvar) && nzchar(input$yvar)) check_column_exists(df(), input$yvar, "yvar") else ""
 })
 
 ## ───────────────────────────────────────────────────────────
@@ -4080,10 +4156,34 @@ observeEvent(input$disconnect, {
   })
 })
 
+## ── phantom-click guard for renderUI-created action buttons ──────────────
+## When a dynamically rendered actionButton's DOM is rebuilt/rebound (the
+## sidebar re-renders widgets after variable selection), its client-side click
+## counter resets to 0. Shiny reports that 0 as a "change", firing observeEvent
+## with no user click -- a phantom Reset here used to wipe the X/Y dropdowns.
+## Only counter INCREASES are real clicks.
+make_click_guard <- function(id) {
+  last <- reactiveVal(0)
+  function(val) {
+    new <- suppressWarnings(as.numeric(val %||% 0))
+    if (!isTRUE(is.finite(new))) new <- 0
+    old <- last()
+    last(new)
+    real <- isTRUE(new > old)
+    if (!real) log_debug("Ignored phantom {id} event (counter {old} -> {new})",
+                         id = id, old = old, new = new)
+    real
+  }
+}
+reload_click_real <- make_click_guard("reload_btn")
+build_click_real  <- make_click_guard("buildButton")
+go_click_real     <- make_click_guard("goButton")
+
 observeEvent(input$reload_btn, {
   ## ── "Reset Selections" – soft-reset back to Step 2 ─────────────────────
   ## Preserves: uploaded files, parsed data, knowledge, causal graph
   ## Resets:    variable selections, thresholds, model config, all results
+    req(reload_click_real(input$reload_btn))
     req(graph_complete())        # only meaningful if a graph exists
 
     # ── 1. Clear all result / estimation buffers ──────────────────────────
@@ -4169,6 +4269,7 @@ observeEvent(input$confirm_mismatch, ignoreInit = TRUE, {
 
 # Causal graph build button
 observeEvent(input$buildButton, {
+  req(build_click_real(input$buildButton))
   if (isTRUE(cols_mismatch())) {
       bad <- htmltools::htmlEscape(setdiff(knowledge()$variable, names(df())))
       confirmSweetAlert(
@@ -4427,6 +4528,7 @@ shiny::validate({
 })
 
 observeEvent(input$goButton, {
+  req(go_click_real(input$goButton))
   req(both_ready())
   req(graph_complete())
 
@@ -4752,6 +4854,7 @@ output$xvar <- renderUI({
     tags$script(HTML(sprintf("
       (function(){
         $(document).off('.xvarBlock');
+        if (window.__xvarBlockInterval) { clearInterval(window.__xvarBlockInterval); }
 
         var blocked = %s;
 
@@ -4764,10 +4867,8 @@ output$xvar <- renderUI({
             this.title = '';
           });
 
-          if (sel.value && blocked.indexOf(sel.value) !== -1) {
-            sel.value = '';
-            $(sel).trigger('change');
-          }
+          // deliberately no force-reset of sel.value here: server-side validate()
+          // rejects blocked picks, and a JS reset can silently blank a user's pick
 
           $('#xvar option').each(function(){
             if (this.value && blocked.indexOf(this.value) !== -1){
@@ -4777,14 +4878,19 @@ output$xvar <- renderUI({
           });
         }
 
-        var tries=0, t=setInterval(function(){
+        // NOTE: deliberately NOT bound to document-wide shiny:value/shiny:visualchange --
+        // those fire on EVERY Shiny output update anywhere on the page (e.g. the live
+        // log tail re-renders every second), which was toggling these <option> elements
+        // while the native dropdown was open and silently swallowing the user's click.
+        // A fresh render (which re-runs this whole script) already fires whenever the
+        // choices can actually change, so the short poll below is enough.
+        var tries=0;
+        window.__xvarBlockInterval = setInterval(function(){
           applyXDisabled();
-          if(++tries>20) clearInterval(t);
+          if(++tries>20) clearInterval(window.__xvarBlockInterval);
         }, 100);
-
-        $(document).on('shiny:value.xvarBlock shiny:visualchange.xvarBlock', applyXDisabled);
       })();
-    ", jsonlite::toJSON(blocked, auto_unbox = TRUE))))
+    ", jsonlite::toJSON(blocked))))
   )
 })
 
@@ -4859,6 +4965,7 @@ output$yvar <- renderUI({
         (function(){
           // Remove previous handler to prevent accumulation
           $(document).off('.yvarBlock');
+          if (window.__yvarBlockInterval) { clearInterval(window.__yvarBlockInterval); }
 
           var blocked = %s;
 
@@ -4872,10 +4979,8 @@ output$yvar <- renderUI({
               this.title = '';
             });
 
-            if (sel.value && blocked.indexOf(sel.value) !== -1) {
-              sel.value = '';
-              $(sel).trigger('change');
-            }
+            // deliberately no force-reset of sel.value here: server-side validate()
+            // rejects blocked picks, and a JS reset can silently blank a user's pick
 
             $('#yvar option').each(function(){
               if (this.value && blocked.indexOf(this.value) !== -1){
@@ -4885,14 +4990,19 @@ output$yvar <- renderUI({
             });
           }
 
-          var tries=0, t=setInterval(function(){
+          // NOTE: deliberately NOT bound to document-wide shiny:value/shiny:visualchange --
+          // those fire on EVERY Shiny output update anywhere on the page (e.g. the live
+          // log tail re-renders every second), which was toggling these <option> elements
+          // while the native dropdown was open and silently swallowing the user's click.
+          // A fresh render (which re-runs this whole script) already fires whenever the
+          // choices can actually change, so the short poll below is enough.
+          var tries=0;
+          window.__yvarBlockInterval = setInterval(function(){
             applyYDisabled();
-            if(++tries>20) clearInterval(t);
+            if(++tries>20) clearInterval(window.__yvarBlockInterval);
           }, 100);
-
-          $(document).on('shiny:value.yvarBlock shiny:visualchange.yvarBlock', applyYDisabled);
         })();
-      ", jsonlite::toJSON(blocked_y, auto_unbox = TRUE))))
+      ", jsonlite::toJSON(blocked_y))))
     )
   }
 })
@@ -4922,7 +5032,7 @@ output$yvar <- renderUI({
 observeEvent(input$xvar, ignoreInit = TRUE, {
   # Only act if graph exists and X is valid
   req(graph_complete(), nzchar(input$xvar))
-  
+
   # Reset Y selection to force a fresh pick
   updateSelectInput(session, "yvar", selected = "")
   
@@ -4973,8 +5083,8 @@ make_threshold_ui <- function(id, vec, n_bins = 30) {
 }
 
 output$ui_threshold_x <- renderUI({
-  req(vars_sel()$x)
-  vec <- df()[[vars_sel()$x]]
+  req(x_val())
+  vec <- df()[[x_val()]]
   val <- {
           prev <- isolate(input$tv_threshold)
           if (!is.null(prev) && !is.na(prev)) prev else default_split(vec)
@@ -4988,7 +5098,7 @@ output$ui_threshold_x <- renderUI({
   tagList(
     tags$div(
   style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
-  tags$span(paste("Test the effect when ", vars_sel()$x, " is ")),
+  tags$span(paste("Test the effect when ", x_val(), " is ")),
 
   tags$div(
     style = "display:inline-block;",
@@ -5024,15 +5134,15 @@ output$ui_threshold_x <- renderUI({
 })
 
 output$ui_threshold_y <- renderUI({
-  req(vars_sel()$y)
-  vec <- df()[[vars_sel()$y]]
+  req(y_val())
+  vec <- df()[[y_val()]]
   val <- if (locked() && !is.null(input$ov_threshold))
            isolate(ov_val()) else default_split(vec)
   step <- fine_step(vec)  # half a bin, n_bins = 30
   tagList(
   tags$div(
   style = "display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;",
-  tags$span(paste("Where success is defined as ", vars_sel()$y, " being ")),
+  tags$span(paste("Where success is defined as ", y_val(), " being ")),
 
   tags$div(
     style = "display:inline-block;",
@@ -5121,14 +5231,14 @@ output$ui_file2 <- renderUI({
 })
 
 output$histogram_x <- renderPlot({
-  req(vars_sel()$x, !is.null(input$tv_threshold))   # wait for slider
-  p <- get_histogram_x(df(), vars_sel()$x, tv_dir(), tv_val())
+  req(x_val(), !is.null(input$tv_threshold))   # wait for slider
+  p <- get_histogram_x(df(), x_val(), tv_dir(), tv_val())
   p
   }, bg = "transparent")
 
 output$histogram_y <- renderPlot({
-  req(vars_sel()$y, !is.null(input$ov_threshold))   # wait for slider
-  p <- get_histogram_y(df(), vars_sel()$y, ov_dir(), ov_val())
+  req(y_val(), !is.null(input$ov_threshold))   # wait for slider
+  p <- get_histogram_y(df(), y_val(), ov_dir(), ov_val())
   p
   }, bg = "transparent")
 
