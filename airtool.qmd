@@ -1812,8 +1812,10 @@ second_node <- function(line) {
 }
 
 ## 5. bold every edge whose source is one of `nodes` ─────────────────────
-## (used to draw attention to edges leaving a bias-flagged/red node)
-bold_edges_from <- function(dot, nodes, penwidth = 2) {
+## (used to draw attention to edges leaving a bias-flagged/red node);
+## if `only_into` is given, only edges whose TARGET is in it are bolded --
+## used to restrict bolding to edges on the flagged Z → X/Y pathway
+bold_edges_from <- function(dot, nodes, penwidth = 2, only_into = NULL) {
   nodes <- nodes[nzchar(nodes)]
   if (!length(nodes)) return(dot)
 
@@ -1821,6 +1823,7 @@ bold_edges_from <- function(dot, nodes, penwidth = 2) {
 
   bold_one <- function(line) {
     if (!is_edge_line(line) || !(first_node(line) %in% nodes)) return(line)
+    if (!is.null(only_into) && !(second_node(line) %in% only_into)) return(line)
 
     if (grepl("penwidth\\s*=", line, perl = TRUE)) {
       sub("penwidth\\s*=\\s*[0-9.]+", paste0("penwidth=", penwidth), line, perl = TRUE)
@@ -1919,16 +1922,18 @@ gray_out_background <- function(dot, highlighted, node_color = "#B9BEC7",
                                  path_fwd = character(0), path_bwd = character(0)) {
   highlighted <- unique(highlighted[nzchar(highlighted)])
   on_path <- intersect(path_fwd, path_bwd)
+  focused <- c(highlighted, on_path)   # nodes that keep their normal look
 
-  others <- setdiff(all_dot_nodes(dot), c(highlighted, on_path))
+  others <- setdiff(all_dot_nodes(dot), focused)
   dot <- mute_nodes(dot, others, node_color, node_font)
 
   lines <- strsplit(dot, "\n", fixed = TRUE)[[1]]
   fade_edge <- function(line) {
     if (!is_edge_line(line)) return(line)
-    if (first_node(line) %in% highlighted) return(line)  # black only *from* a highlighted node
     if (first_node(line) %in% path_fwd && second_node(line) %in% path_bwd)
       return(line)                                       # edge lies on a flagged Z → X/Y path
+    if (first_node(line) %in% highlighted && second_node(line) %in% focused)
+      return(line)                                       # between focused nodes (e.g. X → Y)
 
     if (grepl("\\[", line, perl = TRUE)) {
       sub("\\[", paste0('[color="', edge_color, '", '), line, perl = TRUE)
@@ -2784,10 +2789,10 @@ if (in_z1 && in_z2) {
   # against the dark fill
   dot <- paint_nodes(dot, Z1, "'#B6202D'", "'white'")
   dot <- paint_nodes(dot, Z2, "'#B6202D'", "'white'")
-  dot <- bold_edges_from(dot, c(Z1, Z2))
-  # biased -- mute everything but X/Y/Z1/Z2, sparing the pathways that carry
-  # the flagged bias into X/Y
+  # biased -- bold only the red-node edges that lie on a Z → X/Y pathway,
+  # then mute everything but X/Y/Z1/Z2 and those pathways
   paths <- dot_path_sets(dot, c(Z1, Z2), c(xvar, yvar))
+  dot <- bold_edges_from(dot, c(Z1, Z2), only_into = paths$bwd)
   dot <- gray_out_background(dot, c(xvar, yvar, Z1, Z2),
                              path_fwd = paths$fwd, path_bwd = paths$bwd)
   log_debug("flag outside both intervals")
