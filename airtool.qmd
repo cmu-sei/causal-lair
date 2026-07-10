@@ -2236,7 +2236,7 @@ This suggests that the data or model assumptions may not support a consistent ca
 
 
 get_figure_caption <- function(AIRHome, df_vars) {
-  caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to 'no significant effect.")
+  caption <- paste0("Risk Difference: This chart represents the difference in outcomes resulting from a change in your experimental variable,",df_vars[1,][[2]],". The x-axis ranges from negative to positive effect, where the treatment, ", df_vars[2,][[2]]," either increases the likelihood of the outcome or decreases it, respectively. The midpoint corresponds to no significant effect.")
   return(caption)
 }
 
@@ -4775,11 +4775,11 @@ output$second_column_content <- renderUI({
       tags$div(
         style = "display: flex; flex-direction: column; height: 100%;",
         tags$div(
-          style = "flex: 0 0 25%;",
+          style = "flex: 0 0 auto;",   # shrink to content -- no reserved dead space
           uiOutput("ui_ribbon_plot")
         ),
         tags$div(
-          style = "flex: 0 0 25%;",
+          style = "flex: 0 0 auto;",
           uiOutput("ui_figurecaption")
         ),
         tags$hr(
@@ -5358,14 +5358,6 @@ output$ui_ci_plot = renderUI({
 
 output$ui_ribbon_plot <- renderUI({
   req(calc_complete())
-  tagList(
-    h4("Comparison of ATE for AIR and ML"),
-    imageOutput("ribbon_plot")
-  )
-})
-
-output$ui_ribbon_plot <- renderUI({
-  req(calc_complete())
   tags$div(
     style = "max-width: 600px;
             margin: 0 auto;",
@@ -5391,8 +5383,14 @@ output$ribbon_plot <- renderImage(
       ))
     }
 
+    # canvas hugs the ribbon (aspect.ratio = 0.2 panel) -- a taller canvas
+    # just bakes white bands above/below the strip into the PNG. The
+    # algorithm-flag arrow (drawn when a model/ATE was supplied) sits well
+    # above the strip via clip = "off", so it needs extra headroom
+    has_flag <- !is.null(rv$model_yn) && rv$model_yn != "null"
     ggsave(tmp, plot = plt,
-           width = 6.5, height = 4, units = "in", bg = "transparent")
+           width = 6.5, height = if (has_flag) 3.25 else 1.8,
+           units = "in", bg = "transparent")
            list(src         = tmp,
                 contentType = "image/png",
                 alt         = "ATE ribbon plot",
@@ -5462,7 +5460,12 @@ output$ui_buildButton = renderUI({
 output$figurecaption = renderUI({
   req(calc_complete())
   caption <- get_figure_caption(AIRHome, df_vars)
-  tags$div(style = "font-size:12px;", caption)
+  # bold the lead-in; done here (not in get_figure_caption) so the plain
+  # string stays usable in the PDF report
+  caption <- sub("^Risk Difference:", "<strong>Risk Difference:</strong>", caption)
+  # font size matches the interpretation section; bottom margin gives the
+  # caption breathing room before the divider
+  tags$div(style = "font-size:24px; margin-bottom: 1em;", HTML(caption))
   })
 
 output$ui_interpretation = renderUI({
