@@ -2143,14 +2143,15 @@ This suggests that the data or model assumptions may not support a consistent ca
                    lineend = "round",
                    position = position_nudge(x = 0)) +
 
-    ## +/- annotations
+    ## +/- annotations, centered on the black end caps (anchored at the
+    ## bar's endpoints so they stay put at any render size)
     annotate("text",
-             x = 1, y = -1,
-             label = "-", hjust = 2.5, vjust = 0.25,
+             x = 1, y = -1.05,
+             label = "−", hjust = 0.5, vjust = 0.4,
              size = 5, color = "white") +
     annotate("text",
-             x = 1, y = 1,
-             label = "+", hjust = -0.35, vjust = 0.4,
+             x = 1, y = 1.05,
+             label = "+", hjust = 0.5, vjust = 0.4,
              size = 5, color = "white") +
 
     ## red baseline ribbon (everything outside CIs)
@@ -2219,14 +2220,14 @@ This suggests that the data or model assumptions may not support a consistent ca
     )
   if (rv$model_yn != "null") {
      p +
-      ## arrow for algorithm flag
+      ## arrow for algorithm flag -- below the strip, pointing up at the flag
     geom_segment(data = dfr,
-                 aes(x = 2.5, xend = 1.25, y = flag, yend = flag, color = algorithm),
+                 aes(x = -0.5, xend = 0.75, y = flag, yend = flag, color = algorithm),
                  arrow = arrow(length = unit(0.5, "cm")),
                  lwd = 1.2,
                  color = "#0F9ED5") +
     geom_point(data = dfr,
-               aes(x = 2.5, y = flag, shape = algorithm),
+               aes(x = -0.5, y = flag, shape = algorithm),
                size = 3, color = "#0F9ED5")
   } else {
     p
@@ -5359,8 +5360,7 @@ output$ui_ci_plot = renderUI({
 output$ui_ribbon_plot <- renderUI({
   req(calc_complete())
   tags$div(
-    style = "max-width: 600px;
-            margin: 0 auto;",
+    style = "width: 100%;",
     h4("Comparison of ATE for AIR and ML"),
     # make the <img> responsive
     imageOutput("ribbon_plot",
@@ -5383,14 +5383,12 @@ output$ribbon_plot <- renderImage(
       ))
     }
 
-    # canvas hugs the ribbon (aspect.ratio = 0.2 panel) -- a taller canvas
-    # just bakes white bands above/below the strip into the PNG. The
-    # algorithm-flag arrow (drawn when a model/ATE was supplied) sits well
-    # above the strip via clip = "off", so it needs extra headroom
-    has_flag <- !is.null(rv$model_yn) && rv$model_yn != "null"
+    # wide canvas + hugging height: line widths are fixed in mm, so a wider
+    # canvas renders proportionally thinner marks once CSS stretches the
+    # image to the column width; a taller canvas would just bake white bands
+    # above/below the aspect.ratio-pinned panel into the PNG
     ggsave(tmp, plot = plt,
-           width = 6.5, height = if (has_flag) 3.25 else 1.8,
-           units = "in", bg = "transparent")
+           width = 10, height = 2.2, units = "in", bg = "transparent")
            list(src         = tmp,
                 contentType = "image/png",
                 alt         = "ATE ribbon plot",
