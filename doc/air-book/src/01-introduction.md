@@ -1,5 +1,35 @@
 # Introduction to AIR Tool
 
+## Table of Contents 
+
+[Getting Started](./02-getting-started.md) 
+
+[Installation](./03-installation.md)
+
+[Causal Thinking](./04-causal-thinking.md)
+
+[Key Concepts](./05-key-concepts.md)
+
+[Data Guidelines](./06-data-guidelines/README.md)
+
+[Preparing Input Files](./07-running/input-files.md)
+
+[Using AIR: Step 1 Causal Graph](./07-running/step1-causal-graph.md)
+
+[Using AIR: Step 2 Selecting Variables](./07-running/step2-variables.md)
+
+[Using AIR: Step 3 Causal Estimation](./07-running/step3-estimation.md)
+
+[Troubleshooting](./07-running/troubleshooting.md)
+
+[Tool Limitations](./08-limitations.md)
+
+[Contact Us](./09-contact.md)
+
+ 
+
+
+
 ## Why It Was Developed
 
 Predictive models (such as those using statistics, AI, or machine learning) can provide a significant and even game-changing edge to the DoW; however, their development and use is not without challenges. In rapidly changing environments, such models may no longer provide accurate classifications and predictions (e.g., friend vs. foe; when a system may fail; likelihood of mission success). Distrust in model outputs can rapidly escalate into ignoring the model's classifications and predictions. Retraining helps but takes time and is disruptive — so, when does the model need to be retrained? Current test and evaluation methods are inadequate for ongoing evaluation of predictive models as they heavily rely on correlations within the data, which are undermined by data/concept drift, evolving edge cases, and emerging phenomena.
