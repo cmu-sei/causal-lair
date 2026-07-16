@@ -13,7 +13,7 @@ The table below summarizes the trade-offs at a glance; each option is described 
 
 |Option|What you provide|What AIR does|Best when…|
 |---|---|---|---|
-|Yes: I cam upload it|A trained R model file|Computes ATE from your model, then compares to the causal ATE estimate|You have direct access to your model and want the check of model prediction|
+|Yes: I can upload it|A trained R model file|Computes ATE from your model, then compares to the causal ATE estimate|You have direct access to your model and want the check of model prediction|
 |Yes: I can provide an ATE|A single ATE value from your model|Compares your ATE to the causal ATE estimate|You can query your model but can't easily export it, or your model isn't in R|
 |No: Do it all for me|Nothing extra|Trains a battery of predictive models, computes their ATEs, and compares against the causal ATE estimate|You don't have a model yet and want to see how common model families would behave|
 |No: Just show me the effect|Nothing extra|Reports the causal ATE estimate only|You only want to know whether X has a reliable causal effect on Y|
