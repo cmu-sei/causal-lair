@@ -77,6 +77,11 @@ Pearl, Judea. *The Do-Calculus Revisited.* Pages 3–11. UAI'12: Proceedings of 
 Perković, Emilija; Textor, Johannes; Kalisch, Markus; & Maathuis, Marloes H. *Complete Graphical Characterization and Construction of Adjustment Sets in Markov Equivalence Classes of Ancestral Graphs.* Journal of Machine Learning Research. Volume 18. 2018. Pages 1–62.
 <https://doi.org/10.48550/arXiv.1606.06903>
 
+Characterization  and  Construction  of  Adjustment  Sets  in Markov  Equivalence  Classes  of  Ancestral  Graphs.  _Journal of Machine Learning Research._ Volume 18. 2018. Pages 1–62. [**https://doi.org/10.48550/arXiv.1606.06903**](https://doi.org/10.48550/arXiv.1606.06903)
+
+_This  source  addresses  causal  identification  in  a  much  more  general way than the way in which it has been implemented by the SEI._
+
+
 ## AIR Step 3: Causal Estimation
 
 Causal estimation helps answer: How can we quantify the causal effect? What effect should be seen on the treatment variable in the absence of bias? Is that effect different from what our classifier is predicting?
