@@ -30,4 +30,10 @@ Leveraging the Earth Science Information Partners (ESIP) Checklist to Examine AI
 
 [Annotated ESIP Checklist (PDF)](https://github.com/cmu-sei/causal-lair/blob/main/doc/log_retrieval_instructions_files/media/data_guidelines_ESIP.pdf)
 
+#### ESIP Checklist Formatting Key: 
+- Applied Bold/Underline: Emphasized select checklist questions that are relevant to application of the AIR Tool
+- Highlighted in Blue: Emphasize when a particular response to the checklist question is re-quired by the AIR Tool
+- Highlighted in Yellow: Additional notes to elaboration on the applicability of the check-list question to the AIR Tool.
+
+
 The full annotated checklist with SEI notes is available in the [ESIP Checklist](esip-checklist.md) subchapter.
