@@ -34,7 +34,7 @@ Choose one of the "Yes" options if you already have a predictive model and want 
 
 If you have direct access to your model file, you can upload it and let AIR handle the rest. This is the most streamlined option: AIR computes the ATE from your model automatically, then folds that value into the health report alongside the causal analysis. The resulting ATE from your model will appear on the Ribbon Plot in the upper right as a blue arrow once the analysis completes.
 
-> [!warning] The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.
+> **Note:** The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.
 
 ### I can provide an ATE
 
@@ -42,12 +42,12 @@ If you can query your model with new data but can't easily export it, or if your
 
 The ATE is the average difference between the two potential outcomes:
 ```
-ATE = (1/N) * Σ (Ŷ₁ᵢ − Ŷ₀ᵢ)
+$$ATE = \frac{1}{N}\sum_{i = 1}^{N}{({\widehat{Y}}_{1i} - \ {\widehat{Y}}_{0i})}\ $$
 ```
 The value returned is what you'll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
 See [Calculating ATE](https://github.com/cmu-sei/causal-lair/blob/main/doc/calculating_ATE.md) for more information.
 
-> [!info] ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
+> **Note:**ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
 
 
 ## No: I don't have a model (or I don't want to evaluate one)
@@ -74,7 +74,7 @@ Each model trains on the data, predicts Y, and is then queried with X manipulate
 
 The point of training a battery of learners rather than a single model is that **the spread itself is informative**. When ATE estimates agree across model families, that's evidence the causal signal is robust to model choice. When they disagree, it tells you the signal is sensitive to which model family is used, and you should be cautious about deploying any single one of them in isolation.
 
-> [!note] This option will be somewhat slower than the others because of the SuperLearner ensemble. 
+> **Note:** This option will be somewhat slower than the others because of the SuperLearner ensemble. 
 
 ### No: Just show me the effect
 
@@ -98,4 +98,4 @@ Once you have made a selection, click **Calculate Results** to finish the causal
 
 > **Note:** After this process has started, it cannot be undone. This process typically takes 2–10 minutes to run with a fairly simple model. Once complete, the progress bar will disappear and the results will be displayed.
 
-![Step 3 model selection interface](../../images/image3.png)
+ <img src="../images/Screen_graph_is_built.jpg"  alt="AIR Toolscreen when Step 3 is complete." />
