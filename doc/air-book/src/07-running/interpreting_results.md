@@ -8,9 +8,9 @@ When you complete an analysis in AIR, you will be presented with two visualizati
 The **Risk Difference** chart compares the average treatment effect (ATE) estimated by the AIR tool with the AI/ML model’s ATE of the experimental variable (a.k.a., “scenario variable” and “treatment variable”) on the outcome variable (a.k.a., “response variable”). The AIR tool ATE estimates are combined at the bottom of the chart into a single long horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your AI/ML model’s classifications.
 
 The x-axis of the Risk Difference chart ranges from negative to positive effect, where a change in treatment either decreases the likelihood of the outcome or increases it, respectively. The midpoint corresponds to no statistically significant effect detected of treatment on outcome.
+
+ <img src="../images/Risk_Difference.png"  alt="Tool generated risk difference chart." />
  
- <img src="./log_retrieval_instructions_files/media/Risk_Difference.png"
-  alt="AIR Tool generated risk difference chart." />
 
 ### Interpretations of the Risk Difference Chart 
 - If your model’s ATE BLUE arrow is in a GREEN region: This means that statistical testing failed to find evidence of confounding bias in the predictions from your AI/ML model. As you continue to use your model for outcome prediction, you may want to periodically re-test just in case something has changed in the data, their distribution, or their sources. 
@@ -38,6 +38,4 @@ Differentiating these three possible causes for non-overlapping confidence inter
 ### Only one adjustment set indicated
 This can happen because there are only a few variables and not much to select from in terms of forming adjustment sets, and only one could be found in AIR Step 2. In this case, we recommend proceeding as if there were two adjustment sets and interpreting whether the BLUE arrow ATE is in the GREED or RED similarly as when there are two adjustment sets.  
 
-
-
-V 0.10.0  
+ 
