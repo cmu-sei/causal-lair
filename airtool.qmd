@@ -4210,9 +4210,10 @@ observeEvent(input$reload_btn, {
     # NOTE: step1lock and graph_complete intentionally left alone
 
     # ── 3. Clear per-run reactive values (keep graph artefacts) ───────────
-    rv$Zvars     <- NULL
-    rv$model_yn  <- NULL
-    rv$model_ate <- NULL
+    rv$Zvars       <- NULL
+    rv$model_yn    <- NULL
+    rv$model_ate   <- NULL
+    rv$data_caveat <- NULL
 
     # ── 4. Tidy up global-env leftovers from the previous run ─────────────
     for (nm in c("Zvars", "df_vars", "results_detailed")) {
@@ -4587,6 +4588,8 @@ shiny::validate({
 
       log_debug("Calculating Adjustment Sets")
 
+      estimation_aborted <- FALSE
+
       tryCatch({
         combos <- expand.grid(i = unique(Zvars$name), j = unique(Zvars$grp), stringsAsFactors = FALSE)
         tv_threshold_val <- tv_val()
@@ -4657,6 +4660,77 @@ shiny::validate({
           df_snapshot  <- df_snapshot[complete.cases(df_snapshot[, lagged_names, drop = FALSE]), ]
           log_debug("Time-series lag={lag}: created {n} lagged columns; {r} rows remain after NA drop.",
                     lag = ts_lag, n = length(lag_cols), r = nrow(df_snapshot))
+        }
+
+        # ── preflight: enough data to estimate? ──────────────────────────
+        # 20-fold stratified CV needs every fold to contain both classes of
+        # the binarized treatment and outcome. Too few rows (especially
+        # after time-series lagging) or a lopsided threshold split makes
+        # every learner fail and the whole run collapse downstream.
+        n_folds <- 20
+        xv <- df_snapshot[[vars_sel()$x]]
+        yv <- df_snapshot[[vars_sel()$y]]
+        treated <- if (isTRUE(tv_dir_val)) xv >= tv_threshold_val else xv <= tv_threshold_val
+        success <- if (isTRUE(ov_dir_val)) yv >= ov_threshold_val else yv <= ov_threshold_val
+        group_n <- c(sum(treated,  na.rm = TRUE), sum(!treated, na.rm = TRUE),
+                     sum(success,  na.rm = TRUE), sum(!success, na.rm = TRUE))
+        names(group_n) <- c(
+          paste0("experimental (", vars_sel()$x, " ", if (isTRUE(tv_dir_val)) "≥" else "≤", " ", tv_threshold_val, ")"),
+          "baseline",
+          paste0("success (", vars_sel()$y, " ", if (isTRUE(ov_dir_val)) "≥" else "≤", " ", ov_threshold_val, ")"),
+          "fail"
+        )
+        min_class <- min(group_n)
+        group_txt <- paste0(names(group_n), " = ", group_n, collapse = ", ")
+
+        # tier 1 -- hopeless: a group with <2 rows (nothing to learn from) or
+        # fewer rows than CV folds. Abort before any learners run.
+        if (min_class < 2L || nrow(df_snapshot) < n_folds) {
+          estimation_aborted <- TRUE
+          locked(FALSE)   # let the user adjust selections and retry immediately
+          sendSweetAlert(
+            session = shiny::getDefaultReactiveDomain(),
+            title = "Not Enough Data to Estimate",
+            text = paste0(
+              nrow(df_snapshot), " rows are available for estimation",
+              if (ts_lag > 0L) " after time-series lagging" else "",
+              ". Group sizes: ", group_txt,
+              ". A group with fewer than 2 rows cannot support estimation at all. ",
+              "Consider a larger dataset",
+              if (ts_lag > 0L) ", disabling time-series mode," else "",
+              " or thresholds that split the data less unevenly."
+            ),
+            type = "warning",
+            btn_labels = "OK",
+            btn_colors = "#1976d2",
+            closeOnClickOutside = TRUE
+          )
+          stop("Insufficient data for estimation (rows=", nrow(df_snapshot),
+               ", ", group_txt, ", folds=", n_folds, ")")
+        }
+
+        # tier 2 -- thin but not hopeless: run anyway, warn now, and carry a
+        # caveat into the results so the output itself says to be careful
+        rv$data_caveat <- NULL
+        if (min_class < n_folds || nrow(df_snapshot) < 2L * n_folds) {
+          rv$data_caveat <- paste0(
+            "Limited data: only ", nrow(df_snapshot),
+            " rows were available for estimation",
+            if (ts_lag > 0L) " after time-series lagging" else "",
+            " (group sizes: ", group_txt, "). With any group below ", n_folds,
+            " rows, the ", n_folds, "-fold cross-validated estimates below may ",
+            "be unstable — interpret them with caution."
+          )
+          log_info("Data caveat attached to this run: {msg}", msg = rv$data_caveat)
+          sendSweetAlert(
+            session = shiny::getDefaultReactiveDomain(),
+            title = "Limited Data — Proceeding with Caution",
+            text = paste0(rv$data_caveat, " The analysis will continue."),
+            type = "warning",
+            btn_labels = "Continue",
+            btn_colors = "#1976d2",
+            closeOnClickOutside = TRUE
+          )
         }
 
         # pass the snapshots to the workers; nothing reactive inside anymore
@@ -4732,16 +4806,50 @@ shiny::validate({
                          log_file      = log_file)
         }, error = function(e) {
           log_debug("processResults() failed: {msg}", msg = conditionMessage(e))
+          estimation_aborted <<- TRUE
+          locked(FALSE)   # let the user adjust selections and retry immediately
+          sendSweetAlert(
+            session = shiny::getDefaultReactiveDomain(),
+            title = "Estimation Failed",
+            text = paste0(
+              "The causal estimates could not be computed (",
+              conditionMessage(e), "). ",
+              "This usually means every machine-learning learner failed to ",
+              "train — most often because one treatment/outcome group is too ",
+              "small or imbalanced to support cross-validation. Consider a ",
+              "larger dataset or thresholds that split the data less ",
+              "unevenly. See the log for details."
+            ),
+            type = "error",
+            btn_labels = "OK",
+            btn_colors = "#1976d2",
+            closeOnClickOutside = TRUE
+          )
         })
 
         incProgress(0.2, message = "Processing Results")
         log_debug("Successfully closed parallel cluster")
 
       }, error = function(e) {
+        # preflight abort already showed its own (more specific) alert
+        if (!estimation_aborted) {
+          sendSweetAlert(
+            session = shiny::getDefaultReactiveDomain(),
+            title = "Estimation Failed",
+            text = paste0("The causal estimation could not be completed. ",
+                          "See the log for details."),
+            type = "error",
+            btn_labels = "OK",
+            btn_colors = "#1976d2",
+            closeOnClickOutside = TRUE
+          )
+        }
+        estimation_aborted <<- TRUE
         log_debug("Fatal error during ATE estimation: {msg}", msg = conditionMessage(e))
       })
 
-     calc_complete(TRUE)
+     if (!estimation_aborted) {
+      calc_complete(TRUE)
 
       output$blankGraph <- renderGrViz({
         dot <- get_final_graph(rv$dot, vars_sel()$x, vars_sel()$y, rv$Zvars)
@@ -4758,6 +4866,7 @@ shiny::validate({
         closeOnClickOutside = TRUE,
         showCloseButton = FALSE
       )
+     }
     })
 
   }, error = function(e) {
@@ -5475,6 +5584,12 @@ output$ui_interpretation = renderUI({
 
   tagList(
     tags$h3("Interpreting your results:"),
+    if (!is.null(rv$data_caveat))
+      tags$div(
+        style = paste0("font-size:24px; border-left: 4px solid #DDB64B; ",
+                       "padding-left: 12px; margin-bottom: 1em;"),
+        tags$strong("Caution: "), rv$data_caveat
+      ),
     tags$div(style = "font-size:24px;", HTML(result_text))
   )
 })
@@ -5542,6 +5657,12 @@ output$download_report <- downloadHandler(
       result_text  <- get_ui_interpretation(AIRHome, df_vars, vals$Zvars,
                                             model_yn = isolate(rv$model_yn),
                                             n_obs    = nrow(vals$df))
+      # carry the limited-data caveat into the PDF report (markdown -- the
+      # report renders result_text inline)
+      data_caveat <- isolate(rv$data_caveat)
+      if (!is.null(data_caveat)) {
+        result_text <- paste0("**Caution:** ", data_caveat, "\n\n", result_text)
+      }
 
   
       # -----------------------------------------------------------------

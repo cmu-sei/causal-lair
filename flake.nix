@@ -294,6 +294,18 @@
           ];
         };
 
+        # sl3's Lrnr_xgboost targets the xgboost 1.x API; nixpkgs ships 3.x,
+        # whose booster objects (ALTREP pointers) sl3 cannot mutate. Pin the
+        # last 1.x release until sl3 upstream supports the new API.
+        xgboost1 = pkgs.rPackages.xgboost.overrideAttrs (old: {
+          name = "r-xgboost-1.7.9.1";
+          version = "1.7.9.1";
+          src = pkgs.fetchurl {
+            url = "https://cran.r-project.org/src/contrib/Archive/xgboost/xgboost_1.7.9.1.tar.gz";
+            sha256 = "sha256-O0rXKdw7jYAjrvpuOm8LONdSeuqhlUyITVpqnf8wV5o=";
+          };
+        });
+
         sl3 = pkgs.rPackages.buildRPackage {
           name = "sl3";
           src = pkgs.fetchFromGitHub{
@@ -350,7 +362,7 @@
             pkgs.rPackages.shinyjs
             pkgs.rPackages.shinyWidgets
             pkgs.rPackages.tidyr
-            pkgs.rPackages.xgboost
+            xgboost1
 
             # These are SL3's dependencies
             pkgs.rPackages.BBmisc
