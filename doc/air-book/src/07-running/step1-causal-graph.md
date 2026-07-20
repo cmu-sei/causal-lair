@@ -23,7 +23,7 @@ Once activated, the tool runs Causal Discovery algorithms and displays the resul
  
 ## Causal Graph Checks
 
-As you evaluate whether this causal graph, you may encounter these results:  
+As you evaluate this causal graph, you may encounter these results:  
 
 ### Check 1: The tool is not returning a causal graph
 

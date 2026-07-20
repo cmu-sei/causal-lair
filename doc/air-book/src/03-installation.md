@@ -17,7 +17,7 @@ In Docker Desktop, open the Terminal by clicking the button at the bottom right 
 In the Terminal, enter the following command (replace `1.1.1` with the latest version number):
 
 ```
-docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.1.1
+docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.6.0
 ```
 
 The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a `/workspace` prompt.
@@ -46,5 +46,5 @@ The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.
 
 When the page loads (may require approximately 30 seconds or a refresh), the AIR Tool interface will appear.
 
-<img src="./images/Opening screen.jpg"  alt="AIR Tool Openign Screen" />
+<img src="./images/AIR_Open_UI.png"  alt="AIR Tool Opening Screen" />
 
