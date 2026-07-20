@@ -34,20 +34,20 @@ Choose one of the "Yes" options if you already have a predictive model and want 
 
 If you have direct access to your model file, you can upload it and let AIR handle the rest. This is the most streamlined option: AIR computes the ATE from your model automatically, then folds that value into the health report alongside the causal analysis. The resulting ATE from your model will appear on the Ribbon Plot in the upper right as a blue arrow once the analysis completes.
 
-> **Note:** The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.
+> **Note:**  The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.
 
 ### I can provide an ATE
 
 If you can query your model with new data but can't easily export it, or if your model is built in a language AIR doesn't yet accept, this option is often the simpler path. You calculate the ATE yourself and enter that value directly into the tool.
 
 The ATE is the average difference between the two potential outcomes:
-```
-$$ATE = \frac{1}{N}\sum_{i = 1}^{N}{({\widehat{Y}}_{1i} - \ {\widehat{Y}}_{0i})}\ $$
-```
-The value returned is what you'll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
-See [Calculating ATE](https://github.com/cmu-sei/causal-lair/blob/main/doc/calculating_ATE.md) for more information.
 
-> **Note:**ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
+ATE = (1/N) Σ<sub>i=1</sub><sup>N</sup> (Ŷ<sub>1i</sub> − Ŷ<sub>0i</sub>)
+
+The value returned is what you'll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
+See [Calculating ATE](Calculating_ATE.md) for more information.
+
+> **Note:** ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
 
 
 ## No: I don't have a model (or I don't want to evaluate one)
