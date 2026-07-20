@@ -4,7 +4,7 @@ The results page requires no input but displays the entire AIR health report. Th
 
 Refreshing the browser or clicking **Reload** on the lower left will reset the tool and allow you to begin a new analysis.
 
-More detailed information can be found in [Interpreting AIR Results](https://github.com/cmu-sei/causal-lair/blob/main/doc/interpreting_results.md).
+More detailed information can be found in [Interpreting AIR Results](./interpreting-results.md).
 
 ## Layout
 
@@ -20,7 +20,8 @@ The Risk Difference chart compares the average treatment effect (ATE) estimated 
 
 The x-axis ranges from negative to positive effect, where a change in treatment either decreases or increases the likelihood of the outcome, respectively. The midpoint corresponds to no statistically significant effect detected.
 
-![Risk Difference chart showing ATE comparison](../../images/image9.png)
+ <img src="../images/Result with Ate of 1.jpg"  alt="AIR Tool risk difference chart result." />
+
 
 ### Interpreting the Risk Difference Chart
 
@@ -34,8 +35,10 @@ The x-axis ranges from negative to positive effect, where a change in treatment 
 
 The Causal Graph indicates which variables are likely causing confounding of the relationship between the experimental variable and the outcome variable.
 
-![Causal graph with confounding variables highlighted in red](../../images/image10.png)
+![Causal graph with confounding variable highlighted in red](../../images/image10.png)
 
+ <img src="../images/Results - no model, no ATE.jpg"  alt="AIR Tool display when causal graph is complete." />
+ 
 - If your model's ATE is **not within** both AIR-calculated 95% confidence intervals, the red variables (or their causal ancestors) are likely introducing bias into your model's results.
 - If your model's ATE is **within** the AIR-calculated 95% confidence intervals, the red nodes are simply informative for future potential bias.
 
