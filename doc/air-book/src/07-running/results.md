@@ -4,7 +4,7 @@ The results page requires no input but displays the entire AIR health report. Th
 
 Refreshing the browser or clicking **Reload** on the lower left will reset the tool and allow you to begin a new analysis.
 
-More detailed information can be found in [Interpreting AIR Results](./interpreting-results.md).
+More detailed information can be found in [Interpreting AIR Results](./interpreting-results.md) and [Interpretation States](./interpreting-states.md) provides a summary of all possible result states.
 
 ## Layout
 
