@@ -35,8 +35,6 @@ The x-axis ranges from negative to positive effect, where a change in treatment 
 
 The Causal Graph indicates which variables are likely causing confounding of the relationship between the experimental variable and the outcome variable.
 
-![Causal graph with confounding variable highlighted in red](../../images/image10.png)
-
  <img src="../images/Results - no model, no ATE.jpg"  alt="AIR Tool display when causal graph is complete." />
  
 - If your model's ATE is **not within** both AIR-calculated 95% confidence intervals, the red variables (or their causal ancestors) are likely introducing bias into your model's results.
