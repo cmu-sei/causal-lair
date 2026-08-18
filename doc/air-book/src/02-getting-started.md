@@ -51,6 +51,6 @@ Installing the AIR tool requires:
 
 [Previous Page: Introduction](./01-introduction.md)
 
-[Next Page: Installation](./03-installation.md)
+[Next Page: Installation Instructions](./03-installation.md)
 
 
