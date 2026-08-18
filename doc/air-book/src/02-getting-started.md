@@ -40,7 +40,7 @@ Installing the AIR tool requires:
 
   More information can be found in [Data Guidelines](../06-data-guidelines/README.md).
 
-### Model (if AIR analysis is intended for an existing model)
+### Model (if AIR results will be used to test existing model)
 
 - Must be an AI/ML model that operates on structured or tabular data, relying on numerical, categorical, or time-series features — not unstructured data such as images, audio, or natural language text
 - Should have a single outcome variable that the model is predicting (e.g., mission success, threat assessment, component failure)
@@ -48,4 +48,8 @@ Installing the AIR tool requires:
 - Should allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE) **or** be compatible with use in an R environment and able to utilize a `predict()` function
 - Must not require GPU acceleration or external hardware not currently supported by the tool
 - Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported
+
+[Previous Page: Introduction](../01-introduction.md).
+[Next Page: Installation](../03-installation.md).
+
 
