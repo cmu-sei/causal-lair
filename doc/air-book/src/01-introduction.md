@@ -19,3 +19,5 @@ The GitHub location for AIR is: <https://github.com/cmu-sei/causal-lair/>
 
 The license for AIR is a modified MIT End User License and can be found here:
 <https://github.com/cmu-sei/causal-lair/blob/main/container-files/license.txt>
+
+[Next Page: Getting Started](./02-getting-started.md)
