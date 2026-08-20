@@ -13,3 +13,7 @@ Issues still present in the current release will be revealed with further testin
 **Model format:** The tool only accepts `.rda` files for model upload. If you have a different model format, contact tailor-help@sei.cmu.edu and the team will try to support your model type.
 
 **No model remediation:** The tool does not fix your model but provides a health report that identifies areas and variables where bias is likely being introduced. The user will need to identify and apply appropriate remediations based on this information.
+
+[Previous Page: Running the AIR Tool](./07-running.md)
+
+[Next Page: Contact and Support](./09-contact.md)
