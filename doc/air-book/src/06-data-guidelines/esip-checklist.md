@@ -159,3 +159,7 @@ To indicate dataset attributes important to successful AIR Tool application, the
 ## References
 
 1. OSTP Subcommittee on Open Science (2019). *Draft AI-ready data matrix.* *(This draft document is not an official publication of the committee.)*
+
+[Previous Page: Data Guidlines](./06-data-guidelines.md)
+
+[Next Page: Running the AIR Tool](./07-running.md)
