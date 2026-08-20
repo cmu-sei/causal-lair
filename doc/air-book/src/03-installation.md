@@ -50,4 +50,4 @@ When the page loads (may require approximately 30 seconds or a refresh), the AIR
 
 [Previous Page: Getting Started](./02-getting-started.md)
 
-[Next Page: Causal Thinking](./04-causal-thinking.md)
+[Next Page: Understanding Causal Thinking](./04-causal-thinking.md)
