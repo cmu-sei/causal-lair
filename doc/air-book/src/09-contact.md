@@ -17,3 +17,5 @@ The license for AIR is a modified MIT End User License:
 
 - Upcoming Features: Coming soon
 - Planned Enhancements: Coming soon
+
+[Previous Page: Known Issues and Limitations](./08-limitations.md)
