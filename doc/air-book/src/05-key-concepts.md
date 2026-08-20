@@ -132,3 +132,7 @@ Miller, Suzanne. *Five Models of Technology Transition to Bridge the Gap Between
 
 Fowler, Priscilla & Levine, Linda. *A Conceptual Framework for Software Technology Transition.* CMU/SEI-93-TR-031. Software Engineering Institute, Carnegie Mellon University. 1993.
 <https://insights.sei.cmu.edu/library/a-conceptual-framework-for-software-technology-transition/>
+
+[Previous Page: Understanding Causal Thinking](./04-causal-thinking.md)
+
+[Next Page: Data Guidelines](./065-cata guidelines.md)
