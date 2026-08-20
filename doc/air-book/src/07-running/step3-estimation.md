@@ -20,7 +20,7 @@ The table below summarizes the trade-offs at a glance; each option is described 
 
 ## How AIR estimates the ATE
 
-Regardless of which option you choose, the AIR Tool estimates the causal Average Treatment Effect (ATE) using **two independent adjustment sets** identified from the causal graph: one drawn from variables near the treatment, and one from variables near the outcome. Each adjustment set produces its own ATE estimate via TMLE with a SuperLearner ensemble. Agreement between the two estimates is itself a robustness check — when they converge, you have evidence of a stable causal signal; when they diverge, the signal is sensitive to which confounders are controlled for. More information about interpreting adjustment set results can be found at Section 7 Results. 
+Regardless of which option you choose, the AIR Tool estimates the causal Average Treatment Effect (ATE) using **two independent adjustment sets** identified from the causal graph: one drawn from variables near the treatment, and one from variables near the outcome. A causal adjustment set is a group of variables that must be conditioned or controlled for to estimate the unbiased causal effect of a treatment on an outcome. Each adjustment set produces its own ATE estimate via Targeted Maximum Likelihood Estimation (TMLE) with a SuperLearner ensemble. Agreement between the two estimates is itself a robustness check — when they converge, you have evidence of a stable causal signal; when they diverge, the signal is sensitive to which confounders are controlled for. More information about interpreting adjustment set results can be found at Section 7 Results. 
 
 The "Yes: I can upload it" and "Yes: I can provide an ETA" options layer a comparison on top of this: your model's implied ATE is plotted against the causal ATE estimate's confidence interval on the Ribbon Plot. If your model's ATE falls inside the CI, your model is consistent with the causal evidence. If it falls outside, your model is likely picking up something other than the causal effect.
 
@@ -45,7 +45,7 @@ The ATE is the average difference between the two potential outcomes:
 ATE = (1/N) Σ<sub>i=1</sub><sup>N</sup> (Ŷ<sub>1i</sub> − Ŷ<sub>0i</sub>)
 
 The value returned is what you'll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
-See [Calculating ATE](Calculating_ATE.md) for more information.
+See [Calculating ATE](./Calculating_ATE.md) for more information.
 
 > **Note:** ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
 
