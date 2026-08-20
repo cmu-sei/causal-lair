@@ -8,7 +8,7 @@ More detailed information can be found in [Interpreting AIR Results](./interpret
 
 ## Layout
 
-**Left panel:** The causal graph with both x and y variables highlighted in blue/purple. If additional nodes are found to be contributing significant bias, they will be highlighted in red.
+**Left panel:** The causal graph with both x and y variables highlighted in light blue/navy blue. If additional nodes are found to be contributing significant bias, they will be highlighted in red.
 
 **Top right panel:** The Risk Difference chart.
 
