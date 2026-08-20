@@ -135,4 +135,4 @@ Fowler, Priscilla & Levine, Linda. *A Conceptual Framework for Software Technolo
 
 [Previous Page: Understanding Causal Thinking](./04-causal-thinking.md)
 
-[Next Page: Data Guidelines](./06-data guidelines.md)
+[Next Page: Data Guidelines](./06-data-guidelines.md)
