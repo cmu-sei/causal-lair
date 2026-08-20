@@ -47,3 +47,7 @@ The AIR Tool does not replace your model or retrain it. What it does is give you
 You do not need to be a statistician or a causal inference researcher to use the AIR Tool effectively. The mathematics underlying causal discovery, identification, and estimation are handled internally. What the tool requires from you — and what no algorithm can substitute for — is **domain knowledge**: an understanding of your variables, your operational scenario, and the rough causal hierarchy among the factors at play. That knowledge, encoded in the knowledge file and the variable definitions you provide, is what allows the tool to produce results that are meaningful rather than merely mathematical.
 
 If you want to go deeper into the theory behind any of these steps, [Key Concepts and Reference](05-key-concepts.md) provides curated references for each.
+
+[Previous Page: Installation](./03-installation.md)
+
+[Next Page: Key Concepts and Reference](./05-key-concepts.md)
