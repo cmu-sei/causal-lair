@@ -2,47 +2,9 @@
 
 ## Log Retrieval
 
-If you wish to capture a log of activity occurring while using the AIR Tool, begin by returning to the Docker Desktop application.
+If you wish to view a log of activity occurring while using the AIR Tool, this is available in the Logs tab at the top of the AIR user interface. 
 
-### Step 1: Return to Docker Desktop
-
-In the Docker Desktop Terminal, the prompt should look like this:
-
-![Docker Desktop terminal showing active session prompt](../../images/image11.png)
-
-End the session by pressing **Ctrl+C**, which should change the prompt:
-
-![Docker Desktop terminal after pressing Ctrl+C](../../images/image12.png)
-
-### Step 2: Access Logs
-
-To view the logs, enter:
-
-```
-tree logs
-```
-
-Note the most recent log in the output.
-
-![Tree logs output showing log directory structure](../../images/image13.png)
-
-![Log directory listing with most recent log highlighted](../../images/image14.png)
-
-### Step 3: View Log Details
-
-To view log details, enter the following command using your log name:
-
-```
-tail -f logs/LOGNAME/airtool.log
-```
-
-Example:
-
-```
-tail -f logs/2025-09-04_14-44-22/airtool.log
-```
-
-![Terminal showing airtool.log output](../../images/image15.png)
+### NEED IMAGE###
 
 ---
 
