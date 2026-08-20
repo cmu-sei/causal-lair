@@ -24,7 +24,7 @@ The Terminal will indicate the progress of downloading and extracting the contai
 
 
 
-## Step 3: Initiate the AIR Tool Scripts for the User Interface
+## Step 3: Initiate the AIR Tool Scripts 
 
 At the `/workspace` prompt, enter:
 
@@ -37,7 +37,7 @@ When this command completes, a URL will appear in the terminal.
  <img src="./images/image1.png"  alt="AIR Tool Container start up screen." />
 
 
-## Step 4: Access the AIR Tool User Interface in a Browser
+## Step 4: Open browaser to access the AIR Tool user interface
 
 The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.
 
