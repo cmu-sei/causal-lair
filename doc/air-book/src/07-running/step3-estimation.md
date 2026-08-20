@@ -45,7 +45,7 @@ The ATE is the average difference between the two potential outcomes:
 ATE = (1/N) Σ<sub>i=1</sub><sup>N</sup> (Ŷ<sub>1i</sub> − Ŷ<sub>0i</sub>)
 
 The value returned is what you'll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
-See [Calculating ATE](./Calculating_ATE.md) for more information.
+See [Calculating ATE](./calculating_ATE.md) for more information.
 
 > **Note:** ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that's a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.
 
