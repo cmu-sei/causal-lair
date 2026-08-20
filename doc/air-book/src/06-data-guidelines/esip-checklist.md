@@ -2,7 +2,7 @@
 
 The following is the SEI-annotated version of the Earth Science Information Partners (ESIP) Checklist to Examine AI-readiness for Open Environmental Datasets. Items in **bold** are particularly relevant to AIR Tool application. SEI notes appear as blockquotes beneath relevant items.
 
-![Annotated ESIP Checklist excerpt](../../images/image7.png)
+![Annotated ESIP Checklist excerpt](./data_guidelines_ESIP.pef)
 
 To indicate dataset attributes important to successful AIR Tool application, the SEI has:
 
