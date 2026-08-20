@@ -17,3 +17,8 @@ This section walks through the complete AIR Tool workflow from preparing your in
 Before beginning analysis with the tool, it is useful to carefully consider the causal scenario that the classifier model is used to solve. Understanding the scenario variables to be analyzed and confirming completeness of the data will contribute to gaining meaningful insight from the AIR results.
 
 More detailed information about preparing the scenario and data for analysis can be found in the [Scenario Definition Worksheet](scenarios.md) and [Dataset Guidelines](../06-data-guidelines/README.md).
+
+
+[Previous Page: Understanding Causal Thinking](./06-data-guidelines.md)
+
+[Next Page: Data Guidelines](./input-files.md)
