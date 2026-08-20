@@ -2,7 +2,7 @@
 
 The results page requires no input but displays the entire AIR health report. The blue **Download** button on the lower left allows you to download a PDF summary.
 
-Refreshing the browser or clicking **Reload** on the lower left will reset the tool and allow you to begin a new analysis.
+Clicking **Reset Selections** on the lower left will reset the tool while retaining the causal graph, which allows you to begin another analysis of the same uploaded data and knowledge file. Refreshing the browser will reset the tool to begin a new analysis. 
 
 More detailed information can be found in [Interpreting AIR Results](./interpreting_results.md) and [Interpretation States](./interpretation-states.md) provides a summary of all possible result states.
 
