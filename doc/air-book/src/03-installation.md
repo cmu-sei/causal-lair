@@ -48,6 +48,6 @@ When the page loads (may require approximately 30 seconds or a refresh), the AIR
 
 <img src="./images/AIR_Open_UI.png"  alt="AIR Tool Opening Screen" />
 
-[Previous Page: Getting Started(./02-getting-started.md)
+[Previous Page: Getting Started](./02-getting-started.md)
 
 [Next Page: Causal Thinking](./04-causal-thinking.md)
