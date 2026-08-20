@@ -38,7 +38,7 @@ Installing the AIR tool requires:
 - No missing or null entries in the data
 - Features must have variability (no constant columns) and must not be intentional duplicates of one another
 
-  More information can be found in [Data Guidelines](../06-data-guidelines/README.md).
+  More information can be found in [Data Guidelines](./06-data-guidelines/README.md).
 
 ### Model (if AIR results will be used to test existing model)
 
