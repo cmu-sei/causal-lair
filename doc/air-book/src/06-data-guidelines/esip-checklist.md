@@ -162,4 +162,4 @@ To indicate dataset attributes important to successful AIR Tool application, the
 
 [Previous Page: Data Guidlines](./06-data-guidelines.md)
 
-[Next Page: Running the AIR Tool](./07-running.md)
+[Next Page: Running the AIR Tool](../07-running.md)
