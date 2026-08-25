@@ -99,3 +99,10 @@ Once you have made a selection, click **Calculate Results** to finish the causal
 > **Note:** After this process has started, it cannot be undone. This process typically takes 2–10 minutes to run with a fairly simple model. Once complete, the progress bar will disappear and the results will be displayed.
 
  <img src="../images/Screen_graph_is_built.jpg"  alt="AIR Toolscreen when Step 3 is complete." />
+
+
+[Previous Page: Step 2: Select Variables](./step2-variables.md)
+
+[Next Page: Interpreting Results](./interpreting_results.md)
+
+ 
