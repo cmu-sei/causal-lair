@@ -38,3 +38,7 @@ Differentiating these three possible causes for non-overlapping confidence inter
 This can happen because there are only a few variables and not much to select from in terms of forming adjustment sets, and only one could be found in AIR Step 2. In this case, we recommend proceeding as if there were two adjustment sets and interpreting whether the BLUE arrow ATE is in the GREED or RED similarly as when there are two adjustment sets.  
 
  
+
+[Previous Page: Step 3: Estimating Causal Effect](./step3-estimation.md)
+
+[Next Page: Summary of Interpretation States](./interpretation-states.md)
