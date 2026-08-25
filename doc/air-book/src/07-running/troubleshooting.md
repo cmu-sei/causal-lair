@@ -25,3 +25,9 @@ Ensure your data file meets all requirements outlined in [Input Data Files](inpu
 If you encounter issues not covered here, reach out to the AIR Tool team:
 
 **Email:** tailor-help@sei.cmu.edu
+
+
+ 
+[Previous Page: Interpreting Results](./interpreting_results.md)
+
+[Next Page: Limitations](../08-limitations.md)
