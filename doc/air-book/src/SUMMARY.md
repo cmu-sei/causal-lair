@@ -14,10 +14,14 @@
   - [Step 1: Causal Graph](07-running/step1-causal-graph.md)
   - [Step 2: Select Variables](07-running/step2-variables.md)
   - [Step 3: Estimating Causal Effect](07-running/step3-estimation.md)
-  - [Calculating an ATE](07-running/calculating_ATE.md)
   - [Interpreting Results](07-running/results.md)
-  - [Summary of Interpretation States](07-running/interpretation-states.md)
-  - [Scenario Definition Worksheet](07-running/scenarios.md)
   - [Troubleshooting](07-running/troubleshooting.md)
 - [Known Issues and Limitations](08-limitations.md)
 - [Contact and Support](09-contact.md)
+
+  
+- Other Resources
+    - [Scenario Definition Worksheet](07-running/scenarios.md)
+    - [Calculating an ATE] (07-running/calculating_ATE.md)  
+    - [Interpretation Section and Potential Future Improvements](07-running/interpretation-states.md)
+  
