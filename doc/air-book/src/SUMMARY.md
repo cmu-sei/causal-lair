@@ -22,6 +22,6 @@
   
 - Other Resources
     - [Scenario Definition Worksheet](07-running/scenarios.md)
-    - [Calculating an ATE] (07-running/calculating_ATE.md)  
+    - [Calculating an ATE](07-running/calculating_ATE.md)  
     - [Interpretation Section and Potential Future Improvements](07-running/interpretation-states.md)
   
