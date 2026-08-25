@@ -30,4 +30,4 @@ If you encounter issues not covered here, reach out to the AIR Tool team:
  
 [Previous Page: Interpreting Results](./interpreting_results.md)
 
-[Next Page: Limitations](../08-limitations.md)
+[Next Page: Known Issues and Limitations](../08-limitations.md)
