@@ -41,4 +41,4 @@ This can happen because there are only a few variables and not much to select fr
 
 [Previous Page: Step 3: Estimating Causal Effect](./step3-estimation.md)
 
-[Next Page: Summary of Interpretation States](./interpretation-states.md)
+[Next Page: Troubleshooting](./troubleshooting.md)
