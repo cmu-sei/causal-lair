@@ -49,3 +49,8 @@ Each variable name should appear exactly once. The AIR tool will provide a notif
  <img src="../images/KF_Example.png"  alt="Knowledge File Example." />
 
 Currently, all knowledge assertions must be done ahead of time as in-place editing is not yet supported by the tool.
+
+
+[Previous Page: Running the AIR Tool](./README.md)
+
+[Next Page: Step 1: Causal Graph](./step1-causal-graph.md)
