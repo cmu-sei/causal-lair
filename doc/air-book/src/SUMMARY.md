@@ -18,10 +18,7 @@
   - [Troubleshooting](07-running/troubleshooting.md)
 - [Known Issues and Limitations](08-limitations.md)
 - [Contact and Support](09-contact.md)
-
-  
-- Other Resources
-    - [Scenario Definition Worksheet](07-running/scenarios.md)
-    - [Calculating an ATE](07-running/calculating_ATE.md)  
-    - [Interpretation Section and Potential Future Improvements](07-running/interpretation-states.md)
-  
+- [Other Resources]()
+  - [Scenario Definition Worksheet](07-running/scenarios.md)
+  - [Calculating an ATE](07-running/calculating_ATE.md)
+  - [Interpretation Section and Potential Future Improvements](07-running/interpretation-states.md)

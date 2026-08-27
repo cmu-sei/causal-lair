@@ -1,0 +1,488 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Interpretation Section and Potential Future Improvements - AIR Tool Documentation</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon-de23e50b.svg">
+        <link rel="shortcut icon" href="../favicon-8114d1fc.png">
+        <link rel="stylesheet" href="../css/variables-8adf115d.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
+        <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../fonts/fonts-9644e21d.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="mdbook-highlight-css" href="../highlight-493f70e1.css">
+        <link rel="stylesheet" id="mdbook-tomorrow-night-css" href="../tomorrow-night-4c0ae647.css">
+        <link rel="stylesheet" id="mdbook-ayu-highlight-css" href="../ayu-highlight-3fdfc3ac.css">
+
+        <!-- Custom theme stylesheets -->
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex-9f5a6a81.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc-f11b03f0.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="mdbook-body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="mdbook-sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("mdbook-sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="mdbook-sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="mdbook-sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="mdbook-page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="mdbook-menu-bar-hover-placeholder"></div>
+                <div id="mdbook-menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="mdbook-sidebar-toggle" class="icon-button" for="mdbook-sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="mdbook-sidebar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M0 96C0 78.3 14.3 64 32 64H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32C14.3 128 0 113.7 0 96zM0 256c0-17.7 14.3-32 32-32H416c17.7 0 32 14.3 32 32s-14.3 32-32 32H32c-17.7 0-32-14.3-32-32zM448 416c0 17.7-14.3 32-32 32H32c-17.7 0-32-14.3-32-32s14.3-32 32-32H416c17.7 0 32 14.3 32 32z"/></svg></span>
+                        </label>
+                        <button id="mdbook-theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="mdbook-theme-list">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M371.3 367.1c27.3-3.9 51.9-19.4 67.2-42.9L600.2 74.1c12.6-19.5 9.4-45.3-7.6-61.2S549.7-4.4 531.1 9.6L294.4 187.2c-24 18-38.2 46.1-38.4 76.1L371.3 367.1zm-19.6 25.4l-116-104.4C175.9 290.3 128 339.6 128 400c0 3.9 .2 7.8 .6 11.6c1.8 17.5-10.2 36.4-27.8 36.4H96c-17.7 0-32 14.3-32 32s14.3 32 32 32H240c61.9 0 112-50.1 112-112c0-2.5-.1-5-.2-7.5z"/></svg></span>
+                        </button>
+                        <ul id="mdbook-theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="mdbook-theme-ayu">Ayu</button></li>
+                        </ul>
+                        <button id="mdbook-search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="mdbook-searchbar">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M416 208c0 45.9-14.9 88.3-40 122.7L502.6 457.4c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0L330.7 376c-34.4 25.2-76.8 40-122.7 40C93.1 416 0 322.9 0 208S93.1 0 208 0S416 93.1 416 208zM208 352c79.5 0 144-64.5 144-144s-64.5-144-144-144S64 128.5 64 208s64.5 144 144 144z"/></svg></span>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">AIR Tool Documentation</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <span class=fa-svg id="print-button"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M128 0C92.7 0 64 28.7 64 64v96h64V64H354.7L384 93.3V160h64V93.3c0-17-6.7-33.3-18.7-45.3L400 18.7C388 6.7 371.7 0 354.7 0H128zM384 352v32 64H128V384 368 352H384zm64 32h32c17.7 0 32-14.3 32-32V256c0-35.3-28.7-64-64-64H64c-35.3 0-64 28.7-64 64v96c0 17.7 14.3 32 32 32H64v64c0 35.3 28.7 64 64 64H384c35.3 0 64-28.7 64-64V384zm-16-88c-13.3 0-24-10.7-24-24s10.7-24 24-24s24 10.7 24 24s-10.7 24-24 24z"/></svg></span>
+                        </a>
+                        <a href="https://github.com/cmu-sei/causal-lair/" title="Git repository" aria-label="Git repository">
+                            <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6zm-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3zm44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9zM244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8zM97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1zm-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7zm32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1zm-11.4-14.7c-1.6 1-1.6 3.6 0 5.9 1.6 2.3 4.3 3.3 5.6 2.3 1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2z"/></svg></span>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="mdbook-search-wrapper" class="hidden">
+                    <form id="mdbook-searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="mdbook-searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="mdbook-searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <span class=fa-svg id="fa-spin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M304 48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zm0 416c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM48 304c26.5 0 48-21.5 48-48s-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48zm464-48c0-26.5-21.5-48-48-48s-48 21.5-48 48s21.5 48 48 48s48-21.5 48-48zM142.9 437c18.7-18.7 18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zm0-294.2c18.7-18.7 18.7-49.1 0-67.9S93.7 56.2 75 75s-18.7 49.1 0 67.9s49.1 18.7 67.9 0zM369.1 437c18.7 18.7 49.1 18.7 67.9 0s18.7-49.1 0-67.9s-49.1-18.7-67.9 0s-18.7 49.1 0 67.9z"/></svg></span>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="mdbook-searchresults-outer" class="searchresults-outer hidden">
+                        <div id="mdbook-searchresults-header" class="searchresults-header"></div>
+                        <ul id="mdbook-searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('mdbook-sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('mdbook-sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#mdbook-sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="mdbook-content" class="content">
+                    <main>
+                        <h1 id="interpretation-section--states-mockups-and-language-suggestions"><a class="header" href="#interpretation-section--states-mockups-and-language-suggestions">Interpretation Section — States, Mockups, and Language Suggestions</a></h1>
+<p>This document maps every possible interpretation output to the conditions that produce it,
+shows a concrete mockup of each, and proposes plain-language rewrites that include richer
+context already available in the tool’s computations.</p>
+<p>Variable names used in mockups: <strong>credit_score</strong> (treatment, X) → <strong>loan_default</strong> (outcome, Y).</p>
+<hr>
+<h2 id="1-what-the-user-chose-model-mode"><a class="header" href="#1-what-the-user-chose-model-mode">1. What the User Chose (Model Mode)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>UI choice</th><th>Internal value</th><th>What it means</th></tr>
+</thead>
+<tbody>
+<tr><td>Yes: I can upload it</td><td><code>"Yes"</code></td><td>User provides a trained R model; AIR runs it against the data to get a predicted effect</td></tr>
+<tr><td>Yes: I can provide an ATE</td><td><code>"ATE"</code></td><td>User supplies a single effect-size number directly</td></tr>
+<tr><td>No: Do it all for me</td><td><code>"No"</code></td><td>AIR trains five classifiers internally and summarises them</td></tr>
+<tr><td>No: Just show me the effect</td><td><code>"null"</code></td><td>No model; user only wants the causal effect from the data</td></tr>
+</tbody>
+</table>
+</div>
+<p>Modes <code>Yes</code>, <code>ATE</code>, and <code>No</code> all produce a <strong>model ATE</strong> (a flag value) compared to the causal confidence intervals.
+Mode <code>null</code> currently has <strong>no dedicated interpretation path</strong> — it falls into the model-comparison logic with <code>flag = 0</code>, producing misleading text (see §3).</p>
+<hr>
+<h2 id="2-output-states-model-comparison-modes-yes--ate--no"><a class="header" href="#2-output-states-model-comparison-modes-yes--ate--no">2. Output States (Model Comparison Modes: Yes / ATE / No)</a></h2>
+<p>These states are evaluated in order; the first that applies wins.</p>
+<hr>
+<h3 id="state-0--computation-failed"><a class="header" href="#state-0--computation-failed">State 0 — Computation Failed</a></h3>
+<p><strong>Condition:</strong> <code>nrow(dfr) == 0</code></p>
+<blockquote>
+<p><em>No results — model fitting failed. Check the log.</em></p>
+</blockquote>
+<hr>
+<h3 id="state-1--no-consensus-between-causal-estimates"><a class="header" href="#state-1--no-consensus-between-causal-estimates">State 1 — No Consensus Between Causal Estimates</a></h3>
+<p><strong>Condition:</strong> Z1 and Z2 confidence intervals do not overlap at all.</p>
+<p><strong>Current text:</strong></p>
+<blockquote>
+<p><strong>Consensus Could Not Be Reached for This Scenario.</strong> The two causal analyses do not agree within their confidence ranges. This suggests that the data or model assumptions may not support a stable or consistent causal conclusion for this scenario.</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>The two causal analyses gave conflicting answers.</strong></p>
+<p>AIR computes the effect of <em>credit_score</em> on <em>loan_default</em> using two different sets of background variables. Here, those two approaches disagree completely — Analysis A estimates the effect at <strong>+5% to +18%</strong>, while Analysis B estimates it at <strong>−8% to +2%</strong>. When the ranges don’t even overlap, no single reliable conclusion can be drawn.</p>
+<p>Wide uncertainty ranges on one or both estimates often accompany this result and can indicate a small dataset, uncertain relationships in the causal graph, or a missing variable that’s driving the disagreement.</p>
+<p><strong>What to do:</strong> Review your causal graph for missing variables or incorrect edges. Consider collecting more data before drawing conclusions.</p>
+</blockquote>
+<p><em>New in this version: the actual CI ranges are quoted so the user can see how far apart the analyses are, not just that they disagree.</em></p>
+<hr>
+<h3 id="state-2--analyses-partially-agree-but-disagree-on-magnitude"><a class="header" href="#state-2--analyses-partially-agree-but-disagree-on-magnitude">State 2 — Analyses Partially Agree but Disagree on Magnitude</a></h3>
+<p><strong>Condition:</strong> Z1 and Z2 CIs overlap, but the point estimates are far enough apart that neither falls inside the other’s interval.</p>
+<p><strong>Current text:</strong></p>
+<blockquote>
+<p>The causal estimates appear inconsistent, suggesting there may not be enough information to train a reliable model.</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>The two analyses agree on direction but disagree on size.</strong></p>
+<p>Both analyses find that <em>credit_score</em> increases the likelihood of <em>loan_default</em>, but they differ meaningfully on how large that effect is. Analysis A estimates <strong>+8%</strong> and Analysis B estimates <strong>+28%</strong> — a 20 percentage-point spread. Their confidence ranges do overlap (roughly +10% to +18%), so a causal effect in that region is plausible, but the disagreement means estimates should be treated as rough approximations rather than precise values.</p>
+<p>This usually reflects limited data or structural uncertainty in the causal graph, not necessarily a problem with your model.</p>
+</blockquote>
+<p><em>New in this version: the actual point estimates are quoted, the overlap region is identified as the most defensible range, and the user gets a concrete sense of the disagreement rather than just a warning.</em></p>
+<hr>
+<h3 id="state-3--standard-interpretation-z1z2-agree-model-present"><a class="header" href="#state-3--standard-interpretation-z1z2-agree-model-present">State 3 — Standard Interpretation (Z1/Z2 agree; model present)</a></h3>
+<p>All remaining cases share the same structure. What varies:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>Values</th></tr>
+</thead>
+<tbody>
+<tr><td>Consensus range</td><td>The overlap of Z1 and Z2 CIs — the most reliable single estimate</td></tr>
+<tr><td>CI width</td><td>Narrow / moderate / wide — used to signal how confident the analysis is</td></tr>
+<tr><td>Z1/Z2 point estimate proximity</td><td>How closely the two analyses agree, beyond just overlapping</td></tr>
+<tr><td>Model estimation</td><td>Underestimating / overestimating / accurate</td></tr>
+<tr><td>Degree of divergence</td><td>How far outside the CI the model is (not just inside/outside)</td></tr>
+<tr><td>Bias status</td><td>Unbiased / partially biased / biased</td></tr>
+<tr><td>Bias source</td><td>Z1 variables (direct drivers of treatment) vs Z2 variables (confounders along the pathway)</td></tr>
+<tr><td>Classifier spread</td><td><code>"No"</code> mode only — consistency across the five internal classifiers</td></tr>
+<tr><td>Sample size note</td><td>Appears when n is small, as a caveat on unbiased or marginal results</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h4 id="3a--unbiased-positive-effect-accurate-model"><a class="header" href="#3a--unbiased-positive-effect-accurate-model">3a — Unbiased, Positive Effect, Accurate Model</a></h4>
+<p><strong>Current output (assembled from templates):</strong></p>
+<blockquote>
+<p>Your model appears to be accurately estimating the effect that credit_score has on loan_default. Based on the causal analysis, credit_score is expected to have a positive effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default increases by about 12–18%. Fortunately, your model is producing unbiased results. Your model’s effect is: 0.15. Overall, this suggests your seeing an appropriate change in loan_default as credit_score varies. No evidence of bias is detected at this time. These treatment effect estimates are based on the variables included in your causal graph. If important factors are missing, the results may not represent true causal relationships…</p>
+</blockquote>
+<p><strong>Suggested rewrite (Yes / ATE mode):</strong></p>
+<blockquote>
+<p><strong>No bias detected.</strong></p>
+<p>Your model’s predicted effect of <em>credit_score</em> on <em>loan_default</em> (15%) is consistent with what the causal analysis expects. Both independent analyses agree that the true effect lies in the range of <strong>14–16%</strong> (Analysis A: 12–18%, Analysis B: 13–17%), and your model falls squarely within that window. The two analyses give nearly identical estimates, which adds confidence to this finding.</p>
+<p>The uncertainty range is narrow, meaning the data supports a fairly precise estimate — not just a directional guess.</p>
+<p><strong>What the causal analysis found:</strong> When <em>credit_score</em> moves from its baseline range to its experimental range, the probability of <em>loan_default</em> increases by roughly <strong>12–18%</strong>.</p>
+<p><strong>Caveat:</strong> These estimates are only as reliable as the causal graph. If an important variable is missing, the true effect may differ.</p>
+</blockquote>
+<p><strong>Additional paragraph for “No: Do it all for me” mode (classifiers consistent):</strong></p>
+<blockquote>
+<p>The five classifiers AIR trained internally also gave consistent predictions, ranging from 13% to 17%. This agreement across different modeling approaches reinforces the conclusion.</p>
+</blockquote>
+<p><strong>Additional paragraph for “No: Do it all for me” mode (classifiers inconsistent):</strong></p>
+<blockquote>
+<p>Note: the five classifiers AIR trained internally gave a wide spread of predictions (5% to 31%). Even though the summary estimate is unbiased, this spread suggests the model may be sensitive to the choice of algorithm. Interpret the specific effect size with caution.</p>
+</blockquote>
+<hr>
+<h4 id="3b--partially-biased-positive-effect-overestimating"><a class="header" href="#3b--partially-biased-positive-effect-overestimating">3b — Partially Biased, Positive Effect, Overestimating</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be overestimating the effect that credit_score has on loan_default by roughly 5–9%. Based on the causal analysis, credit_score is expected to have a positive effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default increases by about 12–18%. Unfortunately, your model is producing partially biased results. Your model’s effect is: 0.24. Overall, this suggests your seeing a larger than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age, income (see causal graph)…</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Possible bias detected.</strong></p>
+<p>Your model predicts that <em>credit_score</em> increases the probability of <em>loan_default</em> by <strong>24%</strong>, but the causal analysis puts the best estimate at <strong>14–16%</strong> — your model is overstating the effect by roughly <strong>8–10 percentage points</strong>. It falls within one of the two analysis ranges but outside the other, which is a warning sign rather than a definitive verdict.</p>
+<p><strong>Likely source:</strong> The variables <em>age</em> and <em>income</em> are highlighted in red on the causal graph. These are direct background causes of <em>credit_score</em> itself — meaning your model may have learned a relationship that’s partly driven by who has high credit scores, rather than what high credit scores do. Adjusting for these variables (or investigating whether they are properly represented in your model) is the recommended next step.</p>
+<p><strong>What the causal analysis found:</strong> A genuine <strong>12–18% increase</strong> in <em>loan_default</em> probability as <em>credit_score</em> moves from baseline to experimental values. The two analyses agree well (Analysis A: 12–18%, Analysis B: 13–20%), so this range is reliable.</p>
+</blockquote>
+<p><em>New in this version: the degree of overshoot is explicit (“8–10 percentage points”), the structural meaning of Z1 bias variables (“direct background causes of the treatment”) is explained, and the point estimate proximity between Z1/Z2 is reported.</em></p>
+<hr>
+<h4 id="3c--biased-negative-effect-underestimating"><a class="header" href="#3c--biased-negative-effect-underestimating">3c — Biased, Negative Effect, Underestimating</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be underestimating the effect that credit_score has on loan_default by roughly 8–14%. Based on the causal analysis, credit_score is expected to have a negative effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default decreases by about 20–28%. Unfortunately, your model is producing biased results. Your model’s effect is: -0.10. Overall, this suggests your seeing a smaller than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age, income and/or payment_history (see causal graph)…</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Bias detected.</strong></p>
+<p>Your model predicts only a <strong>10% decrease</strong> in <em>loan_default</em> probability from <em>credit_score</em>, but both causal analyses consistently estimate the true effect is a <strong>20–28% decrease</strong> — your model is understating the effect by roughly <strong>10–18 percentage points</strong>. The model’s prediction falls outside both analysis ranges, not just one.</p>
+<p><strong>Likely source:</strong> The variables <em>age</em>, <em>income</em>, and <em>payment_history</em> are flagged on the causal graph. <em>Age</em> and <em>income</em> appear to influence <em>credit_score</em> directly (they are direct causes of your treatment variable). <em>Payment_history</em> sits on the pathway between <em>credit_score</em> and <em>loan_default</em>, meaning it may be partially absorbing the effect your model is trying to measure. Together, these variables may be causing your model to underestimate how strongly <em>credit_score</em> affects <em>loan_default</em>.</p>
+<p><strong>What the causal analysis found:</strong> A genuine <strong>20–28% reduction</strong> in <em>loan_default</em> probability when <em>credit_score</em> moves from baseline to experimental values. Both analyses agree closely (Analysis A: −20% to −24%, Analysis B: −22% to −28%), giving high confidence in this range.</p>
+</blockquote>
+<p><em>New in this version: Z1 variables and Z2 variables are explained with different structural language (“direct causes of the treatment” vs “sits on the pathway”), and the degree of disagreement and its CI-agreement level are both surfaced.</em></p>
+<hr>
+<h4 id="3d--biased-no-effect-model-detects-an-effect-the-causal-analysis-doesnt-support"><a class="header" href="#3d--biased-no-effect-model-detects-an-effect-the-causal-analysis-doesnt-support">3d — Biased, No Effect (model detects an effect the causal analysis doesn’t support)</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be overestimating the effect that credit_score has on loan_default by roughly 12–16%. Based on the causal analysis, credit_score is expected to have no effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default is unlikely to change. Unfortunately, your model is producing biased results. Your model’s effect is: 0.14. Overall, this suggests your seeing a larger than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age (see causal graph).</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Bias detected — the relationship your model found may be spurious.</strong></p>
+<p>Your model predicts that <em>credit_score</em> has a meaningful effect on <em>loan_default</em> (+14%), but the causal analysis finds <strong>no real effect</strong>: both independent analyses agree the true effect is near zero (Analysis A: −3% to +4%, Analysis B: −2% to +5%). Your model’s prediction is <strong>17–19 percentage points</strong> above what either analysis supports.</p>
+<p><strong>Likely source:</strong> The variable <em>age</em> (highlighted in red) appears to be a direct cause of <em>credit_score</em>. It is likely that <em>age</em> affects both <em>credit_score</em> and <em>loan_default</em> independently, creating a statistical association between them that is not a genuine causal effect. Your model may have learned this spurious association rather than a real one.</p>
+<p><strong>What the causal analysis found:</strong> Changing <em>credit_score</em> from baseline to experimental values does not meaningfully change the probability of <em>loan_default</em>. The two analyses agree on this with narrow confidence ranges, making this a high-confidence finding. The association your model detected is not causally supported.</p>
+</blockquote>
+<p><em>New in this version: the actual CI values for “no effect” are shown (so the user understands it’s not just zero — it’s a bounded claim), the degree of divergence is stated explicitly, and the spurious-association mechanism is explained plainly.</em></p>
+<hr>
+<h4 id="3e--wide-cis-uncertainty-modifier-any-bias-state"><a class="header" href="#3e--wide-cis-uncertainty-modifier-any-bias-state">3e — Wide CIs (Uncertainty Modifier, any bias state)</a></h4>
+<p>This isn’t a separate state — it’s an additional sentence that should appear whenever the CI width exceeds a threshold (e.g., &gt; 25 percentage points), regardless of bias status.</p>
+<p><strong>Additional sentence for wide CIs:</strong></p>
+<blockquote>
+<p><em>Note: the uncertainty range for this analysis is wide (spanning more than 25 percentage points), meaning the data supports only a rough directional conclusion, not a precise effect size. Collecting more data or refining the causal graph may narrow this range.</em></p>
+</blockquote>
+<p><strong>Additional sentence for narrow CIs:</strong></p>
+<blockquote>
+<p><em>The uncertainty range is narrow, meaning the data supports a fairly precise estimate — not just a directional guess.</em></p>
+</blockquote>
+<hr>
+<h2 id="3-just-show-me-the-effect-mode--currently-missing"><a class="header" href="#3-just-show-me-the-effect-mode--currently-missing">3. “Just Show Me the Effect” Mode — Currently Missing</a></h2>
+<p>When the user selects <strong>“No: Just show me the effect”</strong> (<code>null</code>), the code sets <code>m_ate = 0</code> and runs the model-comparison logic. This produces text like “your model is underestimating the effect” — but the user has no model. The text is nonsensical.</p>
+<p>This mode needs its own interpretation branch that:</p>
+<ul>
+<li>Opens with the consensus range as the headline (the overlap of Z1 and Z2)</li>
+<li>Reports CI width as a confidence signal</li>
+<li>Reports Z1/Z2 point estimate proximity</li>
+<li>Does <strong>not</strong> mention a model, bias, or classifiers</li>
+<li>Still surfaces the Z1/Z2 agreement/disagreement check (States 1 and 2 still apply)</li>
+</ul>
+<h3 id="proposed-mockups-for-null-mode"><a class="header" href="#proposed-mockups-for-null-mode">Proposed mockups for “null” mode</a></h3>
+<h4 id="null--positive-effect-z1z2-closely-agree-narrow-cis"><a class="header" href="#null--positive-effect-z1z2-closely-agree-narrow-cis">null — Positive Effect, Z1/Z2 Closely Agree, Narrow CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with a <strong>12–18% increase</strong> in the probability of <em>loan_default</em>.</p>
+<p>Both independent analyses give nearly identical estimates (Analysis A: 12–18%, Analysis B: 13–17%), and the most defensible single range — where both analyses agree — is <strong>13–17%</strong>. The uncertainty range is narrow, so this is a fairly precise estimate.</p>
+<p><strong>Caveat:</strong> These estimates depend on the variables in your causal graph. If an important variable is missing, the true effect may differ.</p>
+</blockquote>
+<h4 id="null--negative-effect-z1z2-agree-moderate-cis"><a class="header" href="#null--negative-effect-z1z2-agree-moderate-cis">null — Negative Effect, Z1/Z2 Agree, Moderate CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with a <strong>20–28% decrease</strong> in the probability of <em>loan_default</em>.</p>
+<p>Both analyses agree on direction and are reasonably consistent on magnitude (Analysis A: −20% to −24%, Analysis B: −22% to −28%). The range where both analyses agree is <strong>−22% to −24%</strong>, which is the most reliable estimate. There is moderate uncertainty about the exact size of the effect.</p>
+</blockquote>
+<h4 id="null--no-effect-z1z2-agree"><a class="header" href="#null--no-effect-z1z2-agree">null — No Effect, Z1/Z2 Agree</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, changing <em>credit_score</em> from baseline to experimental values does <strong>not meaningfully change</strong> the probability of <em>loan_default</em>. Both analyses agree: the effect, if any, is too small to distinguish from random variation.</p>
+<p>The range where both analyses agree spans roughly <strong>−3% to +4%</strong>, which the tool treats as no meaningful effect.</p>
+</blockquote>
+<h4 id="null--positive-effect-wide-cis"><a class="header" href="#null--positive-effect-wide-cis">null — Positive Effect, Wide CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with an <strong>increase</strong> in the probability of <em>loan_default</em>, but the data does not support a precise estimate. The analysis places the effect somewhere between <strong>+5% and +40%</strong> — a wide range that reflects high uncertainty.</p>
+<p>Both analyses agree on direction (positive), but differ on magnitude. Before drawing conclusions about the size of this effect, consider whether additional data or a refined causal graph might tighten this estimate.</p>
+</blockquote>
+<h4 id="null--z1z2-dont-agree-state-1"><a class="header" href="#null--z1z2-dont-agree-state-1">null — Z1/Z2 Don’t Agree (State 1)</a></h4>
+<blockquote>
+<p><strong>The two causal analyses gave conflicting answers.</strong></p>
+<p>This means the data cannot reliably support a single conclusion about how <em>credit_score</em> affects <em>loan_default</em> under the current causal graph. Review the graph for missing variables or uncertain edges, and consider collecting more data before drawing conclusions.</p>
+</blockquote>
+<hr>
+<h2 id="4-language-issues-in-the-current-implementation"><a class="header" href="#4-language-issues-in-the-current-implementation">4. Language Issues in the Current Implementation</a></h2>
+<h3 id="problem-1-one-unbroken-sentence-chain"><a class="header" href="#problem-1-one-unbroken-sentence-chain">Problem 1: One unbroken sentence chain</a></h3>
+<p>All text is concatenated with <code>paste0(...)</code>, producing a dense block. Breaking it into a <strong>headline + 2–3 short paragraphs</strong> makes the same information scannable.</p>
+<h3 id="problem-2-jargon"><a class="header" href="#problem-2-jargon">Problem 2: Jargon</a></h3>
+<p>Suggested substitutions:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Current term</th><th>Suggested replacement</th></tr>
+</thead>
+<tbody>
+<tr><td>causal estimates</td><td>what the causal analysis expects</td></tr>
+<tr><td>adjustment set / Z1 / Z2</td><td>Analysis A / Analysis B, or “two independent analyses”</td></tr>
+<tr><td>confidence interval / confidence range</td><td>uncertainty range / plausible range</td></tr>
+<tr><td>ATE</td><td>predicted effect / effect size</td></tr>
+<tr><td>flag</td><td>your model’s predicted effect</td></tr>
+<tr><td>treatment level</td><td>experimental condition</td></tr>
+<tr><td>control level</td><td>baseline condition</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="problem-3-fortunatelyunfortunately--bias-label-without-action"><a class="header" href="#problem-3-fortunatelyunfortunately--bias-label-without-action">Problem 3: “Fortunately/Unfortunately” + bias label without action</a></h3>
+<p>“Unfortunately, your model is producing partially biased results” sounds alarming but gives no direction. Rewrite as: <strong>what</strong> is biased, <strong>which variables</strong> are likely causing it, <strong>why</strong> structurally, and <strong>what to do</strong>.</p>
+<h3 id="problem-4-the-disclaimer-is-boilerplate-in-every-case"><a class="header" href="#problem-4-the-disclaimer-is-boilerplate-in-every-case">Problem 4: The disclaimer is boilerplate in every case</a></h3>
+<p>The caveat about missing variables is valid, but appending it identically everywhere makes it feel like a legal disclaimer. It should only appear when results are positive or marginal — when bias is already flagged, the disclaimer is redundant.</p>
+<h3 id="problem-5-the-figure-caption-repeats-the-interpretation"><a class="header" href="#problem-5-the-figure-caption-repeats-the-interpretation">Problem 5: The figure caption repeats the interpretation</a></h3>
+<p>The “Risk Difference” caption text largely duplicates what the interpretation paragraph says. Consider removing it and letting the interpretation carry all the explanation.</p>
+<hr>
+<h2 id="5-new-data-signals--what-they-are-and-where-they-come-from"><a class="header" href="#5-new-data-signals--what-they-are-and-where-they-come-from">5. New Data Signals — What They Are and Where They Come From</a></h2>
+<p>These signals are all computed today and simply not surfaced in the interpretation text.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>Where it comes from</th><th>What it adds</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Consensus range</strong></td><td><code>lo_overlap</code> / <code>hi_overlap</code> (already computed at line 2065)</td><td>The single most defensible effect estimate — where both analyses agree. More actionable than two separate CI bands.</td></tr>
+<tr><td><strong>CI width</strong></td><td><code>z1_ATE_UCI - z1_ATE_LCI</code>, same for Z2</td><td>Tells the user whether this is a precise estimate or a rough directional finding. Applies to every state.</td></tr>
+<tr><td><strong>Z1/Z2 point estimate proximity</strong></td><td><code>abs(z1_ATE - z2_ATE)</code></td><td>Distinguishes “barely overlapping” from “nearly identical” — a meaningful confidence gradient the current logic collapses to a binary.</td></tr>
+<tr><td><strong>Degree of model divergence</strong></td><td><code>abs(flag - nearest CI boundary)</code></td><td>Replaces the vague “biased” label with a concrete number — how far off is the model, in percentage points?</td></tr>
+<tr><td><strong>Classifier spread</strong> (<code>"No"</code> mode only)</td><td><code>range(ate_df_all$flag)</code> — all five ATEs are in <code>ate_df_all</code> (line 1514)</td><td>If the five classifiers agree, the summary ATE is trustworthy; if they scatter, the bias verdict is less reliable. Currently unused after line 1523.</td></tr>
+<tr><td><strong>Z1 vs Z2 structural roles</strong></td><td>Z1 = <code>Zvars[grp=="Z1"]</code> (parents of treatment); Z2 = <code>Zvars[grp=="Z2"]</code> (confounders of intermediate variables)</td><td>Bias variables from Z1 mean the model isn’t accounting for <em>what drives the treatment</em>. Bias variables from Z2 mean the model is confusing the <em>mechanism</em> with the effect. Different diagnoses, currently conflated.</td></tr>
+<tr><td><strong>Sample size</strong></td><td><code>nrow(df())</code></td><td>When n is small, even “no bias detected” should carry a note that the analysis may not have had enough data to detect bias if it exists.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="6-proposed-code-change-for-null-mode"><a class="header" href="#6-proposed-code-change-for-null-mode">6. Proposed Code Change for <code>null</code> Mode</a></h2>
+<p>In <code>get_ui_interpretation()</code> (line 2053), add an early return before the CI overlap check:</p>
+<pre><code class="language-r"># --- null mode: no model, just show the causal effect ---
+if (isTRUE(rv$model_yn == "null")) {
+  # Reuse: flagdir, CI range arithmetic, lo_overlap/hi_overlap, CI width
+  # Omit:  all "your model is…" and "bias may be introduced through…" sentences
+  # ...return a standalone causal effect summary...
+}
+</code></pre>
+<p>The <code>flagdir</code>, CI range arithmetic, and Z1/Z2 overlap logic can all be reused — the only change is
+that none of the model-comparison or bias-source sentences should appear.</p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../07-running/calculating_ATE.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
+
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../07-running/calculating_ATE.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
+
+            </nav>
+
+        </div>
+
+        <template id=fa-eye><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 576 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M288 32c-80.8 0-145.5 36.8-192.6 80.6C48.6 156 17.3 208 2.5 243.7c-3.3 7.9-3.3 16.7 0 24.6C17.3 304 48.6 356 95.4 399.4C142.5 443.2 207.2 480 288 480s145.5-36.8 192.6-80.6c46.8-43.5 78.1-95.4 93-131.1c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C433.5 68.8 368.8 32 288 32zM432 256c0 79.5-64.5 144-144 144s-144-64.5-144-144s64.5-144 144-144s144 64.5 144 144zM288 192c0 35.3-28.7 64-64 64c-11.5 0-22.3-3-31.6-8.4c-.2 2.8-.4 5.5-.4 8.4c0 53 43 96 96 96s96-43 96-96s-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6z"/></svg></span></template>
+        <template id=fa-eye-slash><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M38.8 5.1C28.4-3.1 13.3-1.2 5.1 9.2S-1.2 34.7 9.2 42.9l592 464c10.4 8.2 25.5 6.3 33.7-4.1s6.3-25.5-4.1-33.7L525.6 386.7c39.6-40.6 66.4-86.1 79.9-118.4c3.3-7.9 3.3-16.7 0-24.6c-14.9-35.7-46.2-87.7-93-131.1C465.5 68.8 400.8 32 320 32c-68.2 0-125 26.3-169.3 60.8L38.8 5.1zM223.1 149.5C248.6 126.2 282.7 112 320 112c79.5 0 144 64.5 144 144c0 24.9-6.3 48.3-17.4 68.7L408 294.5c5.2-11.8 8-24.8 8-38.5c0-53-43-96-96-96c-2.8 0-5.6 .1-8.4 .4c5.3 9.3 8.4 20.1 8.4 31.6c0 10.2-2.4 19.8-6.6 28.3l-90.3-70.8zm223.1 298L373 389.9c-16.4 6.5-34.3 10.1-53 10.1c-79.5 0-144-64.5-144-144c0-6.9 .5-13.6 1.4-20.2L83.1 161.5C60.3 191.2 44 220.8 34.5 243.7c-3.3 7.9-3.3 16.7 0 24.6c14.9 35.7 46.2 87.7 93 131.1C174.5 443.2 239.2 480 320 480c47.8 0 89.9-12.9 126.2-32.5z"/></svg></span></template>
+        <template id=fa-copy><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M502.6 70.63l-61.25-61.25C435.4 3.371 427.2 0 418.7 0H255.1c-35.35 0-64 28.66-64 64l.0195 256C192 355.4 220.7 384 256 384h192c35.2 0 64-28.8 64-64V93.25C512 84.77 508.6 76.63 502.6 70.63zM464 320c0 8.836-7.164 16-16 16H255.1c-8.838 0-16-7.164-16-16L239.1 64.13c0-8.836 7.164-16 16-16h128L384 96c0 17.67 14.33 32 32 32h47.1V320zM272 448c0 8.836-7.164 16-16 16H63.1c-8.838 0-16-7.164-16-16L47.98 192.1c0-8.836 7.164-16 16-16H160V128H63.99c-35.35 0-64 28.65-64 64l.0098 256C.002 483.3 28.66 512 64 512h192c35.2 0 64-28.8 64-64v-32h-47.1L272 448z"/></svg></span></template>
+        <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
+        <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr-ef4e11c1.min.js"></script>
+        <script src="../mark-09e88c2c.min.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
+
+        <script src="../clipboard-1626706a.min.js"></script>
+        <script src="../highlight-abc7f01d.js"></script>
+        <script src="../book-609e4cb8.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>

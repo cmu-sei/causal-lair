@@ -16,8 +16,8 @@
         <link rel="icon" href="favicon-de23e50b.svg">
         <link rel="shortcut icon" href="favicon-8114d1fc.png">
         <link rel="stylesheet" href="css/variables-8adf115d.css">
-        <link rel="stylesheet" href="css/general-2459343d.css">
-        <link rel="stylesheet" href="css/chrome-ae938929.css">
+        <link rel="stylesheet" href="css/general-e96d0476.css">
+        <link rel="stylesheet" href="css/chrome-d279d366.css">
         <link rel="stylesheet" href="css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -36,10 +36,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-0ab627b0.js";
+            window.path_to_searchindex_js = "searchindex-9f5a6a81.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-50c8dad3.js"></script>
+        <script src="toc-f11b03f0.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -191,27 +191,24 @@
 <p><strong>Support:</strong> tailor-help@sei.cmu.edu</p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="introduction-to-air-tool"><a class="header" href="#introduction-to-air-tool">Introduction to AIR Tool</a></h1>
-<h2 id="why-it-was-developed"><a class="header" href="#why-it-was-developed">Why It Was Developed</a></h2>
-<p>AI and machine learning systems potentially provide a significant and even game-changing edge to the DoD; however, their development and use is not without challenges.</p>
-<p>In rapidly changing environments, an AI may no longer provide accurate classifications and predictions (e.g., friend vs. foe; when a system may fail; likelihood of mission success).</p>
-<p>Distrust in their outputs can rapidly escalate into ignoring the AI’s classifications and predictions. Retraining helps but takes time and is disruptive — so, when does the AI need to be retrained?</p>
-<p>Current test and evaluation methods are inadequate for ongoing evaluation of an AI as they heavily rely on correlations within the data, which are undermined by data/concept drift, evolving edge cases, and emerging phenomena.</p>
-<p>Following years of SEI research, the SEI has developed and tested a solution employing Causal Discovery and Causal Inference to determine when an AI’s judgments are confounded.</p>
-<p>The TAILOR project offers a precedent-setting capability that fills a gap in the DoD Test and Evaluation phase to improve the correctness of AI classifications and predictions, enhancing the use of AI in development and operations decision making.</p>
-<p>TAILOR adds analytical capability that didn’t exist, enabling an analyst to characterize and measure the overall accuracy of the AI as the underlying environment changes.</p>
-<p>The result is a scenario-based characterization of when an AI’s classifications and predictions can or cannot be trusted. In a nutshell: TAILOR helps answer whether an AI is ready to deploy.</p>
+<p>Predictive models (such as those using statistics, AI, or machine learning) can provide a significant and even game-changing edge to the DoW; however, their development and use are not without challenges. In rapidly changing environments, such models may no longer provide accurate classifications and predictions (e.g., friend vs. foe; when a system may fail; likelihood of mission success). Distrust in model outputs can rapidly escalate into ignoring the model’s classifications and predictions. Retraining helps but takes time and is disruptive — so, when does the model need to be retrained? Current test and evaluation methods are inadequate for ongoing evaluation of predictive models as they heavily rely on correlations within the data, which are undermined by data/concept drift, evolving edge cases, and emerging phenomena.</p>
+<p>Following years of SEI research, the SEI has developed and tested a solution employing Causal Discovery and Causal Inference to determine when a predictive model’s judgments are confounded.
+The TAILOR project offers a precedent-setting capability that supports improving the correctness of model predictions, enhancing the use of predictive models in development and operational decision making.</p>
+<p>This AIR tool adds analytical capability that didn’t exist, enabling an analyst to characterize and measure the overall accuracy of the predictive model as the underlying environment changes.</p>
+<p>The result is a scenario-based characterization of when a model’s predictions can or cannot be trusted.</p>
 <h2 id="github-location"><a class="header" href="#github-location">GitHub Location</a></h2>
 <p>The GitHub location for AIR is: <a href="https://github.com/cmu-sei/causal-lair/">https://github.com/cmu-sei/causal-lair/</a></p>
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>The license for AIR is a modified MIT End User License and can be found here:
 <a href="https://github.com/cmu-sei/causal-lair/blob/main/container-files/license.txt">https://github.com/cmu-sei/causal-lair/blob/main/container-files/license.txt</a></p>
+<p><a href="#getting-started">Next Page: Getting Started</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
 <h2 id="introduction"><a class="header" href="#introduction">Introduction</a></h2>
 <p>Modern analytic methods, including Artificial Intelligence (AI) and Machine Learning (ML) classifiers, depend on correlations; however, such approaches often fail to account for confounding in the data, which prevents accurate modeling of cause and effect and often leads to prediction bias. The AI Robustness (AIR) tool allows users to gauge AI/ML classifier performance with unprecedented confidence.</p>
-<p><strong>Target Audience:</strong> Projects that have an established AI/ML model workflow, complete with data dictionaries and subject-matter experts.</p>
+<p><strong>Target Audience:</strong> Projects that have an established AI/ML model workflow (or are working to establish an AI/ML model workflow), complete with data dictionaries and subject-matter experts.</p>
 <h2 id="requirements-for-running-air"><a class="header" href="#requirements-for-running-air">Requirements for Running AIR</a></h2>
-<p>AIR tool can be installed at a partner site or run in the SEI environment. Classified options are not available at the SEI at this point.</p>
+<p>Installing the AIR tool requires:</p>
 <h3 id="hardware"><a class="header" href="#hardware">Hardware</a></h3>
 <ul>
 <li>16 GB of storage (20 GB recommended) + any additional for your data</li>
@@ -229,27 +226,45 @@
 <li>Permissions to run a Docker container and any other supporting tools</li>
 <li>Local copies of datasets to use with the AIR tool</li>
 </ul>
-<h3 id="model-if-air-analysis-is-intended-for-an-existing-model"><a class="header" href="#model-if-air-analysis-is-intended-for-an-existing-model">Model (if AIR analysis is intended for an existing model)</a></h3>
+<h3 id="data"><a class="header" href="#data">Data</a></h3>
 <ul>
-<li>Must be an AI/ML model (e.g., classifier) that operates on structured or tabular data, relying on numerical, categorical, or time-series features — not unstructured data such as images, audio, or natural language text</li>
-<li>Should have a single outcome variable that the classifier is predicting (e.g., mission success, threat assessment, component failure)</li>
+<li>
+<p>Must be tabular <code>.csv</code> format with a header specifying variable names with no spaces in the variable names</p>
+</li>
+<li>
+<p>Must contain all variables used in the model provided (where applicable)</p>
+</li>
+<li>
+<p>Variable names in the data file must be identical to those in the provided model (where applicable)</p>
+</li>
+<li>
+<p>Recommended to contain fewer than 1,000 variables. Above this threshold, causal discovery algorithms may slow significantly</p>
+</li>
+<li>
+<p>All categorical variables must be one-hot encoded</p>
+</li>
+<li>
+<p>All time-series data must be consistently formatted</p>
+</li>
+<li>
+<p>No missing or null entries in the data</p>
+</li>
+<li>
+<p>Features must have variability (no constant columns) and must not be intentional duplicates of one another</p>
+<p>More information can be found in <a href="06-data-guidelines/README.html">Data Guidelines</a>.</p>
+</li>
+</ul>
+<h3 id="model-if-air-results-will-be-used-to-test-existing-model"><a class="header" href="#model-if-air-results-will-be-used-to-test-existing-model">Model (if AIR results will be used to test existing model)</a></h3>
+<ul>
+<li>Must be an AI/ML model that operates on structured or tabular data, relying on numerical, categorical, or time-series features — not unstructured data such as images, audio, or natural language text</li>
+<li>Should have a single outcome variable that the model is predicting (e.g., mission success, threat assessment, component failure)</li>
 <li>Should be run against multiple scenarios to predict the outcome above (e.g., does location affect mission success, does operating system affect threat assessment, does weather affect component failure)</li>
-<li>Should be compatible with use in an R environment and able to utilize a <code>predict()</code> function — <strong>or</strong> allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE)</li>
+<li>Should allow the user to predict output given user-defined input to predict Average Treatment Effect (ATE) <strong>or</strong> be compatible with use in an R environment and able to utilize a <code>predict()</code> function</li>
 <li>Must not require GPU acceleration or external hardware not currently supported by the tool</li>
 <li>Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported</li>
 </ul>
-<h3 id="data"><a class="header" href="#data">Data</a></h3>
-<ul>
-<li>Must be tabular <code>.csv</code> format with a header specifying variable names with no spaces in the variable names</li>
-<li>Must contain all variables used in the model provided (where applicable)</li>
-<li>Variable names in the data file must be identical to those in the provided model (where applicable)</li>
-<li>Recommended to contain fewer than 1,000 variables. Above this threshold, causal discovery algorithms may slow significantly</li>
-<li>All categorical variables must be one-hot encoded</li>
-<li>All time-series data must be consistently formatted</li>
-<li>No missing or null entries in the data</li>
-<li>Features must have variability (no constant columns) and must not be intentional duplicates of one another</li>
-</ul>
-<p>More information can be found in <a href="../06-data-guidelines/README.html">Data Guidelines</a>.</p>
+<p><a href="#introduction-to-air-tool">Previous Page: Introduction</a></p>
+<p><a href="#installation-instructions">Next Page: Installation Instructions</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
 <p>Installation is a matter of copying the container to a location accessible from the Docker host. You’ll want to have your data and knowledge files accessible to the Docker host as well.</p>
@@ -264,24 +279,25 @@
 <h2 id="step-2-download-extract-and-run-the-air-tool-container-from-github"><a class="header" href="#step-2-download-extract-and-run-the-air-tool-container-from-github">Step 2: Download, Extract, and Run the AIR Tool Container from GitHub</a></h2>
 <p>In Docker Desktop, open the Terminal by clicking the button at the bottom right of the window.</p>
 <p>In the Terminal, enter the following command (replace <code>1.1.1</code> with the latest version number):</p>
-<pre><code>docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.1.1
+<pre><code>docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.6.0
 </code></pre>
 <p>The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a <code>/workspace</code> prompt.</p>
-<p><img src="../images/image4.png" alt="Docker Desktop terminal showing /workspace prompt"></p>
-<h2 id="step-3-initiate-the-air-tool-scripts-for-the-user-interface"><a class="header" href="#step-3-initiate-the-air-tool-scripts-for-the-user-interface">Step 3: Initiate the AIR Tool Scripts for the User Interface</a></h2>
+<h2 id="step-3-initiate-the-air-tool-scripts"><a class="header" href="#step-3-initiate-the-air-tool-scripts">Step 3: Initiate the AIR Tool Scripts</a></h2>
 <p>At the <code>/workspace</code> prompt, enter:</p>
 <pre><code>scripts/run_quarto.sh
 </code></pre>
 <p>When this command completes, a URL will appear in the terminal.</p>
-<p><img src="../images/image5.png" alt="Terminal showing AIR Tool URL after running run_quarto.sh"></p>
-<h2 id="step-4-access-the-air-tool-user-interface-in-a-browser"><a class="header" href="#step-4-access-the-air-tool-user-interface-in-a-browser">Step 4: Access the AIR Tool User Interface in a Browser</a></h2>
-<p>The User Interface is accessible on Chrome, Safari, Edge, and Firefox.</p>
+ <img src="images/image1.png" alt="AIR Tool Container start up screen." />
+<h2 id="step-4-open-browaser-to-access-the-air-tool-user-interface"><a class="header" href="#step-4-open-browaser-to-access-the-air-tool-user-interface">Step 4: Open browaser to access the AIR Tool user interface</a></h2>
+<p>The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.</p>
 <ul>
 <li><strong>Linux OS:</strong> <code>http://172.17.0.2:4173/</code></li>
 <li><strong>Windows OS:</strong> <code>localhost:4173/</code></li>
 </ul>
 <p>When the page loads (may require approximately 30 seconds or a refresh), the AIR Tool interface will appear.</p>
-<p><img src="../images/image6.png" alt="AIR Tool user interface in browser"></p>
+<img src="images/AIR_Open_UI.png" alt="AIR Tool Opening Screen" />
+<p><a href="#getting-started">Previous Page: Getting Started</a></p>
+<p><a href="#understanding-causal-thinking">Next Page: Understanding Causal Thinking</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="understanding-causal-thinking"><a class="header" href="#understanding-causal-thinking">Understanding Causal Thinking</a></h1>
 <p>The AIR Tool is built on a branch of statistics and computer science called causal inference. If you are coming to it primarily as an AI/ML practitioner, or primarily as a domain expert, some of the ideas underlying the tool may be unfamiliar. This section introduces the core concepts you need in order to use the tool effectively and interpret its results with confidence. <a href="#key-concepts-and-reference">Key Concepts and Reference</a> provides a deeper technical reference for those who want to go further.</p>
@@ -308,6 +324,8 @@
 <h2 id="what-you-do-not-need-to-know"><a class="header" href="#what-you-do-not-need-to-know">What You Do Not Need to Know</a></h2>
 <p>You do not need to be a statistician or a causal inference researcher to use the AIR Tool effectively. The mathematics underlying causal discovery, identification, and estimation are handled internally. What the tool requires from you — and what no algorithm can substitute for — is <strong>domain knowledge</strong>: an understanding of your variables, your operational scenario, and the rough causal hierarchy among the factors at play. That knowledge, encoded in the knowledge file and the variable definitions you provide, is what allows the tool to produce results that are meaningful rather than merely mathematical.</p>
 <p>If you want to go deeper into the theory behind any of these steps, <a href="#key-concepts-and-reference">Key Concepts and Reference</a> provides curated references for each.</p>
+<p><a href="#installation-instructions">Previous Page: Installation</a></p>
+<p><a href="#key-concepts-and-reference">Next Page: Key Concepts and Reference</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="key-concepts-and-reference"><a class="header" href="#key-concepts-and-reference">Key Concepts and Reference</a></h1>
 <p>The AIR method has three primary steps: (1) causal discovery, (2) causal identification, and (3) causal estimation. Each step leverages innovative research in distinct fields of practice, which can be challenging to understand. Use of the AIR Tool does not require a detailed understanding of any of its steps; however, understanding one or more steps in a little more detail can help users better appreciate what the AIR Tool accomplishes, and better understand the basis for the tool’s capabilities and limitations.</p>
@@ -364,6 +382,8 @@ doi: 10.2202/1557-4679.1297</p>
 <a href="https://dl.acm.org/doi/abs/10.5555/3020652.3020654">https://dl.acm.org/doi/abs/10.5555/3020652.3020654</a></p>
 <p>Perković, Emilija; Textor, Johannes; Kalisch, Markus; &amp; Maathuis, Marloes H. <em>Complete Graphical Characterization and Construction of Adjustment Sets in Markov Equivalence Classes of Ancestral Graphs.</em> Journal of Machine Learning Research. Volume 18. 2018. Pages 1–62.
 <a href="https://doi.org/10.48550/arXiv.1606.06903">https://doi.org/10.48550/arXiv.1606.06903</a></p>
+<p>Characterization  and  Construction  of  Adjustment  Sets  in Markov  Equivalence  Classes  of  Ancestral  Graphs.  <em>Journal of Machine Learning Research.</em> Volume 18. 2018. Pages 1–62. <a href="https://doi.org/10.48550/arXiv.1606.06903"><strong>https://doi.org/10.48550/arXiv.1606.06903</strong></a></p>
+<p><em>This  source  addresses  causal  identification  in  a  much  more  general way than the way in which it has been implemented by the SEI.</em></p>
 <h2 id="air-step-3-causal-estimation"><a class="header" href="#air-step-3-causal-estimation">AIR Step 3: Causal Estimation</a></h2>
 <p>Causal estimation helps answer: How can we quantify the causal effect? What effect should be seen on the treatment variable in the absence of bias? Is that effect different from what our classifier is predicting?</p>
 <p><strong>Key source</strong></p>
@@ -395,6 +415,8 @@ doi: 10.2202/1557-4679.1297</p>
 <a href="https://insights.sei.cmu.edu/blog/five-models-of-technology-transition-to-bridge-the-gap-between-digital-natives-and-digital-immigrants/">https://insights.sei.cmu.edu/blog/five-models-of-technology-transition-to-bridge-the-gap-between-digital-natives-and-digital-immigrants/</a></p>
 <p>Fowler, Priscilla &amp; Levine, Linda. <em>A Conceptual Framework for Software Technology Transition.</em> CMU/SEI-93-TR-031. Software Engineering Institute, Carnegie Mellon University. 1993.
 <a href="https://insights.sei.cmu.edu/library/a-conceptual-framework-for-software-technology-transition/">https://insights.sei.cmu.edu/library/a-conceptual-framework-for-software-technology-transition/</a></p>
+<p><a href="#understanding-causal-thinking">Previous Page: Understanding Causal Thinking</a></p>
+<p><a href="06-data-guidelines/README.html">Next Page: Data Guidelines</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="data-guidelines"><a class="header" href="#data-guidelines">Data Guidelines</a></h1>
 <p>Selecting and preparing the right dataset is one of the most important factors in getting meaningful results from the AIR Tool. This section covers what makes a dataset suitable for AIR analysis and what to watch out for during preparation.</p>
@@ -410,18 +432,27 @@ doi: 10.2202/1557-4679.1297</p>
 <li>No variables that are constant values across all cases</li>
 <li>Variable names must have no embedded spaces and must be in the first row of the CSV file</li>
 </ul>
+<h3 id="time-series-data"><a class="header" href="#time-series-data">Time Series Data</a></h3>
+<p>The current version of the AIR tool has the capability of analyzing time series data.   Time series data should be ordered sequentially from earliest to latest and should not include timestamps or other data values reflecting the time series intervals.</p>
 <h2 id="other-key-considerations"><a class="header" href="#other-key-considerations">Other Key Considerations</a></h2>
-<p>For time-series data, using data from two time periods can provide meaningful direct causal relationships between variables in the current time period and the next. Causal relationships within the same time period will be much less robust.</p>
 <p>The dataset is most helpful if it is either the same data used to build the AI classifier in question, or data that is or could be fed to the classifier to make predictions.</p>
 <p>When using the AIR tool to analyze results of an AI model that makes predictions of consequences from taking actions on a system, the analyzed dataset should include variables addressing those actions and consequences in order to provide more accurate (de-confounded) and complete information.</p>
 <h2 id="ai-readiness-checklist"><a class="header" href="#ai-readiness-checklist">AI-Readiness Checklist</a></h2>
 <p>Leveraging the Earth Science Information Partners (ESIP) Checklist to Examine AI-readiness for Open Environmental Datasets, the SEI has identified dataset readiness conditions that are likely to ensure successful application of the current version of the AIR Tool.</p>
 <p><a href="https://github.com/cmu-sei/causal-lair/blob/main/doc/log_retrieval_instructions_files/media/data_guidelines_ESIP.pdf">Annotated ESIP Checklist (PDF)</a></p>
+<h4 id="esip-checklist-formatting-key"><a class="header" href="#esip-checklist-formatting-key">ESIP Checklist Formatting Key:</a></h4>
+<ul>
+<li>Applied Bold/Underline: Emphasized select checklist questions that are relevant to application of the AIR Tool</li>
+<li>Highlighted in Blue: Emphasize when a particular response to the checklist question is re-quired by the AIR Tool</li>
+<li>Highlighted in Yellow: Additional notes to elaboration on the applicability of the check-list question to the AIR Tool.</li>
+</ul>
 <p>The full annotated checklist with SEI notes is available in the <a href="#esip-checklist">ESIP Checklist</a> subchapter.</p>
+<p><a href="#key-concepts-and-reference">Previous Page: Key Concepts and Reference</a></p>
+<p><a href="#esip-checklist">Next Page: ESIP Checklist</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="esip-checklist"><a class="header" href="#esip-checklist">ESIP Checklist</a></h1>
 <p>The following is the SEI-annotated version of the Earth Science Information Partners (ESIP) Checklist to Examine AI-readiness for Open Environmental Datasets. Items in <strong>bold</strong> are particularly relevant to AIR Tool application. SEI notes appear as blockquotes beneath relevant items.</p>
-<p><img src="../images/image7.png" alt="Annotated ESIP Checklist excerpt"></p>
+<p><a href="06-data-guidelines/data_guidelines_ESIP.pdf">Download ESIP Checklist</a></p>
 <p>To indicate dataset attributes important to successful AIR Tool application, the SEI has:</p>
 <ul>
 <li><strong>Bold/Underline:</strong> Emphasized checklist questions relevant to AIR Tool application</li>
@@ -585,6 +616,8 @@ doi: 10.2202/1557-4679.1297</p>
 <ol>
 <li>OSTP Subcommittee on Open Science (2019). <em>Draft AI-ready data matrix.</em> <em>(This draft document is not an official publication of the committee.)</em></li>
 </ol>
+<p><a href="06-data-guidelines/README.html">Previous Page: Data Guidelines</a></p>
+<p><a href="07-running/README.html">Next Page: Running the AIR Tool</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="running-the-air-tool"><a class="header" href="#running-the-air-tool">Running the AIR Tool</a></h1>
 <p>This section walks through the complete AIR Tool workflow from preparing your input files to interpreting your results. Each step of the analysis has its own subchapter.</p>
@@ -601,6 +634,8 @@ doi: 10.2202/1557-4679.1297</p>
 <h2 id="before-you-begin"><a class="header" href="#before-you-begin">Before You Begin</a></h2>
 <p>Before beginning analysis with the tool, it is useful to carefully consider the causal scenario that the classifier model is used to solve. Understanding the scenario variables to be analyzed and confirming completeness of the data will contribute to gaining meaningful insight from the AIR results.</p>
 <p>More detailed information about preparing the scenario and data for analysis can be found in the <a href="#usage-scenarios">Scenario Definition Worksheet</a> and <a href="06-data-guidelines/README.html">Dataset Guidelines</a>.</p>
+<p><a href="07-running/06-data-guidelines/README.html">Previous Page: Data Guidelines</a></p>
+<p><a href="#input-data-files">Next Page: Input Data Files</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="input-data-files"><a class="header" href="#input-data-files">Input Data Files</a></h1>
 <p>The AIR Tool requires two input files: a <strong>data file</strong> and a <strong>knowledge file</strong>. Both must be prepared before beginning analysis.</p>
@@ -637,19 +672,24 @@ doi: 10.2202/1557-4679.1297</p>
 <li><code>variable</code> — the variable name exactly as written in the data file</li>
 </ul>
 <p>Each variable name should appear exactly once. The AIR tool will provide a notification if it detects header formatting issues or variable names that don’t appear in the uploaded data.</p>
-<p><img src="../images/image8.png" alt="Knowledge file format example showing level and variable columns"></p>
+ <img src="images/KF_Example.png" alt="Knowledge File Example." />
 <p>Currently, all knowledge assertions must be done ahead of time as in-place editing is not yet supported by the tool.</p>
+<p><a href="07-running/README.html">Previous Page: Running the AIR Tool</a></p>
+<p><a href="#step-1-building-your-causal-graph">Next Page: Step 1: Causal Graph</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-1-building-your-causal-graph"><a class="header" href="#step-1-building-your-causal-graph">Step 1: Building Your Causal Graph</a></h1>
 <p>Once the AIR tool is successfully installed and open in the web browser, the first step is to upload your data and knowledge files and build the causal graph.</p>
 <h2 id="uploading-files"><a class="header" href="#uploading-files">Uploading Files</a></h2>
-<p>The tool will first prompt you to upload your data file. The blue status bar will confirm when upload is complete. The tool will provide a notification if errors are discovered during upload.</p>
+<p>The tool will first prompt you to upload your data file. If you are uploading time series data sorted in sequential order, select the Time Series? radio button to enable the approrpriate analysis capability.</p>
+ <img src="images/Opening_screen.jpg" alt="AIR Tool initial screen with prompt to upload." />
+<p>The blue status bar will confirm when upload is complete. The tool will provide a notification if errors are discovered during upload.</p>
+ <img src="images/High_Corr_Detected.jpg" alt="AIR Tool display when potential issues are discovered during data upload." />
 <p>After the data file is uploaded, you will be prompted to upload the knowledge file. Once both files are accepted, a <strong>Build Graph</strong> button will appear.</p>
-<p>Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.</p>
-<p>More detailed information about assessing causal graphs can be found in <a href="https://github.com/cmu-sei/causal-lair/blob/main/doc/causal_graph_checks.md">AIR Tool Causal Graph Insights</a>.</p>
-<p><img src="../images/image1.png" alt="Causal graph displayed in the AIR Tool main panel"></p>
+ <img src="images/Uploads_complete.jpg" alt="AIR Tool display when input uploads are complete." />
+<p>Once activated, the tool runs Causal Discovery algorithms and displays the resulting causal graph in the main panel. Review the causal graph carefully to evaluate whether this causal graph produced by the tool reflects reasonable expectations before proceeding. If you are unsatisfied with the graph, you can select new files and re-build until satisfied.</p>
+ <img src="images/Screen_graph_is_built.jpg" alt="AIR Tool display when causal graph is complete." />
 <h2 id="causal-graph-checks"><a class="header" href="#causal-graph-checks">Causal Graph Checks</a></h2>
-<p>Use the following checks to evaluate whether the causal graph produced by the tool reflects reasonable expectations before proceeding.</p>
+<p>As you evaluate this causal graph, you may encounter these results:</p>
 <h3 id="check-1-the-tool-is-not-returning-a-causal-graph"><a class="header" href="#check-1-the-tool-is-not-returning-a-causal-graph">Check 1: The tool is not returning a causal graph</a></h3>
 <p><strong>Why this might be happening:</strong></p>
 <ul>
@@ -702,72 +742,140 @@ doi: 10.2202/1557-4679.1297</p>
 <li>Consider removing one of two very strongly correlated variables and rerunning</li>
 <li>Consider the impact of any missing nonlinear relationship and determine whether to continue with the AIR tool</li>
 </ul>
+<p><a href="#input-data-files">Previous Page: Input Data Files</a></p>
+<p><a href="#step-2-identifying-potential-sources-of-bias">Next Page: Step 2: Select Variables</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-2-identifying-potential-sources-of-bias"><a class="header" href="#step-2-identifying-potential-sources-of-bias">Step 2: Identifying Potential Sources of Bias</a></h1>
-<p>The tool will now prompt you for additional information about the problem scenario the classifier is attempting to solve.</p>
+<p>The tool will now prompt you for additional information about the causal scenario that you wish to analyze.</p>
 <h2 id="selecting-treatment-and-outcome-variables"><a class="header" href="#selecting-treatment-and-outcome-variables">Selecting Treatment and Outcome Variables</a></h2>
-<p>The most important step is identifying both the experimental/treatment (x) and outcome (y) variables.</p>
-<ul>
-<li>The experimental (x) variable definition is pulled from the data file uploaded in Step 1. Variables with no inputs or no outputs cannot be selected.</li>
-<li>The outcome (y) variables available in the tool will be the causal successors of the selected experimental (x) variable.</li>
-</ul>
+<p>The most important step is identifying both the experimental/treatment (x) and outcome (y) variables for the scenario to be analyzed.</p>
+<p>The experimental (x) variable can be selected from variables in the data file uploaded in Step 1. Variables with no inputs or no outputs cannot be selected.</p>
+ <img src="images/Select_X_dropdown.jpg" alt="Selection of Experimental X variable" />
+<p>The outcome (y) variable can be selected from the causal successors of the selected experimental (x) variable.</p>
+ <img src="images/Select_y_dropdown.jpg" alt="Selection of Outcome Y variable" />
 <p>In the current version of the tool, both x and y variables must be treated as binary. Users define what constitutes “treated” vs. “untreated” and “success” vs. “fail” for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.</p>
 <h2 id="results-of-causal-identification"><a class="header" href="#results-of-causal-identification">Results of Causal Identification</a></h2>
 <p>Once you have completed your definitions, AIR will run the causal identification algorithms, resulting in changes to the causal graph that highlight:</p>
 <ul>
-<li>Both experimental/treatment (x) variable (blue) and outcome (y) variable (purple)</li>
+<li>Both experimental/treatment (x) variable (light blue) and outcome (y) variable (navy blue)</li>
 <li>Two separate adjustment sets identified by AIR</li>
 <li>Potential confounders that are parents of x and y (medium gray)</li>
 <li>Potential confounders that are parents of x and intermediate variables and/or y (light gray)</li>
 </ul>
-<p><img src="../images/image2.png" alt="Causal graph with x and y variables highlighted after Step 2"></p>
+ <img src="images/Post_y_selection.jpg" alt="AIR Tool Step 2 complete." />
+<p><a href="#step-1-building-your-causal-graph">Previous Page: Step 1: Causal Graph</a></p>
+<p><a href="#step-3-estimating-the-causal-effect">Next Page: Step 3: Estimating Causal Effect</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-3-estimating-the-causal-effect"><a class="header" href="#step-3-estimating-the-causal-effect">Step 3: Estimating the Causal Effect</a></h1>
-<p>The tool will now prompt you for information about the model to be tested. You have four options.</p>
-<h2 id="option-1-upload-your-model"><a class="header" href="#option-1-upload-your-model">Option 1: Upload Your Model</a></h2>
-<p>This choice prompts you to upload a copy of your model. The tool will estimate the average treatment effect (ATE) predicted by your model and compare it against the causally-derived estimates of AIR.</p>
-<p>Currently, this tool only accepts models in <code>.rda</code> format. If you have a different model format, contact the team and they will try to support your model type.</p>
-<h2 id="option-2-provide-an-ate"><a class="header" href="#option-2-provide-an-ate">Option 2: Provide an ATE</a></h2>
-<p>If you can calculate your own ATE, you can input it directly. The AIR Tool accepts ATE values calculated using potential outcome prediction.</p>
-<p>For each individual data point in the dataset, calculate potential outcomes as follows:</p>
-<ul>
-<li><strong>Ŷ₁:</strong> the predicted outcome where the treatment value for all individuals is manually set to 1 (T=1)</li>
-<li><strong>Ŷ₀:</strong> the predicted outcome where the treatment value for all individuals is manually set to 0 (T=0)</li>
-</ul>
+<p>Step 3 of the AIR Tool offers four analysis paths, ranging from “evaluate the model I already have” to “just tell me the causal effect.” The right choice depends on two things: whether you have an existing predictive model to evaluate, and how much of the analysis you want AIR to handle for you.</p>
+<p>The four options are:</p>
+<ol>
+<li><strong>Yes: I can upload it</strong></li>
+<li><strong>Yes: I can provide an ATE</strong></li>
+<li><strong>No: Do it all for me</strong></li>
+<li><strong>No: Just show me the effect</strong></li>
+</ol>
+<p>The table below summarizes the trade-offs at a glance; each option is described in detail in the sections that follow.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>What you provide</th><th>What AIR does</th><th>Best when…</th></tr>
+</thead>
+<tbody>
+<tr><td>Yes: I can upload it</td><td>A trained R model file</td><td>Computes ATE from your model, then compares to the causal ATE estimate</td><td>You have direct access to your model and want the check of model prediction</td></tr>
+<tr><td>Yes: I can provide an ATE</td><td>A single ATE value from your model</td><td>Compares your ATE to the causal ATE estimate</td><td>You can query your model but can’t easily export it, or your model isn’t in R</td></tr>
+<tr><td>No: Do it all for me</td><td>Nothing extra</td><td>Trains a battery of predictive models, computes their ATEs, and compares against the causal ATE estimate</td><td>You don’t have a model yet and want to see how common model families would behave</td></tr>
+<tr><td>No: Just show me the effect</td><td>Nothing extra</td><td>Reports the causal ATE estimate only</td><td>You only want to know whether X has a reliable causal effect on Y</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="how-air-estimates-the-ate"><a class="header" href="#how-air-estimates-the-ate">How AIR estimates the ATE</a></h2>
+<p>Regardless of which option you choose, the AIR Tool estimates the causal Average Treatment Effect (ATE) using <strong>two independent adjustment sets</strong> identified from the causal graph: one drawn from variables near the treatment, and one from variables near the outcome. A causal adjustment set is a group of variables that must be conditioned or controlled for to estimate the unbiased causal effect of a treatment on an outcome. Each adjustment set produces its own ATE estimate via Targeted Maximum Likelihood Estimation (TMLE) with a SuperLearner ensemble. Agreement between the two estimates is itself a robustness check — when they converge, you have evidence of a stable causal signal; when they diverge, the signal is sensitive to which confounders are controlled for. More information about interpreting adjustment set results can be found at Section 7 Results.</p>
+<p>The “Yes: I can upload it” and “Yes: I can provide an ETA” options layer a comparison on top of this: your model’s implied ATE is plotted against the causal ATE estimate’s confidence interval on the Ribbon Plot. If your model’s ATE falls inside the CI, your model is consistent with the causal evidence. If it falls outside, your model is likely picking up something other than the causal effect.</p>
+<p>More information about interpreting adjustment set results can be found at Section 7 Results.</p>
+<h2 id="yes-i-have-a-model-options"><a class="header" href="#yes-i-have-a-model-options">Yes I have a model options</a></h2>
+<p>Choose one of the “Yes” options if you already have a predictive model and want to know whether bias might be affecting its predictions. AIR will compute (or accept) the model’s Average Treatment Effect and compare it against the causal estimate derived from the data and graph.</p>
+<h3 id="i-can-upload-it"><a class="header" href="#i-can-upload-it">I can upload it</a></h3>
+<p>If you have direct access to your model file, you can upload it and let AIR handle the rest. This is the most streamlined option: AIR computes the ATE from your model automatically, then folds that value into the health report alongside the causal analysis. The resulting ATE from your model will appear on the Ribbon Plot in the upper right as a blue arrow once the analysis completes.</p>
+<blockquote>
+<p><strong>Note:</strong>  The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.</p>
+</blockquote>
+<h3 id="i-can-provide-an-ate"><a class="header" href="#i-can-provide-an-ate">I can provide an ATE</a></h3>
+<p>If you can query your model with new data but can’t easily export it, or if your model is built in a language AIR doesn’t yet accept, this option is often the simpler path. You calculate the ATE yourself and enter that value directly into the tool.</p>
 <p>The ATE is the average difference between the two potential outcomes:</p>
-<pre><code>ATE = (1/N) * Σ (Ŷ₁ᵢ − Ŷ₀ᵢ)
-</code></pre>
-<p>See <a href="https://github.com/cmu-sei/causal-lair/blob/main/doc/calculating_ATE.md">Calculating ATE</a> for more information.</p>
-<h2 id="option-3-do-it-all-for-me"><a class="header" href="#option-3-do-it-all-for-me">Option 3: Do It All for Me</a></h2>
-<p>This option is for a user who doesn’t have a specific model but would like the tool to generate several commonly-used machine learning models to compare against the causally-derived model of AIR. No additional input required.</p>
-<h2 id="option-4-just-show-me-the-effect"><a class="header" href="#option-4-just-show-me-the-effect">Option 4: Just Show Me the Effect</a></h2>
-<p>This option allows you to proceed with the AIR analysis without any comparison to a predictive model.</p>
-<hr>
+<p>ATE = (1/N) Σ<sub>i=1</sub><sup>N</sup> (Ŷ<sub>1i</sub> − Ŷ<sub>0i</sub>)</p>
+<p>The value returned is what you’ll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
+See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
+<blockquote>
+<p><strong>Note:</strong> ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that’s a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.</p>
+</blockquote>
+<h2 id="no-i-dont-have-a-model-or-i-dont-want-to-evaluate-one"><a class="header" href="#no-i-dont-have-a-model-or-i-dont-want-to-evaluate-one">No: I don’t have a model (or I don’t want to evaluate one)</a></h2>
+<p>Choose one of the “No” options if you want to investigate the causal relationships in your data without comparing against a specific predictive model. These options are useful when you’re deciding <em>whether</em> to use certain data to build a model in the first place, but they’re also useful any time you want a causal-only view of an X → Y relationship.</p>
+<h3 id="no-do-it-all-for-me"><a class="header" href="#no-do-it-all-for-me">No: Do it all for me</a></h3>
+<p>This option requires no additional input. AIR will train a series of statistical, machine learning, and ensemble models on your data using the chosen X and Y variables. The models trained include:</p>
+<ul>
+<li>Logistic Regression</li>
+<li>Decision Tree</li>
+<li>Support Vector Machine</li>
+<li>Random Forest</li>
+<li>A stacked SuperLearner ensemble consisting of:
+<ul>
+<li>Generalized Linear Model (i.e., logistic regression)</li>
+<li>Generalized Linear Model with elastic net regularization</li>
+<li>XGBoost (eXtreme Gradient Boosted Decision Trees)</li>
+<li>Earth (R’s version of Multivariate Adaptive Regression Splines, i.e. MARS)</li>
+<li>Feedforward Neural Network</li>
+<li>Support Vector Machine</li>
+</ul>
+</li>
+</ul>
+<p>Each model trains on the data, predicts Y, and is then queried with X manipulated to produce its own ATE. AIR aggregates these into a mean ATE for display on the Ribbon Plot and reports the spread across model families in the interpretation section.</p>
+<p>The point of training a battery of learners rather than a single model is that <strong>the spread itself is informative</strong>. When ATE estimates agree across model families, that’s evidence the causal signal is robust to model choice. When they disagree, it tells you the signal is sensitive to which model family is used, and you should be cautious about deploying any single one of them in isolation.</p>
+<blockquote>
+<p><strong>Note:</strong> This option will be somewhat slower than the others because of the SuperLearner ensemble.</p>
+</blockquote>
+<h3 id="no-just-show-me-the-effect"><a class="header" href="#no-just-show-me-the-effect">No: Just show me the effect</a></h3>
+<p>This is the leanest analysis path. AIR skips the predictive-model comparison entirely and reports only the causal effect of X on Y, estimated from the data and graph.</p>
+<p>This option answers two distinct questions:</p>
+<ol>
+<li><strong>Is the X → Y relationship reliably estimable at all?</strong> The 95% confidence interval on the Ribbon Plot tells you. A tight CI that excludes zero indicates a stable, detectable effect; a wide CI or one straddling zero indicates the relationship can’t be pinned down with this data.</li>
+<li><strong>If the relationship is reliable, how big is it?</strong> The magnitude of the causal estimate gives you an ATE target to aim for when training a predictive model later — you’ll know what effect size your model should be capturing.</li>
+</ol>
+<h2 id="choosing-between-options"><a class="header" href="#choosing-between-options">Choosing between options</a></h2>
+<p>A few common scenarios:</p>
+<ul>
+<li><strong>You have an R model and full access to the file</strong> → Upload it. Lowest effort, fullest analysis.</li>
+<li><strong>You have a model in Python (or any non-R language) but can score new data with it</strong> → Calculate the ATE yourself and use “I can provide an ATE.”</li>
+<li><strong>You’re early in a modeling project and haven’t picked a model family</strong> → Use “Do it all for me” to see how different model families behave on this problem.</li>
+<li><strong>You’re not building a model — you just want to know if X causes Y</strong> → Use “Just show me the effect.”</li>
+</ul>
 <p>Once you have made a selection, click <strong>Calculate Results</strong> to finish the causal estimation portion of the tool.</p>
 <blockquote>
 <p><strong>Note:</strong> After this process has started, it cannot be undone. This process typically takes 2–10 minutes to run with a fairly simple model. Once complete, the progress bar will disappear and the results will be displayed.</p>
 </blockquote>
-<p><img src="../images/image3.png" alt="Step 3 model selection interface"></p>
+ <img src="images/Screen_graph_is_built.jpg" alt="AIR Toolscreen when Step 3 is complete." />
+<p><a href="#step-2-identifying-potential-sources-of-bias">Previous Page: Step 2: Select Variables</a></p>
+<p><a href="07-running/interpreting_results.html">Next Page: Interpreting Results</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h1>
 <p>The results page requires no input but displays the entire AIR health report. The blue <strong>Download</strong> button on the lower left allows you to download a PDF summary.</p>
-<p>Refreshing the browser or clicking <strong>Reload</strong> on the lower left will reset the tool and allow you to begin a new analysis.</p>
-<p>More detailed information can be found in <a href="https://github.com/cmu-sei/causal-lair/blob/main/doc/interpreting_results.md">Interpreting AIR Results</a>.</p>
+<p>Clicking <strong>Reset Selections</strong> on the lower left will reset the tool while retaining the causal graph, which allows you to begin another analysis of the same uploaded data and knowledge file. Refreshing the browser will reset the tool to begin a new analysis.</p>
+<p>More detailed information can be found in <a href="07-running/interpreting_results.html">Interpreting AIR Results</a> and <a href="#interpretation-section--states-mockups-and-language-suggestions">Interpretation States</a> provides a summary of all possible result states.</p>
 <h2 id="layout"><a class="header" href="#layout">Layout</a></h2>
-<p><strong>Left panel:</strong> The causal graph with both x and y variables highlighted in blue/purple. If additional nodes are found to be contributing significant bias, they will be highlighted in red.</p>
+<p><strong>Left panel:</strong> The causal graph with both x and y variables highlighted in light blue/navy blue. If additional nodes are found to be contributing significant bias, they will be highlighted in red.</p>
 <p><strong>Top right panel:</strong> The Risk Difference chart.</p>
 <p><strong>Bottom right panel:</strong> A custom text-based interpretation summarizing the results from all steps, generated uniquely for each session.</p>
 <h2 id="risk-difference-chart"><a class="header" href="#risk-difference-chart">Risk Difference Chart</a></h2>
 <p>The Risk Difference chart compares the average treatment effect (ATE) estimated by the AIR tool with your AI/ML model’s ATE. The AIR tool ATE estimates are combined at the bottom of the chart into a single horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your model’s classifications.</p>
 <p>The x-axis ranges from negative to positive effect, where a change in treatment either decreases or increases the likelihood of the outcome, respectively. The midpoint corresponds to no statistically significant effect detected.</p>
-<p><img src="../images/image9.png" alt="Risk Difference chart showing ATE comparison"></p>
+ <img src="images/Result with Ate of 1.jpg" alt="AIR Tool risk difference chart result." />
 <h3 id="interpreting-the-risk-difference-chart"><a class="header" href="#interpreting-the-risk-difference-chart">Interpreting the Risk Difference Chart</a></h3>
 <p><strong>BLUE arrow in GREEN region:</strong> Statistical testing failed to find evidence of confounding bias. Consider periodically re-testing as data may change over time.</p>
 <p><strong>BLUE arrow in YELLOW region:</strong> There is some evidence of bias, but it is weak or uncertain. Continue monitoring with the AIR Tool in case the arrow moves into the RED region.</p>
 <p><strong>BLUE arrow in RED region:</strong> There is statistically significant evidence that your AI/ML model exhibits confounding bias. Consider obtaining better measures of the variables in the adjustment sets, gathering more training data, and retraining your classifier. Note that there is no guarantee additional training will fully de-bias the model. If the model continues to make biased predictions after retraining, you might consider modeling the bias itself and adjusting the model output accordingly.</p>
 <h2 id="causal-graph"><a class="header" href="#causal-graph">Causal Graph</a></h2>
 <p>The Causal Graph indicates which variables are likely causing confounding of the relationship between the experimental variable and the outcome variable.</p>
-<p><img src="../images/image10.png" alt="Causal graph with confounding variables highlighted in red"></p>
+ <img src="images/Results - no model, no ATE.jpg" alt="AIR Tool display when causal graph is complete." />
 <ul>
 <li>If your model’s ATE is <strong>not within</strong> both AIR-calculated 95% confidence intervals, the red variables (or their causal ancestors) are likely introducing bias into your model’s results.</li>
 <li>If your model’s ATE is <strong>within</strong> the AIR-calculated 95% confidence intervals, the red nodes are simply informative for future potential bias.</li>
@@ -783,6 +891,49 @@ doi: 10.2202/1557-4679.1297</p>
 <p>Differentiating these causes is difficult. We recommend assuming reason (3) can be rejected, re-examining the provenance of your data, and checking whether key measures might be missing. Please also notify the SEI of any problems encountered at tailor-help@sei.cmu.edu.</p>
 <h3 id="only-one-adjustment-set-indicated"><a class="header" href="#only-one-adjustment-set-indicated">Only one adjustment set indicated</a></h3>
 <p>This can happen when there are only a few variables and only one adjustment set could be found in Step 2. In this case, proceed as if there were two adjustment sets and interpret the BLUE arrow position as you would when two adjustment sets are present.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
+<h2 id="log-retrieval"><a class="header" href="#log-retrieval">Log Retrieval</a></h2>
+<p>If you wish to view a log of activity occurring while using the AIR Tool, this is available in the Logs tab at the top of the AIR user interface.</p>
+<h3 id="need-image"><a class="header" href="#need-image">NEED IMAGE###</a></h3>
+<hr>
+<h2 id="common-problems"><a class="header" href="#common-problems">Common Problems</a></h2>
+<h3 id="variables-not-selectable-in-step-2"><a class="header" href="#variables-not-selectable-in-step-2">Variables not selectable in Step 2</a></h3>
+<p>Experimental (x) variables that have no inputs or no outputs cannot be selected in the tool. If a variable you expect to select is unavailable, review the causal graph from Step 1 — the variable may not have the connections expected. Refer to <a href="#step-1-building-your-causal-graph">Causal Graph Checks</a> for guidance on diagnosing graph issues.</p>
+<h3 id="data-file-issues"><a class="header" href="#data-file-issues">Data file issues</a></h3>
+<p>Ensure your data file meets all requirements outlined in <a href="#input-data-files">Input Data Files</a>. Common causes of upload failure include spaces in variable names, missing values, and constant columns.</p>
+<hr>
+<h2 id="contact-and-support"><a class="header" href="#contact-and-support">Contact and Support</a></h2>
+<p>If you encounter issues not covered here, reach out to the AIR Tool team:</p>
+<p><strong>Email:</strong> tailor-help@sei.cmu.edu</p>
+<p><a href="07-running/interpreting_results.html">Previous Page: Interpreting Results</a></p>
+<p><a href="#known-issues-and-limitations">Next Page: Known Issues and Limitations</a></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="known-issues-and-limitations"><a class="header" href="#known-issues-and-limitations">Known Issues and Limitations</a></h1>
+<h2 id="existing-problems"><a class="header" href="#existing-problems">Existing Problems</a></h2>
+<p>Issues still present in the current release will be revealed with further testing.</p>
+<h2 id="limitations"><a class="header" href="#limitations">Limitations</a></h2>
+<p><strong>Multiple runs on the same dataset:</strong> Running the AIR tool multiple times on the same full dataset is not recommended because it increases the risk of false discoveries due to multiple comparisons. Each run introduces a chance of identifying spurious associations that may appear statistically significant but are actually artifacts of random noise. If multiple analyses are necessary, use different versions of the full dataset (subsets, partitions, or new datasets entirely). This phenomenon is true in any statistical analysis and is not specific to the AIR Tool.</p>
+<p><strong>Binary variables only:</strong> The tool is currently only equipped to handle binary (on/off or true/false) treatment and binary outcome variables. A built-in capability to transform continuous variables into binary is provided as a workaround.</p>
+<p><strong>Model format:</strong> The tool only accepts <code>.rda</code> files for model upload. If you have a different model format, contact tailor-help@sei.cmu.edu and the team will try to support your model type.</p>
+<p><strong>No model remediation:</strong> The tool does not fix your model but provides a health report that identifies areas and variables where bias is likely being introduced. The user will need to identify and apply appropriate remediations based on this information.</p>
+<p><a href="07-running.html">Previous Page: Running the AIR Tool</a></p>
+<p><a href="#contact-and-support-1">Next Page: Contact and Support</a></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="contact-and-support-1"><a class="header" href="#contact-and-support-1">Contact and Support</a></h1>
+<h2 id="support"><a class="header" href="#support">Support</a></h2>
+<p><strong>Email:</strong> tailor-help@sei.cmu.edu</p>
+<h2 id="security-information"><a class="header" href="#security-information">Security Information</a></h2>
+<p>In the current AIR tool, data is not saved or used for any purpose other than as specified in this documentation. When the tool has finished running, the state is not saved for future use. The user is responsible for the handling of their source data.</p>
+<h2 id="licensing-and-legal-information"><a class="header" href="#licensing-and-legal-information">Licensing and Legal Information</a></h2>
+<p>The license for AIR is a modified MIT End User License:
+<a href="https://github.com/cmu-sei/causal-lair/tree/main?tab=License-1-ov-file">https://github.com/cmu-sei/causal-lair/tree/main?tab=License-1-ov-file</a></p>
+<h2 id="roadmap-and-future-updates"><a class="header" href="#roadmap-and-future-updates">Roadmap and Future Updates</a></h2>
+<ul>
+<li>Upcoming Features: Coming soon</li>
+<li>Planned Enhancements: Coming soon</li>
+</ul>
+<p><a href="#known-issues-and-limitations">Previous Page: Known Issues and Limitations</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="usage-scenarios"><a class="header" href="#usage-scenarios">Usage Scenarios</a></h1>
 <h2 id="scenario-definition-worksheet"><a class="header" href="#scenario-definition-worksheet">Scenario Definition Worksheet</a></h2>
@@ -832,62 +983,279 @@ doi: 10.2202/1557-4679.1297</p>
 <h3 id="issues"><a class="header" href="#issues">Issues</a></h3>
 <p><em>Describe any issues or questions encountered during scenario preparation, and possible resolutions.</em></p>
 <div style="break-before: page; page-break-before: always;"></div>
-<h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
-<h2 id="log-retrieval"><a class="header" href="#log-retrieval">Log Retrieval</a></h2>
-<p>If you wish to capture a log of activity occurring while using the AIR Tool, begin by returning to the Docker Desktop application.</p>
-<h3 id="step-1-return-to-docker-desktop"><a class="header" href="#step-1-return-to-docker-desktop">Step 1: Return to Docker Desktop</a></h3>
-<p>In the Docker Desktop Terminal, the prompt should look like this:</p>
-<p><img src="../images/image11.png" alt="Docker Desktop terminal showing active session prompt"></p>
-<p>End the session by pressing <strong>Ctrl+C</strong>, which should change the prompt:</p>
-<p><img src="../images/image12.png" alt="Docker Desktop terminal after pressing Ctrl+C"></p>
-<h3 id="step-2-access-logs"><a class="header" href="#step-2-access-logs">Step 2: Access Logs</a></h3>
-<p>To view the logs, enter:</p>
-<pre><code>tree logs
-</code></pre>
-<p>Note the most recent log in the output.</p>
-<p><img src="../images/image13.png" alt="Tree logs output showing log directory structure"></p>
-<p><img src="../images/image14.png" alt="Log directory listing with most recent log highlighted"></p>
-<h3 id="step-3-view-log-details"><a class="header" href="#step-3-view-log-details">Step 3: View Log Details</a></h3>
-<p>To view log details, enter the following command using your log name:</p>
-<pre><code>tail -f logs/LOGNAME/airtool.log
-</code></pre>
-<p>Example:</p>
-<pre><code>tail -f logs/2025-09-04_14-44-22/airtool.log
-</code></pre>
-<p><img src="../images/image15.png" alt="Terminal showing airtool.log output"></p>
-<hr>
-<h2 id="common-problems"><a class="header" href="#common-problems">Common Problems</a></h2>
-<h3 id="variables-not-selectable-in-step-2"><a class="header" href="#variables-not-selectable-in-step-2">Variables not selectable in Step 2</a></h3>
-<p>Experimental (x) variables that have no inputs or no outputs cannot be selected in the tool. If a variable you expect to select is unavailable, review the causal graph from Step 1 — the variable may not have the connections expected. Refer to <a href="#step-1-building-your-causal-graph">Causal Graph Checks</a> for guidance on diagnosing graph issues.</p>
-<h3 id="data-file-issues"><a class="header" href="#data-file-issues">Data file issues</a></h3>
-<p>Ensure your data file meets all requirements outlined in <a href="#input-data-files">Input Data Files</a>. Common causes of upload failure include spaces in variable names, missing values, and constant columns.</p>
-<hr>
-<h2 id="contact-and-support"><a class="header" href="#contact-and-support">Contact and Support</a></h2>
-<p>If you encounter issues not covered here, reach out to the AIR Tool team:</p>
-<p><strong>Email:</strong> tailor-help@sei.cmu.edu</p>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="known-issues-and-limitations"><a class="header" href="#known-issues-and-limitations">Known Issues and Limitations</a></h1>
-<h2 id="existing-problems"><a class="header" href="#existing-problems">Existing Problems</a></h2>
-<p>Issues still present in the current release will be revealed with further testing.</p>
-<h2 id="limitations"><a class="header" href="#limitations">Limitations</a></h2>
-<p><strong>Multiple runs on the same dataset:</strong> Running the AIR tool multiple times on the same full dataset is not recommended because it increases the risk of false discoveries due to multiple comparisons. Each run introduces a chance of identifying spurious associations that may appear statistically significant but are actually artifacts of random noise. If multiple analyses are necessary, use different versions of the full dataset (subsets, partitions, or new datasets entirely). This phenomenon is true in any statistical analysis and is not specific to the AIR Tool.</p>
-<p><strong>Binary variables only:</strong> The tool is currently only equipped to handle binary (on/off or true/false) treatment and binary outcome variables. A built-in capability to transform continuous variables into binary is provided as a workaround.</p>
-<p><strong>Model format:</strong> The tool only accepts <code>.rda</code> files for model upload. If you have a different model format, contact tailor-help@sei.cmu.edu and the team will try to support your model type.</p>
-<p><strong>No model remediation:</strong> The tool does not fix your model but provides a health report that identifies areas and variables where bias is likely being introduced. The user will need to identify and apply appropriate remediations based on this information.</p>
-<div style="break-before: page; page-break-before: always;"></div>
-<h1 id="contact-and-support-1"><a class="header" href="#contact-and-support-1">Contact and Support</a></h1>
-<h2 id="support"><a class="header" href="#support">Support</a></h2>
-<p><strong>Email:</strong> tailor-help@sei.cmu.edu</p>
-<h2 id="security-information"><a class="header" href="#security-information">Security Information</a></h2>
-<p>In the current AIR tool, data is not saved or used for any purpose other than as specified in this documentation. When the tool has finished running, the state is not saved for future use. The user is responsible for the handling of their source data.</p>
-<h2 id="licensing-and-legal-information"><a class="header" href="#licensing-and-legal-information">Licensing and Legal Information</a></h2>
-<p>The license for AIR is a modified MIT End User License:
-<a href="https://github.com/cmu-sei/causal-lair/tree/main?tab=License-1-ov-file">https://github.com/cmu-sei/causal-lair/tree/main?tab=License-1-ov-file</a></p>
-<h2 id="roadmap-and-future-updates"><a class="header" href="#roadmap-and-future-updates">Roadmap and Future Updates</a></h2>
+<h1 id="calculating-an-ate"><a class="header" href="#calculating-an-ate"><strong><strong>Calculating an ATE</strong></strong></a></h1>
+<p>The average treatment effect (ATE) measures the difference in mean (average) outcomes between “baseline” cases and the “experimental“ cases.</p>
+<p>In the event that you will be providing the average treatment effect (ATE) for your AI model, the AIR Tool will accept ATE values calculated using potential outcome prediction. The calculation is relatively simple. In practice, you cannot observe both $Y_{1}$​ (observed treated outcome) and $Y_{0}$​ (observed untreated outcome) for the same individual, so we will rely on the model to simulate these outcomes for us.</p>
+<p>For each individual data point in the dataset, we first calculate the potential outcomes as:</p>
 <ul>
-<li>Upcoming Features: Coming soon</li>
-<li>Planned Enhancements: Coming soon</li>
+<li>
+<p>${\widehat{Y}}_{1}$: the predicted outcome where the treatment value for all individuals is manually set to 1 ($T = 1$).</p>
+</li>
+<li>
+<p>${\widehat{Y}}_{0}$: the predicted outcome where the treatment value for all individuals is manually set to 0 ($T = 0$).</p>
+</li>
 </ul>
+<p>Next, we use these predicted outcomes to calculate ATE. This value is
+simply the average difference between the two potential outcomes:</p>
+<p>$$ATE = \frac{1}{N}\sum_{i = 1}^{N}{({\widehat{Y}}<em>{1i} - \ {\widehat{Y}}</em>{0i})}\ $$</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="interpretation-section--states-mockups-and-language-suggestions"><a class="header" href="#interpretation-section--states-mockups-and-language-suggestions">Interpretation Section — States, Mockups, and Language Suggestions</a></h1>
+<p>This document maps every possible interpretation output to the conditions that produce it,
+shows a concrete mockup of each, and proposes plain-language rewrites that include richer
+context already available in the tool’s computations.</p>
+<p>Variable names used in mockups: <strong>credit_score</strong> (treatment, X) → <strong>loan_default</strong> (outcome, Y).</p>
+<hr>
+<h2 id="1-what-the-user-chose-model-mode"><a class="header" href="#1-what-the-user-chose-model-mode">1. What the User Chose (Model Mode)</a></h2>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>UI choice</th><th>Internal value</th><th>What it means</th></tr>
+</thead>
+<tbody>
+<tr><td>Yes: I can upload it</td><td><code>"Yes"</code></td><td>User provides a trained R model; AIR runs it against the data to get a predicted effect</td></tr>
+<tr><td>Yes: I can provide an ATE</td><td><code>"ATE"</code></td><td>User supplies a single effect-size number directly</td></tr>
+<tr><td>No: Do it all for me</td><td><code>"No"</code></td><td>AIR trains five classifiers internally and summarises them</td></tr>
+<tr><td>No: Just show me the effect</td><td><code>"null"</code></td><td>No model; user only wants the causal effect from the data</td></tr>
+</tbody>
+</table>
+</div>
+<p>Modes <code>Yes</code>, <code>ATE</code>, and <code>No</code> all produce a <strong>model ATE</strong> (a flag value) compared to the causal confidence intervals.
+Mode <code>null</code> currently has <strong>no dedicated interpretation path</strong> — it falls into the model-comparison logic with <code>flag = 0</code>, producing misleading text (see §3).</p>
+<hr>
+<h2 id="2-output-states-model-comparison-modes-yes--ate--no"><a class="header" href="#2-output-states-model-comparison-modes-yes--ate--no">2. Output States (Model Comparison Modes: Yes / ATE / No)</a></h2>
+<p>These states are evaluated in order; the first that applies wins.</p>
+<hr>
+<h3 id="state-0--computation-failed"><a class="header" href="#state-0--computation-failed">State 0 — Computation Failed</a></h3>
+<p><strong>Condition:</strong> <code>nrow(dfr) == 0</code></p>
+<blockquote>
+<p><em>No results — model fitting failed. Check the log.</em></p>
+</blockquote>
+<hr>
+<h3 id="state-1--no-consensus-between-causal-estimates"><a class="header" href="#state-1--no-consensus-between-causal-estimates">State 1 — No Consensus Between Causal Estimates</a></h3>
+<p><strong>Condition:</strong> Z1 and Z2 confidence intervals do not overlap at all.</p>
+<p><strong>Current text:</strong></p>
+<blockquote>
+<p><strong>Consensus Could Not Be Reached for This Scenario.</strong> The two causal analyses do not agree within their confidence ranges. This suggests that the data or model assumptions may not support a stable or consistent causal conclusion for this scenario.</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>The two causal analyses gave conflicting answers.</strong></p>
+<p>AIR computes the effect of <em>credit_score</em> on <em>loan_default</em> using two different sets of background variables. Here, those two approaches disagree completely — Analysis A estimates the effect at <strong>+5% to +18%</strong>, while Analysis B estimates it at <strong>−8% to +2%</strong>. When the ranges don’t even overlap, no single reliable conclusion can be drawn.</p>
+<p>Wide uncertainty ranges on one or both estimates often accompany this result and can indicate a small dataset, uncertain relationships in the causal graph, or a missing variable that’s driving the disagreement.</p>
+<p><strong>What to do:</strong> Review your causal graph for missing variables or incorrect edges. Consider collecting more data before drawing conclusions.</p>
+</blockquote>
+<p><em>New in this version: the actual CI ranges are quoted so the user can see how far apart the analyses are, not just that they disagree.</em></p>
+<hr>
+<h3 id="state-2--analyses-partially-agree-but-disagree-on-magnitude"><a class="header" href="#state-2--analyses-partially-agree-but-disagree-on-magnitude">State 2 — Analyses Partially Agree but Disagree on Magnitude</a></h3>
+<p><strong>Condition:</strong> Z1 and Z2 CIs overlap, but the point estimates are far enough apart that neither falls inside the other’s interval.</p>
+<p><strong>Current text:</strong></p>
+<blockquote>
+<p>The causal estimates appear inconsistent, suggesting there may not be enough information to train a reliable model.</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>The two analyses agree on direction but disagree on size.</strong></p>
+<p>Both analyses find that <em>credit_score</em> increases the likelihood of <em>loan_default</em>, but they differ meaningfully on how large that effect is. Analysis A estimates <strong>+8%</strong> and Analysis B estimates <strong>+28%</strong> — a 20 percentage-point spread. Their confidence ranges do overlap (roughly +10% to +18%), so a causal effect in that region is plausible, but the disagreement means estimates should be treated as rough approximations rather than precise values.</p>
+<p>This usually reflects limited data or structural uncertainty in the causal graph, not necessarily a problem with your model.</p>
+</blockquote>
+<p><em>New in this version: the actual point estimates are quoted, the overlap region is identified as the most defensible range, and the user gets a concrete sense of the disagreement rather than just a warning.</em></p>
+<hr>
+<h3 id="state-3--standard-interpretation-z1z2-agree-model-present"><a class="header" href="#state-3--standard-interpretation-z1z2-agree-model-present">State 3 — Standard Interpretation (Z1/Z2 agree; model present)</a></h3>
+<p>All remaining cases share the same structure. What varies:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>Values</th></tr>
+</thead>
+<tbody>
+<tr><td>Consensus range</td><td>The overlap of Z1 and Z2 CIs — the most reliable single estimate</td></tr>
+<tr><td>CI width</td><td>Narrow / moderate / wide — used to signal how confident the analysis is</td></tr>
+<tr><td>Z1/Z2 point estimate proximity</td><td>How closely the two analyses agree, beyond just overlapping</td></tr>
+<tr><td>Model estimation</td><td>Underestimating / overestimating / accurate</td></tr>
+<tr><td>Degree of divergence</td><td>How far outside the CI the model is (not just inside/outside)</td></tr>
+<tr><td>Bias status</td><td>Unbiased / partially biased / biased</td></tr>
+<tr><td>Bias source</td><td>Z1 variables (direct drivers of treatment) vs Z2 variables (confounders along the pathway)</td></tr>
+<tr><td>Classifier spread</td><td><code>"No"</code> mode only — consistency across the five internal classifiers</td></tr>
+<tr><td>Sample size note</td><td>Appears when n is small, as a caveat on unbiased or marginal results</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h4 id="3a--unbiased-positive-effect-accurate-model"><a class="header" href="#3a--unbiased-positive-effect-accurate-model">3a — Unbiased, Positive Effect, Accurate Model</a></h4>
+<p><strong>Current output (assembled from templates):</strong></p>
+<blockquote>
+<p>Your model appears to be accurately estimating the effect that credit_score has on loan_default. Based on the causal analysis, credit_score is expected to have a positive effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default increases by about 12–18%. Fortunately, your model is producing unbiased results. Your model’s effect is: 0.15. Overall, this suggests your seeing an appropriate change in loan_default as credit_score varies. No evidence of bias is detected at this time. These treatment effect estimates are based on the variables included in your causal graph. If important factors are missing, the results may not represent true causal relationships…</p>
+</blockquote>
+<p><strong>Suggested rewrite (Yes / ATE mode):</strong></p>
+<blockquote>
+<p><strong>No bias detected.</strong></p>
+<p>Your model’s predicted effect of <em>credit_score</em> on <em>loan_default</em> (15%) is consistent with what the causal analysis expects. Both independent analyses agree that the true effect lies in the range of <strong>14–16%</strong> (Analysis A: 12–18%, Analysis B: 13–17%), and your model falls squarely within that window. The two analyses give nearly identical estimates, which adds confidence to this finding.</p>
+<p>The uncertainty range is narrow, meaning the data supports a fairly precise estimate — not just a directional guess.</p>
+<p><strong>What the causal analysis found:</strong> When <em>credit_score</em> moves from its baseline range to its experimental range, the probability of <em>loan_default</em> increases by roughly <strong>12–18%</strong>.</p>
+<p><strong>Caveat:</strong> These estimates are only as reliable as the causal graph. If an important variable is missing, the true effect may differ.</p>
+</blockquote>
+<p><strong>Additional paragraph for “No: Do it all for me” mode (classifiers consistent):</strong></p>
+<blockquote>
+<p>The five classifiers AIR trained internally also gave consistent predictions, ranging from 13% to 17%. This agreement across different modeling approaches reinforces the conclusion.</p>
+</blockquote>
+<p><strong>Additional paragraph for “No: Do it all for me” mode (classifiers inconsistent):</strong></p>
+<blockquote>
+<p>Note: the five classifiers AIR trained internally gave a wide spread of predictions (5% to 31%). Even though the summary estimate is unbiased, this spread suggests the model may be sensitive to the choice of algorithm. Interpret the specific effect size with caution.</p>
+</blockquote>
+<hr>
+<h4 id="3b--partially-biased-positive-effect-overestimating"><a class="header" href="#3b--partially-biased-positive-effect-overestimating">3b — Partially Biased, Positive Effect, Overestimating</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be overestimating the effect that credit_score has on loan_default by roughly 5–9%. Based on the causal analysis, credit_score is expected to have a positive effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default increases by about 12–18%. Unfortunately, your model is producing partially biased results. Your model’s effect is: 0.24. Overall, this suggests your seeing a larger than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age, income (see causal graph)…</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Possible bias detected.</strong></p>
+<p>Your model predicts that <em>credit_score</em> increases the probability of <em>loan_default</em> by <strong>24%</strong>, but the causal analysis puts the best estimate at <strong>14–16%</strong> — your model is overstating the effect by roughly <strong>8–10 percentage points</strong>. It falls within one of the two analysis ranges but outside the other, which is a warning sign rather than a definitive verdict.</p>
+<p><strong>Likely source:</strong> The variables <em>age</em> and <em>income</em> are highlighted in red on the causal graph. These are direct background causes of <em>credit_score</em> itself — meaning your model may have learned a relationship that’s partly driven by who has high credit scores, rather than what high credit scores do. Adjusting for these variables (or investigating whether they are properly represented in your model) is the recommended next step.</p>
+<p><strong>What the causal analysis found:</strong> A genuine <strong>12–18% increase</strong> in <em>loan_default</em> probability as <em>credit_score</em> moves from baseline to experimental values. The two analyses agree well (Analysis A: 12–18%, Analysis B: 13–20%), so this range is reliable.</p>
+</blockquote>
+<p><em>New in this version: the degree of overshoot is explicit (“8–10 percentage points”), the structural meaning of Z1 bias variables (“direct background causes of the treatment”) is explained, and the point estimate proximity between Z1/Z2 is reported.</em></p>
+<hr>
+<h4 id="3c--biased-negative-effect-underestimating"><a class="header" href="#3c--biased-negative-effect-underestimating">3c — Biased, Negative Effect, Underestimating</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be underestimating the effect that credit_score has on loan_default by roughly 8–14%. Based on the causal analysis, credit_score is expected to have a negative effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default decreases by about 20–28%. Unfortunately, your model is producing biased results. Your model’s effect is: -0.10. Overall, this suggests your seeing a smaller than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age, income and/or payment_history (see causal graph)…</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Bias detected.</strong></p>
+<p>Your model predicts only a <strong>10% decrease</strong> in <em>loan_default</em> probability from <em>credit_score</em>, but both causal analyses consistently estimate the true effect is a <strong>20–28% decrease</strong> — your model is understating the effect by roughly <strong>10–18 percentage points</strong>. The model’s prediction falls outside both analysis ranges, not just one.</p>
+<p><strong>Likely source:</strong> The variables <em>age</em>, <em>income</em>, and <em>payment_history</em> are flagged on the causal graph. <em>Age</em> and <em>income</em> appear to influence <em>credit_score</em> directly (they are direct causes of your treatment variable). <em>Payment_history</em> sits on the pathway between <em>credit_score</em> and <em>loan_default</em>, meaning it may be partially absorbing the effect your model is trying to measure. Together, these variables may be causing your model to underestimate how strongly <em>credit_score</em> affects <em>loan_default</em>.</p>
+<p><strong>What the causal analysis found:</strong> A genuine <strong>20–28% reduction</strong> in <em>loan_default</em> probability when <em>credit_score</em> moves from baseline to experimental values. Both analyses agree closely (Analysis A: −20% to −24%, Analysis B: −22% to −28%), giving high confidence in this range.</p>
+</blockquote>
+<p><em>New in this version: Z1 variables and Z2 variables are explained with different structural language (“direct causes of the treatment” vs “sits on the pathway”), and the degree of disagreement and its CI-agreement level are both surfaced.</em></p>
+<hr>
+<h4 id="3d--biased-no-effect-model-detects-an-effect-the-causal-analysis-doesnt-support"><a class="header" href="#3d--biased-no-effect-model-detects-an-effect-the-causal-analysis-doesnt-support">3d — Biased, No Effect (model detects an effect the causal analysis doesn’t support)</a></h4>
+<p><strong>Current output:</strong></p>
+<blockquote>
+<p>Your model appears to be overestimating the effect that credit_score has on loan_default by roughly 12–16%. Based on the causal analysis, credit_score is expected to have no effect on loan_default. As credit_score changes from baseline to experimental values, the likelihood of loan_default is unlikely to change. Unfortunately, your model is producing biased results. Your model’s effect is: 0.14. Overall, this suggests your seeing a larger than expected change in loan_default as credit_score varies. Bias may be introduced through variable(s): age (see causal graph).</p>
+</blockquote>
+<p><strong>Suggested rewrite:</strong></p>
+<blockquote>
+<p><strong>Bias detected — the relationship your model found may be spurious.</strong></p>
+<p>Your model predicts that <em>credit_score</em> has a meaningful effect on <em>loan_default</em> (+14%), but the causal analysis finds <strong>no real effect</strong>: both independent analyses agree the true effect is near zero (Analysis A: −3% to +4%, Analysis B: −2% to +5%). Your model’s prediction is <strong>17–19 percentage points</strong> above what either analysis supports.</p>
+<p><strong>Likely source:</strong> The variable <em>age</em> (highlighted in red) appears to be a direct cause of <em>credit_score</em>. It is likely that <em>age</em> affects both <em>credit_score</em> and <em>loan_default</em> independently, creating a statistical association between them that is not a genuine causal effect. Your model may have learned this spurious association rather than a real one.</p>
+<p><strong>What the causal analysis found:</strong> Changing <em>credit_score</em> from baseline to experimental values does not meaningfully change the probability of <em>loan_default</em>. The two analyses agree on this with narrow confidence ranges, making this a high-confidence finding. The association your model detected is not causally supported.</p>
+</blockquote>
+<p><em>New in this version: the actual CI values for “no effect” are shown (so the user understands it’s not just zero — it’s a bounded claim), the degree of divergence is stated explicitly, and the spurious-association mechanism is explained plainly.</em></p>
+<hr>
+<h4 id="3e--wide-cis-uncertainty-modifier-any-bias-state"><a class="header" href="#3e--wide-cis-uncertainty-modifier-any-bias-state">3e — Wide CIs (Uncertainty Modifier, any bias state)</a></h4>
+<p>This isn’t a separate state — it’s an additional sentence that should appear whenever the CI width exceeds a threshold (e.g., &gt; 25 percentage points), regardless of bias status.</p>
+<p><strong>Additional sentence for wide CIs:</strong></p>
+<blockquote>
+<p><em>Note: the uncertainty range for this analysis is wide (spanning more than 25 percentage points), meaning the data supports only a rough directional conclusion, not a precise effect size. Collecting more data or refining the causal graph may narrow this range.</em></p>
+</blockquote>
+<p><strong>Additional sentence for narrow CIs:</strong></p>
+<blockquote>
+<p><em>The uncertainty range is narrow, meaning the data supports a fairly precise estimate — not just a directional guess.</em></p>
+</blockquote>
+<hr>
+<h2 id="3-just-show-me-the-effect-mode--currently-missing"><a class="header" href="#3-just-show-me-the-effect-mode--currently-missing">3. “Just Show Me the Effect” Mode — Currently Missing</a></h2>
+<p>When the user selects <strong>“No: Just show me the effect”</strong> (<code>null</code>), the code sets <code>m_ate = 0</code> and runs the model-comparison logic. This produces text like “your model is underestimating the effect” — but the user has no model. The text is nonsensical.</p>
+<p>This mode needs its own interpretation branch that:</p>
+<ul>
+<li>Opens with the consensus range as the headline (the overlap of Z1 and Z2)</li>
+<li>Reports CI width as a confidence signal</li>
+<li>Reports Z1/Z2 point estimate proximity</li>
+<li>Does <strong>not</strong> mention a model, bias, or classifiers</li>
+<li>Still surfaces the Z1/Z2 agreement/disagreement check (States 1 and 2 still apply)</li>
+</ul>
+<h3 id="proposed-mockups-for-null-mode"><a class="header" href="#proposed-mockups-for-null-mode">Proposed mockups for “null” mode</a></h3>
+<h4 id="null--positive-effect-z1z2-closely-agree-narrow-cis"><a class="header" href="#null--positive-effect-z1z2-closely-agree-narrow-cis">null — Positive Effect, Z1/Z2 Closely Agree, Narrow CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with a <strong>12–18% increase</strong> in the probability of <em>loan_default</em>.</p>
+<p>Both independent analyses give nearly identical estimates (Analysis A: 12–18%, Analysis B: 13–17%), and the most defensible single range — where both analyses agree — is <strong>13–17%</strong>. The uncertainty range is narrow, so this is a fairly precise estimate.</p>
+<p><strong>Caveat:</strong> These estimates depend on the variables in your causal graph. If an important variable is missing, the true effect may differ.</p>
+</blockquote>
+<h4 id="null--negative-effect-z1z2-agree-moderate-cis"><a class="header" href="#null--negative-effect-z1z2-agree-moderate-cis">null — Negative Effect, Z1/Z2 Agree, Moderate CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with a <strong>20–28% decrease</strong> in the probability of <em>loan_default</em>.</p>
+<p>Both analyses agree on direction and are reasonably consistent on magnitude (Analysis A: −20% to −24%, Analysis B: −22% to −28%). The range where both analyses agree is <strong>−22% to −24%</strong>, which is the most reliable estimate. There is moderate uncertainty about the exact size of the effect.</p>
+</blockquote>
+<h4 id="null--no-effect-z1z2-agree"><a class="header" href="#null--no-effect-z1z2-agree">null — No Effect, Z1/Z2 Agree</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, changing <em>credit_score</em> from baseline to experimental values does <strong>not meaningfully change</strong> the probability of <em>loan_default</em>. Both analyses agree: the effect, if any, is too small to distinguish from random variation.</p>
+<p>The range where both analyses agree spans roughly <strong>−3% to +4%</strong>, which the tool treats as no meaningful effect.</p>
+</blockquote>
+<h4 id="null--positive-effect-wide-cis"><a class="header" href="#null--positive-effect-wide-cis">null — Positive Effect, Wide CIs</a></h4>
+<blockquote>
+<p><strong>Causal Effect Summary</strong></p>
+<p>Based on your data and causal graph, increasing <em>credit_score</em> from its baseline range to its experimental range is associated with an <strong>increase</strong> in the probability of <em>loan_default</em>, but the data does not support a precise estimate. The analysis places the effect somewhere between <strong>+5% and +40%</strong> — a wide range that reflects high uncertainty.</p>
+<p>Both analyses agree on direction (positive), but differ on magnitude. Before drawing conclusions about the size of this effect, consider whether additional data or a refined causal graph might tighten this estimate.</p>
+</blockquote>
+<h4 id="null--z1z2-dont-agree-state-1"><a class="header" href="#null--z1z2-dont-agree-state-1">null — Z1/Z2 Don’t Agree (State 1)</a></h4>
+<blockquote>
+<p><strong>The two causal analyses gave conflicting answers.</strong></p>
+<p>This means the data cannot reliably support a single conclusion about how <em>credit_score</em> affects <em>loan_default</em> under the current causal graph. Review the graph for missing variables or uncertain edges, and consider collecting more data before drawing conclusions.</p>
+</blockquote>
+<hr>
+<h2 id="4-language-issues-in-the-current-implementation"><a class="header" href="#4-language-issues-in-the-current-implementation">4. Language Issues in the Current Implementation</a></h2>
+<h3 id="problem-1-one-unbroken-sentence-chain"><a class="header" href="#problem-1-one-unbroken-sentence-chain">Problem 1: One unbroken sentence chain</a></h3>
+<p>All text is concatenated with <code>paste0(...)</code>, producing a dense block. Breaking it into a <strong>headline + 2–3 short paragraphs</strong> makes the same information scannable.</p>
+<h3 id="problem-2-jargon"><a class="header" href="#problem-2-jargon">Problem 2: Jargon</a></h3>
+<p>Suggested substitutions:</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Current term</th><th>Suggested replacement</th></tr>
+</thead>
+<tbody>
+<tr><td>causal estimates</td><td>what the causal analysis expects</td></tr>
+<tr><td>adjustment set / Z1 / Z2</td><td>Analysis A / Analysis B, or “two independent analyses”</td></tr>
+<tr><td>confidence interval / confidence range</td><td>uncertainty range / plausible range</td></tr>
+<tr><td>ATE</td><td>predicted effect / effect size</td></tr>
+<tr><td>flag</td><td>your model’s predicted effect</td></tr>
+<tr><td>treatment level</td><td>experimental condition</td></tr>
+<tr><td>control level</td><td>baseline condition</td></tr>
+</tbody>
+</table>
+</div>
+<h3 id="problem-3-fortunatelyunfortunately--bias-label-without-action"><a class="header" href="#problem-3-fortunatelyunfortunately--bias-label-without-action">Problem 3: “Fortunately/Unfortunately” + bias label without action</a></h3>
+<p>“Unfortunately, your model is producing partially biased results” sounds alarming but gives no direction. Rewrite as: <strong>what</strong> is biased, <strong>which variables</strong> are likely causing it, <strong>why</strong> structurally, and <strong>what to do</strong>.</p>
+<h3 id="problem-4-the-disclaimer-is-boilerplate-in-every-case"><a class="header" href="#problem-4-the-disclaimer-is-boilerplate-in-every-case">Problem 4: The disclaimer is boilerplate in every case</a></h3>
+<p>The caveat about missing variables is valid, but appending it identically everywhere makes it feel like a legal disclaimer. It should only appear when results are positive or marginal — when bias is already flagged, the disclaimer is redundant.</p>
+<h3 id="problem-5-the-figure-caption-repeats-the-interpretation"><a class="header" href="#problem-5-the-figure-caption-repeats-the-interpretation">Problem 5: The figure caption repeats the interpretation</a></h3>
+<p>The “Risk Difference” caption text largely duplicates what the interpretation paragraph says. Consider removing it and letting the interpretation carry all the explanation.</p>
+<hr>
+<h2 id="5-new-data-signals--what-they-are-and-where-they-come-from"><a class="header" href="#5-new-data-signals--what-they-are-and-where-they-come-from">5. New Data Signals — What They Are and Where They Come From</a></h2>
+<p>These signals are all computed today and simply not surfaced in the interpretation text.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Signal</th><th>Where it comes from</th><th>What it adds</th></tr>
+</thead>
+<tbody>
+<tr><td><strong>Consensus range</strong></td><td><code>lo_overlap</code> / <code>hi_overlap</code> (already computed at line 2065)</td><td>The single most defensible effect estimate — where both analyses agree. More actionable than two separate CI bands.</td></tr>
+<tr><td><strong>CI width</strong></td><td><code>z1_ATE_UCI - z1_ATE_LCI</code>, same for Z2</td><td>Tells the user whether this is a precise estimate or a rough directional finding. Applies to every state.</td></tr>
+<tr><td><strong>Z1/Z2 point estimate proximity</strong></td><td><code>abs(z1_ATE - z2_ATE)</code></td><td>Distinguishes “barely overlapping” from “nearly identical” — a meaningful confidence gradient the current logic collapses to a binary.</td></tr>
+<tr><td><strong>Degree of model divergence</strong></td><td><code>abs(flag - nearest CI boundary)</code></td><td>Replaces the vague “biased” label with a concrete number — how far off is the model, in percentage points?</td></tr>
+<tr><td><strong>Classifier spread</strong> (<code>"No"</code> mode only)</td><td><code>range(ate_df_all$flag)</code> — all five ATEs are in <code>ate_df_all</code> (line 1514)</td><td>If the five classifiers agree, the summary ATE is trustworthy; if they scatter, the bias verdict is less reliable. Currently unused after line 1523.</td></tr>
+<tr><td><strong>Z1 vs Z2 structural roles</strong></td><td>Z1 = <code>Zvars[grp=="Z1"]</code> (parents of treatment); Z2 = <code>Zvars[grp=="Z2"]</code> (confounders of intermediate variables)</td><td>Bias variables from Z1 mean the model isn’t accounting for <em>what drives the treatment</em>. Bias variables from Z2 mean the model is confusing the <em>mechanism</em> with the effect. Different diagnoses, currently conflated.</td></tr>
+<tr><td><strong>Sample size</strong></td><td><code>nrow(df())</code></td><td>When n is small, even “no bias detected” should carry a note that the analysis may not have had enough data to detect bias if it exists.</td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h2 id="6-proposed-code-change-for-null-mode"><a class="header" href="#6-proposed-code-change-for-null-mode">6. Proposed Code Change for <code>null</code> Mode</a></h2>
+<p>In <code>get_ui_interpretation()</code> (line 2053), add an early return before the CI overlap check:</p>
+<pre><code class="language-r"># --- null mode: no model, just show the causal effect ---
+if (isTRUE(rv$model_yn == "null")) {
+  # Reuse: flagdir, CI range arithmetic, lo_overlap/hi_overlap, CI width
+  # Omit:  all "your model is…" and "bias may be introduced through…" sentences
+  # ...return a standalone causal effect summary...
+}
+</code></pre>
+<p>The <code>flagdir</code>, CI range arithmetic, and Z1/Z2 overlap logic can all be reused — the only change is
+that none of the model-comparison or bias-source sentences should appear.</p>
 
                     </main>
 
@@ -912,22 +1280,6 @@ doi: 10.2202/1557-4679.1297</p>
         <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
         <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
         <script>
@@ -937,11 +1289,11 @@ doi: 10.2202/1557-4679.1297</p>
 
         <script src="elasticlunr-ef4e11c1.min.js"></script>
         <script src="mark-09e88c2c.min.js"></script>
-        <script src="searcher-c2a407aa.js"></script>
+        <script src="searcher-09f2665d.js"></script>
 
         <script src="clipboard-1626706a.min.js"></script>
         <script src="highlight-abc7f01d.js"></script>
-        <script src="book-a0b12cfe.js"></script>
+        <script src="book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 

@@ -15,8 +15,8 @@
         <link rel="icon" href="../favicon-de23e50b.svg">
         <link rel="shortcut icon" href="../favicon-8114d1fc.png">
         <link rel="stylesheet" href="../css/variables-8adf115d.css">
-        <link rel="stylesheet" href="../css/general-2459343d.css">
-        <link rel="stylesheet" href="../css/chrome-ae938929.css">
+        <link rel="stylesheet" href="../css/general-e96d0476.css">
+        <link rel="stylesheet" href="../css/chrome-d279d366.css">
         <link rel="stylesheet" href="../css/print-9e4910d8.css" media="print">
 
         <!-- Fonts -->
@@ -35,10 +35,10 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "../searchindex-0ab627b0.js";
+            window.path_to_searchindex_js = "../searchindex-9f5a6a81.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="../toc-50c8dad3.js"></script>
+        <script src="../toc-f11b03f0.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -178,31 +178,95 @@
                 <div id="mdbook-content" class="content">
                     <main>
                         <h1 id="step-3-estimating-the-causal-effect"><a class="header" href="#step-3-estimating-the-causal-effect">Step 3: Estimating the Causal Effect</a></h1>
-<p>The tool will now prompt you for information about the model to be tested. You have four options.</p>
-<h2 id="option-1-upload-your-model"><a class="header" href="#option-1-upload-your-model">Option 1: Upload Your Model</a></h2>
-<p>This choice prompts you to upload a copy of your model. The tool will estimate the average treatment effect (ATE) predicted by your model and compare it against the causally-derived estimates of AIR.</p>
-<p>Currently, this tool only accepts models in <code>.rda</code> format. If you have a different model format, contact the team and they will try to support your model type.</p>
-<h2 id="option-2-provide-an-ate"><a class="header" href="#option-2-provide-an-ate">Option 2: Provide an ATE</a></h2>
-<p>If you can calculate your own ATE, you can input it directly. The AIR Tool accepts ATE values calculated using potential outcome prediction.</p>
-<p>For each individual data point in the dataset, calculate potential outcomes as follows:</p>
-<ul>
-<li><strong>Ŷ₁:</strong> the predicted outcome where the treatment value for all individuals is manually set to 1 (T=1)</li>
-<li><strong>Ŷ₀:</strong> the predicted outcome where the treatment value for all individuals is manually set to 0 (T=0)</li>
-</ul>
+<p>Step 3 of the AIR Tool offers four analysis paths, ranging from “evaluate the model I already have” to “just tell me the causal effect.” The right choice depends on two things: whether you have an existing predictive model to evaluate, and how much of the analysis you want AIR to handle for you.</p>
+<p>The four options are:</p>
+<ol>
+<li><strong>Yes: I can upload it</strong></li>
+<li><strong>Yes: I can provide an ATE</strong></li>
+<li><strong>No: Do it all for me</strong></li>
+<li><strong>No: Just show me the effect</strong></li>
+</ol>
+<p>The table below summarizes the trade-offs at a glance; each option is described in detail in the sections that follow.</p>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Option</th><th>What you provide</th><th>What AIR does</th><th>Best when…</th></tr>
+</thead>
+<tbody>
+<tr><td>Yes: I can upload it</td><td>A trained R model file</td><td>Computes ATE from your model, then compares to the causal ATE estimate</td><td>You have direct access to your model and want the check of model prediction</td></tr>
+<tr><td>Yes: I can provide an ATE</td><td>A single ATE value from your model</td><td>Compares your ATE to the causal ATE estimate</td><td>You can query your model but can’t easily export it, or your model isn’t in R</td></tr>
+<tr><td>No: Do it all for me</td><td>Nothing extra</td><td>Trains a battery of predictive models, computes their ATEs, and compares against the causal ATE estimate</td><td>You don’t have a model yet and want to see how common model families would behave</td></tr>
+<tr><td>No: Just show me the effect</td><td>Nothing extra</td><td>Reports the causal ATE estimate only</td><td>You only want to know whether X has a reliable causal effect on Y</td></tr>
+</tbody>
+</table>
+</div>
+<h2 id="how-air-estimates-the-ate"><a class="header" href="#how-air-estimates-the-ate">How AIR estimates the ATE</a></h2>
+<p>Regardless of which option you choose, the AIR Tool estimates the causal Average Treatment Effect (ATE) using <strong>two independent adjustment sets</strong> identified from the causal graph: one drawn from variables near the treatment, and one from variables near the outcome. A causal adjustment set is a group of variables that must be conditioned or controlled for to estimate the unbiased causal effect of a treatment on an outcome. Each adjustment set produces its own ATE estimate via Targeted Maximum Likelihood Estimation (TMLE) with a SuperLearner ensemble. Agreement between the two estimates is itself a robustness check — when they converge, you have evidence of a stable causal signal; when they diverge, the signal is sensitive to which confounders are controlled for. More information about interpreting adjustment set results can be found at Section 7 Results.</p>
+<p>The “Yes: I can upload it” and “Yes: I can provide an ETA” options layer a comparison on top of this: your model’s implied ATE is plotted against the causal ATE estimate’s confidence interval on the Ribbon Plot. If your model’s ATE falls inside the CI, your model is consistent with the causal evidence. If it falls outside, your model is likely picking up something other than the causal effect.</p>
+<p>More information about interpreting adjustment set results can be found at Section 7 Results.</p>
+<h2 id="yes-i-have-a-model-options"><a class="header" href="#yes-i-have-a-model-options">Yes I have a model options</a></h2>
+<p>Choose one of the “Yes” options if you already have a predictive model and want to know whether bias might be affecting its predictions. AIR will compute (or accept) the model’s Average Treatment Effect and compare it against the causal estimate derived from the data and graph.</p>
+<h3 id="i-can-upload-it"><a class="header" href="#i-can-upload-it">I can upload it</a></h3>
+<p>If you have direct access to your model file, you can upload it and let AIR handle the rest. This is the most streamlined option: AIR computes the ATE from your model automatically, then folds that value into the health report alongside the causal analysis. The resulting ATE from your model will appear on the Ribbon Plot in the upper right as a blue arrow once the analysis completes.</p>
+<blockquote>
+<p><strong>Note:</strong>  The current version of the AIR Tool only accepts R model files (e.g., .rds). Support for Python and other languages is on the roadmap but not yet available.</p>
+</blockquote>
+<h3 id="i-can-provide-an-ate"><a class="header" href="#i-can-provide-an-ate">I can provide an ATE</a></h3>
+<p>If you can query your model with new data but can’t easily export it, or if your model is built in a language AIR doesn’t yet accept, this option is often the simpler path. You calculate the ATE yourself and enter that value directly into the tool.</p>
 <p>The ATE is the average difference between the two potential outcomes:</p>
-<pre><code>ATE = (1/N) * Σ (Ŷ₁ᵢ − Ŷ₀ᵢ)
-</code></pre>
-<p>See <a href="https://github.com/cmu-sei/causal-lair/blob/main/doc/calculating_ATE.md">Calculating ATE</a> for more information.</p>
-<h2 id="option-3-do-it-all-for-me"><a class="header" href="#option-3-do-it-all-for-me">Option 3: Do It All for Me</a></h2>
-<p>This option is for a user who doesn’t have a specific model but would like the tool to generate several commonly-used machine learning models to compare against the causally-derived model of AIR. No additional input required.</p>
-<h2 id="option-4-just-show-me-the-effect"><a class="header" href="#option-4-just-show-me-the-effect">Option 4: Just Show Me the Effect</a></h2>
-<p>This option allows you to proceed with the AIR analysis without any comparison to a predictive model.</p>
-<hr>
+<p>ATE = (1/N) Σ<sub>i=1</sub><sup>N</sup> (Ŷ<sub>1i</sub> − Ŷ<sub>0i</sub>)</p>
+<p>The value returned is what you’ll enter here. AIR uses your value alongside the causal analysis to generate the health report, and the resulting ATE appears on the Ribbon Plot as a blue arrow.
+See <a href="./calculating_ATE.html">Calculating ATE</a> for more information.</p>
+<blockquote>
+<p><strong>Note:</strong> ATE values This field only accepts ATE values between -1 and 1. Values outside this range are automatically clipped to fit, since the ATE is bounded by [-1, 1] by definition. If your hand-calculated value falls outside this range, that’s a signal worth investigating. It usually indicates an error in the calculation rather than a genuinely extreme effect.</p>
+</blockquote>
+<h2 id="no-i-dont-have-a-model-or-i-dont-want-to-evaluate-one"><a class="header" href="#no-i-dont-have-a-model-or-i-dont-want-to-evaluate-one">No: I don’t have a model (or I don’t want to evaluate one)</a></h2>
+<p>Choose one of the “No” options if you want to investigate the causal relationships in your data without comparing against a specific predictive model. These options are useful when you’re deciding <em>whether</em> to use certain data to build a model in the first place, but they’re also useful any time you want a causal-only view of an X → Y relationship.</p>
+<h3 id="no-do-it-all-for-me"><a class="header" href="#no-do-it-all-for-me">No: Do it all for me</a></h3>
+<p>This option requires no additional input. AIR will train a series of statistical, machine learning, and ensemble models on your data using the chosen X and Y variables. The models trained include:</p>
+<ul>
+<li>Logistic Regression</li>
+<li>Decision Tree</li>
+<li>Support Vector Machine</li>
+<li>Random Forest</li>
+<li>A stacked SuperLearner ensemble consisting of:
+<ul>
+<li>Generalized Linear Model (i.e., logistic regression)</li>
+<li>Generalized Linear Model with elastic net regularization</li>
+<li>XGBoost (eXtreme Gradient Boosted Decision Trees)</li>
+<li>Earth (R’s version of Multivariate Adaptive Regression Splines, i.e. MARS)</li>
+<li>Feedforward Neural Network</li>
+<li>Support Vector Machine</li>
+</ul>
+</li>
+</ul>
+<p>Each model trains on the data, predicts Y, and is then queried with X manipulated to produce its own ATE. AIR aggregates these into a mean ATE for display on the Ribbon Plot and reports the spread across model families in the interpretation section.</p>
+<p>The point of training a battery of learners rather than a single model is that <strong>the spread itself is informative</strong>. When ATE estimates agree across model families, that’s evidence the causal signal is robust to model choice. When they disagree, it tells you the signal is sensitive to which model family is used, and you should be cautious about deploying any single one of them in isolation.</p>
+<blockquote>
+<p><strong>Note:</strong> This option will be somewhat slower than the others because of the SuperLearner ensemble.</p>
+</blockquote>
+<h3 id="no-just-show-me-the-effect"><a class="header" href="#no-just-show-me-the-effect">No: Just show me the effect</a></h3>
+<p>This is the leanest analysis path. AIR skips the predictive-model comparison entirely and reports only the causal effect of X on Y, estimated from the data and graph.</p>
+<p>This option answers two distinct questions:</p>
+<ol>
+<li><strong>Is the X → Y relationship reliably estimable at all?</strong> The 95% confidence interval on the Ribbon Plot tells you. A tight CI that excludes zero indicates a stable, detectable effect; a wide CI or one straddling zero indicates the relationship can’t be pinned down with this data.</li>
+<li><strong>If the relationship is reliable, how big is it?</strong> The magnitude of the causal estimate gives you an ATE target to aim for when training a predictive model later — you’ll know what effect size your model should be capturing.</li>
+</ol>
+<h2 id="choosing-between-options"><a class="header" href="#choosing-between-options">Choosing between options</a></h2>
+<p>A few common scenarios:</p>
+<ul>
+<li><strong>You have an R model and full access to the file</strong> → Upload it. Lowest effort, fullest analysis.</li>
+<li><strong>You have a model in Python (or any non-R language) but can score new data with it</strong> → Calculate the ATE yourself and use “I can provide an ATE.”</li>
+<li><strong>You’re early in a modeling project and haven’t picked a model family</strong> → Use “Do it all for me” to see how different model families behave on this problem.</li>
+<li><strong>You’re not building a model — you just want to know if X causes Y</strong> → Use “Just show me the effect.”</li>
+</ul>
 <p>Once you have made a selection, click <strong>Calculate Results</strong> to finish the causal estimation portion of the tool.</p>
 <blockquote>
 <p><strong>Note:</strong> After this process has started, it cannot be undone. This process typically takes 2–10 minutes to run with a fairly simple model. Once complete, the progress bar will disappear and the results will be displayed.</p>
 </blockquote>
-<p><img src="../../images/image3.png" alt="Step 3 model selection interface"></p>
+ <img src="../images/Screen_graph_is_built.jpg" alt="AIR Toolscreen when Step 3 is complete." />
+<p><a href="./step2-variables.html">Previous Page: Step 2: Select Variables</a></p>
+<p><a href="./interpreting_results.html">Next Page: Interpreting Results</a></p>
 
                     </main>
 
@@ -239,22 +303,6 @@
         <template id=fa-play><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 384 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M73 39c-14.8-9.1-33.4-9.4-48.5-.9S0 62.6 0 80V432c0 17.4 9.4 33.4 24.5 41.9s33.7 8.1 48.5-.9L361 297c14.3-8.7 23-24.2 23-41s-8.7-32.2-23-41L73 39z"/></svg></span></template>
         <template id=fa-clock-rotate-left><span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M75 75L41 41C25.9 25.9 0 36.6 0 57.9V168c0 13.3 10.7 24 24 24H134.1c21.4 0 32.1-25.9 17-41l-30.8-30.8C155 85.5 203 64 256 64c106 0 192 86 192 192s-86 192-192 192c-40.8 0-78.6-12.7-109.7-34.4c-14.5-10.1-34.4-6.6-44.6 7.9s-6.6 34.4 7.9 44.6C151.2 495 201.7 512 256 512c141.4 0 256-114.6 256-256S397.4 0 256 0C185.3 0 121.3 28.7 75 75zm181 53c-13.3 0-24 10.7-24 24V256c0 6.4 2.5 12.5 7 17l72 72c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-65-65V152c0-13.3-10.7-24-24-24z"/></svg></span></template>
 
-        <!-- Livereload script (if served using the cli tool) -->
-        <script>
-            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsAddress = wsProtocol + "//" + location.host + "/" + "__livereload";
-            const socket = new WebSocket(wsAddress);
-            socket.onmessage = function (event) {
-                if (event.data === "reload") {
-                    socket.close();
-                    location.reload();
-                }
-            };
-
-            window.onbeforeunload = function() {
-                socket.close();
-            }
-        </script>
 
 
         <script>
@@ -264,11 +312,11 @@
 
         <script src="../elasticlunr-ef4e11c1.min.js"></script>
         <script src="../mark-09e88c2c.min.js"></script>
-        <script src="../searcher-c2a407aa.js"></script>
+        <script src="../searcher-09f2665d.js"></script>
 
         <script src="../clipboard-1626706a.min.js"></script>
         <script src="../highlight-abc7f01d.js"></script>
-        <script src="../book-a0b12cfe.js"></script>
+        <script src="../book-609e4cb8.js"></script>
 
         <!-- Custom JS scripts -->
 
