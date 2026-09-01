@@ -30,6 +30,3 @@ Once you have completed your definitions, AIR will run the causal identification
  <img src="../images/Post_y_selection.jpg"  alt="AIR Tool Step 2 complete." />
 
 
-[Previous Page: Step 1: Causal Graph](./step1-causal-graph.md)
-
-[Next Page: Step 3: Estimating Causal Effect](./step3-estimation.md)
