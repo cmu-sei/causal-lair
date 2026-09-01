@@ -74,6 +74,3 @@ As you evaluate this causal graph, you may encounter these results:
 - Consider the impact of any missing nonlinear relationship and determine whether to continue with the AIR tool
 
   
-[Previous Page: Input Data Files](./input-files.md)
-
-[Next Page: Step 2: Select Variables](./step2-variables.md)
