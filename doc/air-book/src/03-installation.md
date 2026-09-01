@@ -17,7 +17,7 @@ In Docker Desktop, open the Terminal by clicking the button at the bottom right 
 In the Terminal, enter the following command (replace `1.1.1` with the latest version number):
 
 ```
-docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.6.0
+docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.8.0
 ```
 
 The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a `/workspace` prompt.
