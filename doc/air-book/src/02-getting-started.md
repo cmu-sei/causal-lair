@@ -49,8 +49,5 @@ Installing the AIR tool requires:
 - Must not require GPU acceleration or external hardware not currently supported by the tool
 - Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported
 
-[Previous Page: Introduction](./01-introduction.md)
-
-[Next Page: Installation Instructions](./03-installation.md)
 
 
