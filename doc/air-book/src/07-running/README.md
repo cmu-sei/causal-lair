@@ -19,6 +19,3 @@ Before beginning analysis with the tool, it is useful to carefully consider the 
 More detailed information about preparing the scenario and data for analysis can be found in the [Scenario Definition Worksheet](scenarios.md) and [Dataset Guidelines](../06-data-guidelines/README.md).
 
 
-[Previous Page: Data Guidelines](./06-data-guidelines/README.md)
-
-[Next Page: Input Data Files](./input-files.md)
