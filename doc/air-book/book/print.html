@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-9f5a6a81.js";
+            window.path_to_searchindex_js = "searchindex-6dceaa6f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f11b03f0.js"></script>
@@ -201,7 +201,6 @@ The TAILOR project offers a precedent-setting capability that supports improving
 <h2 id="license"><a class="header" href="#license">License</a></h2>
 <p>The license for AIR is a modified MIT End User License and can be found here:
 <a href="https://github.com/cmu-sei/causal-lair/blob/main/container-files/license.txt">https://github.com/cmu-sei/causal-lair/blob/main/container-files/license.txt</a></p>
-<p><a href="#getting-started">Next Page: Getting Started</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="getting-started"><a class="header" href="#getting-started">Getting Started</a></h1>
 <h2 id="introduction"><a class="header" href="#introduction">Introduction</a></h2>
@@ -263,8 +262,6 @@ The TAILOR project offers a precedent-setting capability that supports improving
 <li>Must not require GPU acceleration or external hardware not currently supported by the tool</li>
 <li>Unsupervised models, text classifiers, image classifiers, and most applications of generative AI are not currently supported</li>
 </ul>
-<p><a href="#introduction-to-air-tool">Previous Page: Introduction</a></p>
-<p><a href="#installation-instructions">Next Page: Installation Instructions</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
 <p>Installation is a matter of copying the container to a location accessible from the Docker host. You’ll want to have your data and knowledge files accessible to the Docker host as well.</p>
@@ -279,7 +276,7 @@ The TAILOR project offers a precedent-setting capability that supports improving
 <h2 id="step-2-download-extract-and-run-the-air-tool-container-from-github"><a class="header" href="#step-2-download-extract-and-run-the-air-tool-container-from-github">Step 2: Download, Extract, and Run the AIR Tool Container from GitHub</a></h2>
 <p>In Docker Desktop, open the Terminal by clicking the button at the bottom right of the window.</p>
 <p>In the Terminal, enter the following command (replace <code>1.1.1</code> with the latest version number):</p>
-<pre><code>docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.6.0
+<pre><code>docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.8.0
 </code></pre>
 <p>The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a <code>/workspace</code> prompt.</p>
 <h2 id="step-3-initiate-the-air-tool-scripts"><a class="header" href="#step-3-initiate-the-air-tool-scripts">Step 3: Initiate the AIR Tool Scripts</a></h2>
@@ -296,8 +293,6 @@ The TAILOR project offers a precedent-setting capability that supports improving
 </ul>
 <p>When the page loads (may require approximately 30 seconds or a refresh), the AIR Tool interface will appear.</p>
 <img src="images/AIR_Open_UI.png" alt="AIR Tool Opening Screen" />
-<p><a href="#getting-started">Previous Page: Getting Started</a></p>
-<p><a href="#understanding-causal-thinking">Next Page: Understanding Causal Thinking</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="understanding-causal-thinking"><a class="header" href="#understanding-causal-thinking">Understanding Causal Thinking</a></h1>
 <p>The AIR Tool is built on a branch of statistics and computer science called causal inference. If you are coming to it primarily as an AI/ML practitioner, or primarily as a domain expert, some of the ideas underlying the tool may be unfamiliar. This section introduces the core concepts you need in order to use the tool effectively and interpret its results with confidence. <a href="#key-concepts-and-reference">Key Concepts and Reference</a> provides a deeper technical reference for those who want to go further.</p>
@@ -324,8 +319,6 @@ The TAILOR project offers a precedent-setting capability that supports improving
 <h2 id="what-you-do-not-need-to-know"><a class="header" href="#what-you-do-not-need-to-know">What You Do Not Need to Know</a></h2>
 <p>You do not need to be a statistician or a causal inference researcher to use the AIR Tool effectively. The mathematics underlying causal discovery, identification, and estimation are handled internally. What the tool requires from you — and what no algorithm can substitute for — is <strong>domain knowledge</strong>: an understanding of your variables, your operational scenario, and the rough causal hierarchy among the factors at play. That knowledge, encoded in the knowledge file and the variable definitions you provide, is what allows the tool to produce results that are meaningful rather than merely mathematical.</p>
 <p>If you want to go deeper into the theory behind any of these steps, <a href="#key-concepts-and-reference">Key Concepts and Reference</a> provides curated references for each.</p>
-<p><a href="#installation-instructions">Previous Page: Installation</a></p>
-<p><a href="#key-concepts-and-reference">Next Page: Key Concepts and Reference</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="key-concepts-and-reference"><a class="header" href="#key-concepts-and-reference">Key Concepts and Reference</a></h1>
 <p>The AIR method has three primary steps: (1) causal discovery, (2) causal identification, and (3) causal estimation. Each step leverages innovative research in distinct fields of practice, which can be challenging to understand. Use of the AIR Tool does not require a detailed understanding of any of its steps; however, understanding one or more steps in a little more detail can help users better appreciate what the AIR Tool accomplishes, and better understand the basis for the tool’s capabilities and limitations.</p>
@@ -415,8 +408,6 @@ doi: 10.2202/1557-4679.1297</p>
 <a href="https://insights.sei.cmu.edu/blog/five-models-of-technology-transition-to-bridge-the-gap-between-digital-natives-and-digital-immigrants/">https://insights.sei.cmu.edu/blog/five-models-of-technology-transition-to-bridge-the-gap-between-digital-natives-and-digital-immigrants/</a></p>
 <p>Fowler, Priscilla &amp; Levine, Linda. <em>A Conceptual Framework for Software Technology Transition.</em> CMU/SEI-93-TR-031. Software Engineering Institute, Carnegie Mellon University. 1993.
 <a href="https://insights.sei.cmu.edu/library/a-conceptual-framework-for-software-technology-transition/">https://insights.sei.cmu.edu/library/a-conceptual-framework-for-software-technology-transition/</a></p>
-<p><a href="#understanding-causal-thinking">Previous Page: Understanding Causal Thinking</a></p>
-<p><a href="06-data-guidelines/README.html">Next Page: Data Guidelines</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="data-guidelines"><a class="header" href="#data-guidelines">Data Guidelines</a></h1>
 <p>Selecting and preparing the right dataset is one of the most important factors in getting meaningful results from the AIR Tool. This section covers what makes a dataset suitable for AIR analysis and what to watch out for during preparation.</p>
@@ -447,8 +438,6 @@ doi: 10.2202/1557-4679.1297</p>
 <li>Highlighted in Yellow: Additional notes to elaboration on the applicability of the check-list question to the AIR Tool.</li>
 </ul>
 <p>The full annotated checklist with SEI notes is available in the <a href="#esip-checklist">ESIP Checklist</a> subchapter.</p>
-<p><a href="#key-concepts-and-reference">Previous Page: Key Concepts and Reference</a></p>
-<p><a href="#esip-checklist">Next Page: ESIP Checklist</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="esip-checklist"><a class="header" href="#esip-checklist">ESIP Checklist</a></h1>
 <p>The following is the SEI-annotated version of the Earth Science Information Partners (ESIP) Checklist to Examine AI-readiness for Open Environmental Datasets. Items in <strong>bold</strong> are particularly relevant to AIR Tool application. SEI notes appear as blockquotes beneath relevant items.</p>
@@ -616,8 +605,6 @@ doi: 10.2202/1557-4679.1297</p>
 <ol>
 <li>OSTP Subcommittee on Open Science (2019). <em>Draft AI-ready data matrix.</em> <em>(This draft document is not an official publication of the committee.)</em></li>
 </ol>
-<p><a href="06-data-guidelines/README.html">Previous Page: Data Guidelines</a></p>
-<p><a href="07-running/README.html">Next Page: Running the AIR Tool</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="running-the-air-tool"><a class="header" href="#running-the-air-tool">Running the AIR Tool</a></h1>
 <p>This section walks through the complete AIR Tool workflow from preparing your input files to interpreting your results. Each step of the analysis has its own subchapter.</p>
@@ -634,8 +621,6 @@ doi: 10.2202/1557-4679.1297</p>
 <h2 id="before-you-begin"><a class="header" href="#before-you-begin">Before You Begin</a></h2>
 <p>Before beginning analysis with the tool, it is useful to carefully consider the causal scenario that the classifier model is used to solve. Understanding the scenario variables to be analyzed and confirming completeness of the data will contribute to gaining meaningful insight from the AIR results.</p>
 <p>More detailed information about preparing the scenario and data for analysis can be found in the <a href="#usage-scenarios">Scenario Definition Worksheet</a> and <a href="06-data-guidelines/README.html">Dataset Guidelines</a>.</p>
-<p><a href="07-running/06-data-guidelines/README.html">Previous Page: Data Guidelines</a></p>
-<p><a href="#input-data-files">Next Page: Input Data Files</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="input-data-files"><a class="header" href="#input-data-files">Input Data Files</a></h1>
 <p>The AIR Tool requires two input files: a <strong>data file</strong> and a <strong>knowledge file</strong>. Both must be prepared before beginning analysis.</p>
@@ -674,8 +659,6 @@ doi: 10.2202/1557-4679.1297</p>
 <p>Each variable name should appear exactly once. The AIR tool will provide a notification if it detects header formatting issues or variable names that don’t appear in the uploaded data.</p>
  <img src="images/KF_Example.png" alt="Knowledge File Example." />
 <p>Currently, all knowledge assertions must be done ahead of time as in-place editing is not yet supported by the tool.</p>
-<p><a href="07-running/README.html">Previous Page: Running the AIR Tool</a></p>
-<p><a href="#step-1-building-your-causal-graph">Next Page: Step 1: Causal Graph</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-1-building-your-causal-graph"><a class="header" href="#step-1-building-your-causal-graph">Step 1: Building Your Causal Graph</a></h1>
 <p>Once the AIR tool is successfully installed and open in the web browser, the first step is to upload your data and knowledge files and build the causal graph.</p>
@@ -742,8 +725,6 @@ doi: 10.2202/1557-4679.1297</p>
 <li>Consider removing one of two very strongly correlated variables and rerunning</li>
 <li>Consider the impact of any missing nonlinear relationship and determine whether to continue with the AIR tool</li>
 </ul>
-<p><a href="#input-data-files">Previous Page: Input Data Files</a></p>
-<p><a href="#step-2-identifying-potential-sources-of-bias">Next Page: Step 2: Select Variables</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-2-identifying-potential-sources-of-bias"><a class="header" href="#step-2-identifying-potential-sources-of-bias">Step 2: Identifying Potential Sources of Bias</a></h1>
 <p>The tool will now prompt you for additional information about the causal scenario that you wish to analyze.</p>
@@ -763,8 +744,6 @@ doi: 10.2202/1557-4679.1297</p>
 <li>Potential confounders that are parents of x and intermediate variables and/or y (light gray)</li>
 </ul>
  <img src="images/Post_y_selection.jpg" alt="AIR Tool Step 2 complete." />
-<p><a href="#step-1-building-your-causal-graph">Previous Page: Step 1: Causal Graph</a></p>
-<p><a href="#step-3-estimating-the-causal-effect">Next Page: Step 3: Estimating Causal Effect</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="step-3-estimating-the-causal-effect"><a class="header" href="#step-3-estimating-the-causal-effect">Step 3: Estimating the Causal Effect</a></h1>
 <p>Step 3 of the AIR Tool offers four analysis paths, ranging from “evaluate the model I already have” to “just tell me the causal effect.” The right choice depends on two things: whether you have an existing predictive model to evaluate, and how much of the analysis you want AIR to handle for you.</p>
@@ -854,8 +833,6 @@ See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
 <p><strong>Note:</strong> After this process has started, it cannot be undone. This process typically takes 2–10 minutes to run with a fairly simple model. Once complete, the progress bar will disappear and the results will be displayed.</p>
 </blockquote>
  <img src="images/Screen_graph_is_built.jpg" alt="AIR Toolscreen when Step 3 is complete." />
-<p><a href="#step-2-identifying-potential-sources-of-bias">Previous Page: Step 2: Select Variables</a></p>
-<p><a href="07-running/interpreting_results.html">Next Page: Interpreting Results</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h1>
 <p>The results page requires no input but displays the entire AIR health report. The blue <strong>Download</strong> button on the lower left allows you to download a PDF summary.</p>
@@ -895,7 +872,7 @@ See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
 <h1 id="troubleshooting"><a class="header" href="#troubleshooting">Troubleshooting</a></h1>
 <h2 id="log-retrieval"><a class="header" href="#log-retrieval">Log Retrieval</a></h2>
 <p>If you wish to view a log of activity occurring while using the AIR Tool, this is available in the Logs tab at the top of the AIR user interface.</p>
-<h3 id="need-image"><a class="header" href="#need-image">NEED IMAGE###</a></h3>
+ <img src="images/Log_screen.png" alt="Log Screen" />
 <hr>
 <h2 id="common-problems"><a class="header" href="#common-problems">Common Problems</a></h2>
 <h3 id="variables-not-selectable-in-step-2"><a class="header" href="#variables-not-selectable-in-step-2">Variables not selectable in Step 2</a></h3>
@@ -906,8 +883,6 @@ See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
 <h2 id="contact-and-support"><a class="header" href="#contact-and-support">Contact and Support</a></h2>
 <p>If you encounter issues not covered here, reach out to the AIR Tool team:</p>
 <p><strong>Email:</strong> tailor-help@sei.cmu.edu</p>
-<p><a href="07-running/interpreting_results.html">Previous Page: Interpreting Results</a></p>
-<p><a href="#known-issues-and-limitations">Next Page: Known Issues and Limitations</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="known-issues-and-limitations"><a class="header" href="#known-issues-and-limitations">Known Issues and Limitations</a></h1>
 <h2 id="existing-problems"><a class="header" href="#existing-problems">Existing Problems</a></h2>
@@ -917,8 +892,6 @@ See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
 <p><strong>Binary variables only:</strong> The tool is currently only equipped to handle binary (on/off or true/false) treatment and binary outcome variables. A built-in capability to transform continuous variables into binary is provided as a workaround.</p>
 <p><strong>Model format:</strong> The tool only accepts <code>.rda</code> files for model upload. If you have a different model format, contact tailor-help@sei.cmu.edu and the team will try to support your model type.</p>
 <p><strong>No model remediation:</strong> The tool does not fix your model but provides a health report that identifies areas and variables where bias is likely being introduced. The user will need to identify and apply appropriate remediations based on this information.</p>
-<p><a href="07-running.html">Previous Page: Running the AIR Tool</a></p>
-<p><a href="#contact-and-support-1">Next Page: Contact and Support</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="contact-and-support-1"><a class="header" href="#contact-and-support-1">Contact and Support</a></h1>
 <h2 id="support"><a class="header" href="#support">Support</a></h2>
@@ -933,7 +906,6 @@ See <a href="#calculating-an-ate">Calculating ATE</a> for more information.</p>
 <li>Upcoming Features: Coming soon</li>
 <li>Planned Enhancements: Coming soon</li>
 </ul>
-<p><a href="#known-issues-and-limitations">Previous Page: Known Issues and Limitations</a></p>
 <div style="break-before: page; page-break-before: always;"></div>
 <h1 id="usage-scenarios"><a class="header" href="#usage-scenarios">Usage Scenarios</a></h1>
 <h2 id="scenario-definition-worksheet"><a class="header" href="#scenario-definition-worksheet">Scenario Definition Worksheet</a></h2>
