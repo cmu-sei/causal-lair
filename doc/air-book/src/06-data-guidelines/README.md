@@ -38,6 +38,4 @@ Leveraging the Earth Science Information Partners (ESIP) Checklist to Examine AI
 
 The full annotated checklist with SEI notes is available in the [ESIP Checklist](esip-checklist.md) subchapter.
 
-[Previous Page: Key Concepts and Reference](../05-key-concepts.md)
 
-[Next Page: ESIP Checklist](./esip-checklist.md)
