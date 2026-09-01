@@ -4,7 +4,7 @@
 
 If you wish to view a log of activity occurring while using the AIR Tool, this is available in the Logs tab at the top of the AIR user interface. 
 
-### NEED IMAGE###
+ <img src="../images/Log_screen.png"  alt="Log Screen" />
 
 ---
 
