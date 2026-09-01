@@ -48,6 +48,4 @@ You do not need to be a statistician or a causal inference researcher to use the
 
 If you want to go deeper into the theory behind any of these steps, [Key Concepts and Reference](05-key-concepts.md) provides curated references for each.
 
-[Previous Page: Installation](./03-installation.md)
 
-[Next Page: Key Concepts and Reference](./05-key-concepts.md)
