@@ -6,5 +6,6 @@ src = "src"
 
 [output.html]
 default-theme = "light"
-preferred-dark-theme = "navy"
+preferred-dark-theme = "light"
 git-repository-url = "https://github.com/cmu-sei/causal-lair/"
+additional-css = ["custom.css"]

@@ -1,0 +1,159 @@
+/* ==========================================================================
+   AIR Book — Recommended Visual System
+   Custom typography for mdbook (doc/air-book)
+
+   Wiring instructions:
+   1. Save this file as doc/air-book/custom.css
+   2. In doc/air-book/book.toml, under [output.html], add:
+
+        additional-css = ["custom.css"]
+
+   Fonts load from Google Fonts at render time (client-side), so no build-
+   time network access is required.
+   ========================================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+:root {
+  --air-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --air-font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
+
+  --air-color-h1: #5E4668;
+  --air-color-h2: #765580;
+  --air-color-h3: #876894;
+  --air-color-h4: #5F6268;
+  --air-color-body: #303238;
+  --air-color-lead: #555860;
+  --air-color-link: #765580;
+  --air-color-code: #343238;
+  --air-color-blockquote: #5F6268;
+  --air-color-caption: #74777D;
+  --air-color-th-text: #FFFFFF;
+  --air-color-th-bg: #765580; /* not specified in source table; using H2 accent */
+}
+
+/* ---- Base body text ---- */
+.content {
+  font-family: var(--air-font-sans);
+  color: var(--air-color-body);
+  font-size: 16px;
+  font-weight: 400;
+}
+
+/* ---- Headings ---- */
+.content h1 {
+  font-family: var(--air-font-sans);
+  font-weight: 700;
+  color: var(--air-color-h1);
+  font-size: 34px; /* midpoint of 32-36px range */
+}
+
+.content h2 {
+  font-family: var(--air-font-sans);
+  font-weight: 700;
+  color: var(--air-color-h2);
+  font-size: 26px; /* midpoint of 24-28px range */
+}
+
+.content h3 {
+  font-family: var(--air-font-sans);
+  font-weight: 600;
+  color: var(--air-color-h3);
+  font-size: 21px; /* midpoint of 19-22px range */
+}
+
+.content h4 {
+  font-family: var(--air-font-sans);
+  font-weight: 600;
+  color: var(--air-color-h4);
+  font-size: 17px; /* midpoint of 16-18px range */
+}
+
+/* ---- Lead / intro text ----
+   No native mdbook element for this. Wrap intro paragraphs manually:
+   <div class="lead">Your intro text here.</div>                       */
+.content .lead {
+  font-family: var(--air-font-sans);
+  font-weight: 400;
+  color: var(--air-color-lead);
+  font-size: 18px;
+}
+
+/* ---- Links ---- */
+.content a {
+  font-family: var(--air-font-sans);
+  font-weight: 500;
+  color: var(--air-color-link);
+  font-size: inherit;
+}
+
+/* ---- Code ----
+   Font/size applied everywhere; color forced only on inline code so
+   syntax-highlighted code blocks keep their highlight.js theme colors. */
+.content code {
+  font-family: var(--air-font-mono);
+  font-weight: 400;
+  font-size: 14px;
+}
+
+.content :not(pre) > code {
+  color: var(--air-color-code);
+}
+
+/* ---- Blockquotes ---- */
+.content blockquote {
+  font-family: var(--air-font-sans);
+  font-weight: 400;
+  color: var(--air-color-blockquote);
+  font-size: 16px;
+}
+
+.content blockquote strong,
+.content blockquote b {
+  font-weight: 500;
+}
+
+/* ---- Captions ----
+   No native mdbook element. Apply manually, e.g.:
+   <figcaption class="caption">Figure 1. …</figcaption>                */
+.content .caption {
+  font-family: var(--air-font-sans);
+  font-weight: 400;
+  color: var(--air-color-caption);
+  font-size: 13px;
+}
+
+/* ---- Table headers ---- */
+.content table th {
+  font-family: var(--air-font-sans);
+  font-weight: 600;
+  color: var(--air-color-th-text);
+  background-color: var(--air-color-th-bg);
+  font-size: 15px; /* midpoint of 14-15px range */
+}
+
+/* Hide the built-in theme switcher entirely — this book only ships one look */
+#theme-toggle,
+.theme-popup {
+  display: none !important;
+}
+
+/* Sidebar logo — sits above the absolutely-positioned TOC scrollbox.
+   NOTE: .sidebar-logo's total box height and .sidebar-scrollbox's top
+   must match, or the logo and TOC will overlap or leave a gap. */
+.sidebar-logo {
+  height: 72px;               /* 16px + 48px img + 8px padding */
+  padding: 16px 16px 8px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.sidebar-logo img {
+  height: 48px;
+  width: auto;
+  display: block;
+}
+
+.sidebar .sidebar-scrollbox {
+  top: 72px;                  /* must equal .sidebar-logo's height above */
+}
