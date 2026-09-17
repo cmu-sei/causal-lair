@@ -61,24 +61,34 @@
       let
         pkgs = import nixpkgs {
           inherit system;
-          overlays = [
-            (final: prev: {
-              nodejs = prev.nodejs_22;
-              gjs = prev.gjs.overrideAttrs (_: { doCheck = false; });
-              sdl3 = prev.sdl3.overrideAttrs (old: { 
-                doCheck = false;
-                cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
-                outputs = builtins.filter (o: o != "installedTests") old.outputs;
-              });
-              sdl2-compat = prev.sdl2-compat.overrideAttrs (old: { 
-                doCheck = false;
-                cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
-                outputs = builtins.filter (o: o != "installedTests") old.outputs;
-              });
-            })
-            rust-overlay.overlays.default
-            myNeovimOverlay.overlays.default
-          ];
+            overlays = [
+              (final: prev: {
+                nodejs = prev.nodejs_22;
+                gjs = prev.gjs.overrideAttrs (_: { doCheck = false; });
+                sdl3 = prev.sdl3.overrideAttrs (old: { 
+                  doCheck = false;
+                  cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
+                  outputs = builtins.filter (o: o != "installedTests") old.outputs;
+                });
+                sdl2-compat = prev.sdl2-compat.overrideAttrs (old: { 
+                  doCheck = false;
+                  cmakeFlags = (old.cmakeFlags or []) ++ [ "-DSDL_TESTS=OFF" ];
+                  outputs = builtins.filter (o: o != "installedTests") old.outputs;
+                });
+
+                # rPackages.quarto forces a build of full pkgs.quarto, which bundles a
+                # Python/Jupyter env whose django dependency has a broken test on this
+                # nixpkgs pin (DatabaseOperationForbidden in flatpages_tests). Skip its
+                # checkPhase so the chain builds.
+                python3 = prev.python3.override {
+                  packageOverrides = pyFinal: pyPrev: {
+                    django = pyPrev.django.overrideAttrs (_: { doCheck = false; });
+                  };
+                };
+              })
+              rust-overlay.overlays.default
+              myNeovimOverlay.overlays.default
+            ];
           config = {
             doCheckByDefault = false;
           };
@@ -349,6 +359,7 @@
             pkgs.rPackages.knitr
             pkgs.rPackages.lintr
             pkgs.rPackages.nnet
+            pkgs.rPackages.quarto 
             pkgs.rPackages.randomForest
             pkgs.rPackages.ranger
             pkgs.rPackages.Rdpack
