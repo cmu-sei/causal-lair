@@ -14,7 +14,7 @@ If you don't have Docker Desktop, you can download it here: <https://www.docker.
 
 In Docker Desktop, open the Terminal by clicking the button at the bottom right of the window.
 
-In the Terminal, enter the following command (replace `1.1.1` with the latest version number):
+In the Terminal, enter the following command (replace `1.8.0` with the latest version number):
 
 ```
 docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.8.0
