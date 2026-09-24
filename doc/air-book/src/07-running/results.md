@@ -40,7 +40,7 @@ The x-axis of the Risk Difference chart ranges from negative to positive effect,
 
 The Causal Graph indicates which variables are likely to be causing a confounding of the relationship between the experimental variable and the outcome variable. If your AI/ML model’s ATE is not within both of the ATE 90% confidence intervals calculated by the AIR tool, then the red variables (or their causal ancestors) are likely to be introducing bias into your model’s results.
 
- <img src="../images/nterpreting_results_with_explanation_boxes_for_colors.jpg"  alt="AIR Tool display when causal graph is complete." />
+ <img src="../images/Interpreting_results_with_explanation_boxes_for_colors.jpg"  alt="AIR Tool display when causal graph is complete." />
  
 - If your model's ATE is **not within** both AIR-calculated 95% confidence intervals, the red variables (or their causal ancestors) are likely introducing bias into your model's results.
 - If your model's ATE is **within** the AIR-calculated 95% confidence intervals, the red nodes are simply informative for future potential bias.
