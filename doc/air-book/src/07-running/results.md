@@ -38,7 +38,7 @@ The x-axis of the Risk Difference chart ranges from negative to positive effect,
 
 ## Causal Graph
 
-The Causal Graph indicates which variables are likely causing confounding of the relationship between the experimental variable and the outcome variable.
+The Causal Graph indicates which variables are likely to be causing a confounding of the relationship between the experimental variable and the outcome variable. If your AI/ML model’s ATE is not within both of the ATE 90% confidence intervals calculated by the AIR tool, then the red variables (or their causal ancestors) are likely to be introducing bias into your model’s results.
 
  <img src="../images/Results - no model, no ATE.jpg"  alt="AIR Tool display when causal graph is complete." />
  
