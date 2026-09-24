@@ -27,6 +27,6 @@ Once you have completed your definitions, AIR will run the causal identification
 - Potential confounders that are parents of x and y (medium gray)
 - Potential confounders that are parents of x and intermediate variables and/or y (light gray)
 
- <img src="../images/Step 3 Dist and Success.jpg"  alt="AIR Tool Step 2 complete." />
+ <img src="../images/Step 2 Dist and Success.jpg"  alt="AIR Tool Step 2 complete." />
 
 
