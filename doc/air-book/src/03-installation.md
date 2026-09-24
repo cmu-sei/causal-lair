@@ -37,7 +37,7 @@ When this command completes, a URL will appear in the terminal.
  <img src="./images/image1.png"  alt="AIR Tool Container start up screen." />
 
 
-## Step 4: Open browaser to access the AIR Tool user interface
+## Step 4: Open browser to access the AIR Tool user interface
 
 The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.
 
