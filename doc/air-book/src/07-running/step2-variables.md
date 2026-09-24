@@ -13,7 +13,7 @@ The experimental (x) variable can be selected from variables in the data file up
 
 The outcome (y) variable can be selected from the causal successors of the selected experimental (x) variable.
 
- <img src="../images/Select_y_dropdown.jpg"  alt="Selection of Outcome Y variable" />
+ <img src="../images/Select_Y_dropdown.jpg"  alt="Selection of Outcome Y variable" />
 
 In the current version of the tool, both x and y variables must be treated as binary. Users define what constitutes "treated" vs. "untreated" and "success" vs. "fail" for the x and y variables, respectively. Data distributions are displayed on the right of the setup pane to help visualize decision criteria.
 
