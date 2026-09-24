@@ -34,7 +34,7 @@ scripts/run_quarto.sh
 
 When this command completes, a URL will appear in the terminal.
 
- <img src="./images/image1.png"  alt="AIR Tool Container start up screen." />
+ <img src="/images/Docker AirShell screen with urls.jpg"  alt="AIR Tool Container start up screen." />
 
 
 ## Step 4: Open browser to access the AIR Tool user interface
