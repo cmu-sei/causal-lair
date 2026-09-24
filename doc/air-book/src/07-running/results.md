@@ -22,6 +22,11 @@ The x-axis ranges from negative to positive effect, where a change in treatment 
 
  <img src="../images/Result with Ate of 1.jpg"  alt="AIR Tool risk difference chart result." />
 
+The **Risk Difference** chart compares the average treatment effect (ATE) estimated by the AIR tool with the AI/ML model’s ATE of the experimental variable (a.k.a., “scenario variable” and “treatment variable”) on the outcome variable (a.k.a., “response variable”). The AIR tool ATE estimates are combined at the bottom of the chart into a single long horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your AI/ML model’s classifications.
+
+The x-axis of the Risk Difference chart ranges from negative to positive effect, where a change in treatment either decreases the likelihood of the outcome or increases it, respectively. The midpoint corresponds to no statistically significant effect detected of treatment on outcome.
+
+ <img src="../images/Risk_Difference.png"  alt="Tool generated risk difference chart." />
 
 ### Interpreting the Risk Difference Chart
 
