@@ -3,6 +3,17 @@
 
 When you complete an analysis in AIR, you will be presented with two visualizations and a brief explanation of the results.
 
+The results page requires no input but displays the entire AIR health report. The blue Download button on the lower left allows you to download a PDF summary.
+
+Clicking Reset Selections on the lower left will reset the tool while retaining the causal graph, which allows you to begin another analysis of the same uploaded data and knowledge file. Refreshing the browser will reset the tool to begin a new analysis.
+
+Layout
+Left panel: The causal graph with both x and y variables highlighted in light blue/navy blue. If additional nodes are found to be contributing significant bias, they will be highlighted in red.
+
+Top right panel: The Risk Difference chart.
+
+Bottom right panel: A custom text-based interpretation summarizing the results from all steps, generated uniquely for each session.
+
 ## Risk Difference Chart 
 
 The **Risk Difference** chart compares the average treatment effect (ATE) estimated by the AIR tool with the AI/ML model’s ATE of the experimental variable (a.k.a., “scenario variable” and “treatment variable”) on the outcome variable (a.k.a., “response variable”). The AIR tool ATE estimates are combined at the bottom of the chart into a single long horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your AI/ML model’s classifications.
