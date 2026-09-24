@@ -30,11 +30,11 @@ The x-axis of the Risk Difference chart ranges from negative to positive effect,
 
 ### Interpreting the Risk Difference Chart
 
-**BLUE arrow in GREEN region:** Statistical testing failed to find evidence of confounding bias. Consider periodically re-testing as data may change over time.
+**BLUE arrow in GREEN region:** This means that statistical testing failed to find evidence of confounding bias in the predictions from your AI/ML model. As you continue to use your model for outcome prediction, you may want to periodically re-test just in case something has changed in the data, their distribution, or their sources.
 
-**BLUE arrow in YELLOW region:** There is some evidence of bias, but it is weak or uncertain. Continue monitoring with the AIR Tool in case the arrow moves into the RED region.
+**BLUE arrow in YELLOW region:** This means that there is some evidence of bias, but it is weak/uncertain. We recommend you continue to use the AIR Tool to monitor that experimental-predicted outcome relationship in case the BLUE arrow ATE moves into the RED region, signifying that the confounding bias may have gotten worse.
 
-**BLUE arrow in RED region:** There is statistically significant evidence that your AI/ML model exhibits confounding bias. Consider obtaining better measures of the variables in the adjustment sets, gathering more training data, and retraining your classifier. Note that there is no guarantee additional training will fully de-bias the model. If the model continues to make biased predictions after retraining, you might consider modeling the bias itself and adjusting the model output accordingly.
+**BLUE arrow in RED region:** f your model’s ATE BLUE arrow is in a RED region: This means there is statistically-significant evidence that your AI/ML model exhibits confounding bias in predicting outcomes. To remedy this, you might want to consider obtaining better measures, if possible, of the other variables, as well as more training data reflecting a range of values for the variables in the adjustment sets and re-train your classifier; or even adjusting the algorithm or AI/ML modeling approach. This situation is harder to fix than the others as there is no guarantee that additional training will de-bias your AI/ML model—it may continue to underestimate or overestimate the outcome (on average). If in spite of your efforts to correct the situation, your (revised) model continues to make biased predictions, you might want to consider modeling the bias itself and adjusting the output of your model accordingly.  (This may be very hard.)
 
 ## Causal Graph
 
