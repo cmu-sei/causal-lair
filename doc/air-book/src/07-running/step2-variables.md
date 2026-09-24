@@ -8,7 +8,7 @@ The most important step is identifying both the experimental/treatment (x) and o
 
 The experimental (x) variable can be selected from variables in the data file uploaded in Step 1. Variables with no inputs or no outputs cannot be selected.
 
- <img src="../images/Select_X_drop_down.jpg"  alt="Selection of Experimental X variable" />
+ <img src="../images/Select_x_drop_down.jpg"  alt="Selection of Experimental X variable" />
   
 
 The outcome (y) variable can be selected from the causal successors of the selected experimental (x) variable.
