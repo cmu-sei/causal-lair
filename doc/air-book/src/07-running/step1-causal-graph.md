@@ -4,7 +4,8 @@ Once the AIR tool is successfully installed and open in the web browser, the fir
 
 ## Uploading Files
 
-The tool will first prompt you to upload your data file. If you are uploading time series data sorted in sequential order, select the Time Series? radio button to enable the approrpriate analysis capability. 
+The tool will first prompt you to upload your data file.
+If you are uploading time series data sorted in sequential order, select the Time Series? radio button to enable the appropriate analysis capability. 
 
  <img src="../images/Opening_screen.jpg"  alt="AIR Tool initial screen with prompt to upload." />
 
