@@ -36,7 +36,7 @@
             const path_to_root = "../";
             const default_light_theme = "light";
             const default_dark_theme = "light";
-            window.path_to_searchindex_js = "../searchindex-6dceaa6f.js";
+            window.path_to_searchindex_js = "../searchindex-3013cf5f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="../toc-f11b03f0.js"></script>
@@ -185,7 +185,7 @@
                         <h1 id="interpreting-results"><a class="header" href="#interpreting-results">Interpreting Results</a></h1>
 <p>The results page requires no input but displays the entire AIR health report. The blue <strong>Download</strong> button on the lower left allows you to download a PDF summary.</p>
 <p>Clicking <strong>Reset Selections</strong> on the lower left will reset the tool while retaining the causal graph, which allows you to begin another analysis of the same uploaded data and knowledge file. Refreshing the browser will reset the tool to begin a new analysis.</p>
-<p>More detailed information can be found in <a href="./interpreting_results.html">Interpreting AIR Results</a> and <a href="./interpretation-states.html">Interpretation States</a> provides a summary of all possible result states.</p>
+<p>More detailed information can be found in <a href="./interpretation-states.html">Interpretation States</a> provides a summary of all possible result states.</p>
 <h2 id="layout"><a class="header" href="#layout">Layout</a></h2>
 <p><strong>Left panel:</strong> The causal graph with both x and y variables highlighted in light blue/navy blue. If additional nodes are found to be contributing significant bias, they will be highlighted in red.</p>
 <p><strong>Top right panel:</strong> The Risk Difference chart.</p>
@@ -193,14 +193,17 @@
 <h2 id="risk-difference-chart"><a class="header" href="#risk-difference-chart">Risk Difference Chart</a></h2>
 <p>The Risk Difference chart compares the average treatment effect (ATE) estimated by the AIR tool with your AI/ML model’s ATE. The AIR tool ATE estimates are combined at the bottom of the chart into a single horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your model’s classifications.</p>
 <p>The x-axis ranges from negative to positive effect, where a change in treatment either decreases or increases the likelihood of the outcome, respectively. The midpoint corresponds to no statistically significant effect detected.</p>
- <img src="../images/Result with Ate of 1.jpg" alt="AIR Tool risk difference chart result." />
+ <img src="../images/Step 3 RiskDiff Dist and Success.jpg" alt="AIR Tool risk difference chart result." />
+<p>The <strong>Risk Difference</strong> chart compares the average treatment effect (ATE) estimated by the AIR tool with the AI/ML model’s ATE of the experimental variable (a.k.a., “scenario variable” and “treatment variable”) on the outcome variable (a.k.a., “response variable”). The AIR tool ATE estimates are combined at the bottom of the chart into a single long horizontal red-yellow-green bar that serves as a reference for determining whether there is bias in your AI/ML model’s classifications.</p>
+<p>The x-axis of the Risk Difference chart ranges from negative to positive effect, where a change in treatment either decreases the likelihood of the outcome or increases it, respectively. The midpoint corresponds to no statistically significant effect detected of treatment on outcome.</p>
+ <img src="../images/Risk_Difference.png" alt="Tool generated risk difference chart." />
 <h3 id="interpreting-the-risk-difference-chart"><a class="header" href="#interpreting-the-risk-difference-chart">Interpreting the Risk Difference Chart</a></h3>
-<p><strong>BLUE arrow in GREEN region:</strong> Statistical testing failed to find evidence of confounding bias. Consider periodically re-testing as data may change over time.</p>
-<p><strong>BLUE arrow in YELLOW region:</strong> There is some evidence of bias, but it is weak or uncertain. Continue monitoring with the AIR Tool in case the arrow moves into the RED region.</p>
-<p><strong>BLUE arrow in RED region:</strong> There is statistically significant evidence that your AI/ML model exhibits confounding bias. Consider obtaining better measures of the variables in the adjustment sets, gathering more training data, and retraining your classifier. Note that there is no guarantee additional training will fully de-bias the model. If the model continues to make biased predictions after retraining, you might consider modeling the bias itself and adjusting the model output accordingly.</p>
+<p><strong>BLUE arrow in GREEN region:</strong> This means that statistical testing failed to find evidence of confounding bias in the predictions from your AI/ML model. As you continue to use your model for outcome prediction, you may want to periodically re-test just in case something has changed in the data, their distribution, or their sources.</p>
+<p><strong>BLUE arrow in YELLOW region:</strong> This means that there is some evidence of bias, but it is weak/uncertain. We recommend you continue to use the AIR Tool to monitor that experimental-predicted outcome relationship in case the BLUE arrow ATE moves into the RED region, signifying that the confounding bias may have gotten worse.</p>
+<p><strong>BLUE arrow in RED region:</strong> f your model’s ATE BLUE arrow is in a RED region: This means there is statistically-significant evidence that your AI/ML model exhibits confounding bias in predicting outcomes. To remedy this, you might want to consider obtaining better measures, if possible, of the other variables, as well as more training data reflecting a range of values for the variables in the adjustment sets and re-train your classifier; or even adjusting the algorithm or AI/ML modeling approach. This situation is harder to fix than the others as there is no guarantee that additional training will de-bias your AI/ML model—it may continue to underestimate or overestimate the outcome (on average). If in spite of your efforts to correct the situation, your (revised) model continues to make biased predictions, you might want to consider modeling the bias itself and adjusting the output of your model accordingly.  (This may be very hard.)</p>
 <h2 id="causal-graph"><a class="header" href="#causal-graph">Causal Graph</a></h2>
-<p>The Causal Graph indicates which variables are likely causing confounding of the relationship between the experimental variable and the outcome variable.</p>
- <img src="../images/Results - no model, no ATE.jpg" alt="AIR Tool display when causal graph is complete." />
+<p>The Causal Graph indicates which variables are likely to be causing a confounding of the relationship between the experimental variable and the outcome variable. If your AI/ML model’s ATE is not within both of the ATE 90% confidence intervals calculated by the AIR tool, then the red variables (or their causal ancestors) are likely to be introducing bias into your model’s results.</p>
+ <img src="../images/Interpreting_results_with_explanation_boxes_for_colors.jpg" alt="AIR Tool display when causal graph is complete." />
 <ul>
 <li>If your model’s ATE is <strong>not within</strong> both AIR-calculated 95% confidence intervals, the red variables (or their causal ancestors) are likely introducing bias into your model’s results.</li>
 <li>If your model’s ATE is <strong>within</strong> the AIR-calculated 95% confidence intervals, the red nodes are simply informative for future potential bias.</li>

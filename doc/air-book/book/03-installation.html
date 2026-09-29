@@ -36,7 +36,7 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "light";
-            window.path_to_searchindex_js = "searchindex-6dceaa6f.js";
+            window.path_to_searchindex_js = "searchindex-3013cf5f.js";
         </script>
         <!-- Start loading toc.js asap -->
         <script src="toc-f11b03f0.js"></script>
@@ -194,7 +194,7 @@
 </blockquote>
 <h2 id="step-2-download-extract-and-run-the-air-tool-container-from-github"><a class="header" href="#step-2-download-extract-and-run-the-air-tool-container-from-github">Step 2: Download, Extract, and Run the AIR Tool Container from GitHub</a></h2>
 <p>In Docker Desktop, open the Terminal by clicking the button at the bottom right of the window.</p>
-<p>In the Terminal, enter the following command (replace <code>1.1.1</code> with the latest version number):</p>
+<p>In the Terminal, enter the following command (replace <code>1.8.0</code> with the latest version number):</p>
 <pre><code>docker run --rm --name airtool -it -p 4173:4173 ghcr.io/cmu-sei/airtool-dev:v1.8.0
 </code></pre>
 <p>The Terminal will indicate the progress of downloading and extracting the container. This step only downloads and extracts if there is a new container version not already downloaded. When complete, the Terminal will display a welcome message with a <code>/workspace</code> prompt.</p>
@@ -203,8 +203,8 @@
 <pre><code>scripts/run_quarto.sh
 </code></pre>
 <p>When this command completes, a URL will appear in the terminal.</p>
- <img src="./images/image1.png" alt="AIR Tool Container start up screen." />
-<h2 id="step-4-open-browaser-to-access-the-air-tool-user-interface"><a class="header" href="#step-4-open-browaser-to-access-the-air-tool-user-interface">Step 4: Open browaser to access the AIR Tool user interface</a></h2>
+ <img src="./images/Docker_AirShell_screen_with_urls.jpg" alt="AIR Tool Container start up screen." />
+<h2 id="step-4-open-browser-to-access-the-air-tool-user-interface"><a class="header" href="#step-4-open-browser-to-access-the-air-tool-user-interface">Step 4: Open browser to access the AIR Tool user interface</a></h2>
 <p>The AIR user interface is accessible on Chrome, Safari, Edge, and Firefox.</p>
 <ul>
 <li><strong>Linux OS:</strong> <code>http://172.17.0.2:4173/</code></li>
